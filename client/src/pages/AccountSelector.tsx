@@ -40,15 +40,15 @@ export default function AccountSelector() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 py-12">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-slate-900 mb-4">FinanceManager</h1>
-          <p className="text-xl text-slate-600">Selecione ou crie uma conta para continuar</p>
+    <div className="min-h-screen w-full bg-slate-50 py-6 sm:py-8 lg:py-12">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-8 sm:mb-10 lg:mb-12">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-3 sm:mb-4">FinanceManager</h1>
+          <p className="text-base sm:text-lg lg:text-xl text-slate-600">Selecione ou crie uma conta para continuar</p>
         </div>
 
-        <div className="max-w-4xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             {accounts.map((account: Account) => (
               <Card 
                 key={account.id} 

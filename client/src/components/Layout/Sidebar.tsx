@@ -44,7 +44,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="w-64 bg-white shadow-sm border-r border-slate-200 fixed h-full z-10">
+      <aside className="w-64 bg-white shadow-sm border-r border-slate-200 fixed h-full z-10 hidden lg:block">
         {/* Account Selector */}
         <div className="p-6 border-b border-slate-200">
           <DropdownMenu>
