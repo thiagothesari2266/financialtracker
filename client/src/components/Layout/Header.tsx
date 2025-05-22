@@ -8,13 +8,15 @@ interface HeaderProps {
   onPreviousMonth: () => void;
   onNextMonth: () => void;
   onAddTransaction: () => void;
+  onMenuToggle: () => void;
 }
 
 export default function Header({ 
   currentMonth, 
   onPreviousMonth, 
   onNextMonth, 
-  onAddTransaction 
+  onAddTransaction,
+  onMenuToggle 
 }: HeaderProps) {
   const { currentAccount } = useAccount();
 
@@ -34,6 +36,7 @@ export default function Header({
           <Button 
             variant="ghost" 
             size="sm"
+            onClick={onMenuToggle}
             className="lg:hidden p-2"
           >
             <Menu className="h-5 w-5 text-slate-600" />

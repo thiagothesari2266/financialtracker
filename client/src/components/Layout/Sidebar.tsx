@@ -13,7 +13,12 @@ import {
 import AccountModal from "@/components/Modals/AccountModal";
 import type { Account } from "@shared/schema";
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const [, setLocation] = useLocation();
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const { currentAccount, accounts, setCurrentAccount } = useAccount();
@@ -44,7 +49,18 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="w-64 bg-white shadow-sm border-r border-slate-200 fixed h-full z-10 hidden lg:block">
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+      
+      {/* Sidebar */}
+      <aside className={`w-64 bg-white shadow-sm border-r border-slate-200 fixed h-full z-50 transition-transform duration-300 ease-in-out ${
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      } lg:translate-x-0 lg:block`}>
         {/* Account Selector */}
         <div className="p-6 border-b border-slate-200">
           <DropdownMenu>

@@ -11,6 +11,7 @@ import TransactionModal from "@/components/Modals/TransactionModal";
 export default function Dashboard() {
   const { currentAccount } = useAccount();
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(() => {
     return new Date().toISOString().substring(0, 7); // YYYY-MM format
   });
@@ -40,7 +41,10 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <Sidebar />
+      <Sidebar 
+        isOpen={isMobileMenuOpen} 
+        onClose={() => setIsMobileMenuOpen(false)} 
+      />
       
       <main className="flex-1 lg:ml-64">
         <Header 
@@ -48,6 +52,7 @@ export default function Dashboard() {
           onPreviousMonth={handlePreviousMonth}
           onNextMonth={handleNextMonth}
           onAddTransaction={() => setIsTransactionModalOpen(true)}
+          onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
         
         <div className="p-4 sm:p-6 lg:p-8">
