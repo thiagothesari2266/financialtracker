@@ -1,0 +1,65 @@
+Crie uma aplicação web de gestão financeira com as seguintes características:
+
+---
+
+🛠️ Tecnologias:
+- Frontend: React + TypeScript + TailwindCSS
+- Backend: Node.js com Express
+- Banco de dados: PostgreSQL utilizando Prisma ORM
+- Comunicação via API RESTful
+
+---
+
+🎯 Finalidade:
+Permitir ao usuário criar e gerenciar múltiplas contas financeiras. Cada conta pode ser do tipo **pessoal** ou **empresarial**. A interface e as funcionalidades variam conforme o tipo da conta.
+
+---
+
+📌 Funcionalidade essencial: criação e gerenciamento de contas
+- O usuário pode criar novas contas financeiras
+- Cada conta possui um nome e um tipo (pessoal ou empresarial)
+- O sistema deve exibir e permitir alternância entre contas ativas
+- Ao alternar de conta, a aplicação deve carregar os dados associados à conta selecionada (transações, cartões, relatórios, etc.)
+- É possível editar ou excluir contas existentes
+
+---
+
+📊 Funcionalidades disponíveis em qualquer conta:
+1. Registro de lançamentos financeiros (entradas e saídas)
+2. Cadastro e gerenciamento de cartões de crédito com suporte a compras parceladas
+3. Dashboard mensal com:
+   - Resumo de saldo atual e previsto
+   - Gráficos de categorias e distribuição de despesas
+   - Visão segmentada por mês, tipo de transação e meio de pagamento
+
+---
+
+🏢 Funcionalidades exclusivas da conta empresarial:
+- Adição de metadados aos lançamentos, como: cliente, projeto, centro de custo
+- Estrutura flexível para futuras funcionalidades, como:
+  - Relatórios empresariais
+  - Cadastro de fornecedores
+  - Geração de documentos fiscais
+  - Controle por departamento ou área
+
+---
+
+🧩 Interface (frontend):
+- Tela de seleção ou criação de conta
+- Sidebar com menu ajustado de acordo com o tipo da conta (pessoal ou empresarial)
+- Componentes organizados em cards, com visual moderno inspirado em dashboards de CRM (ex: layout da imagem enviada)
+- Visualização responsiva com TailwindCSS, fontes claras, cantos arredondados e layout em grid
+- Uso de ícones leves e menus suspensos para ações rápidas
+
+---
+
+📁 Organização geral sugerida:
+- O sistema deve ser dividido em frontend e backend
+- A troca de contas deve ser gerenciada no frontend com React Context ou similar
+- O backend deve aceitar `accountId` em todas as rotas que manipulem dados financeiros
+- O banco de dados deve relacionar cada transação, cartão e lançamento a uma conta
+
+---
+
+🎨 Observação visual:
+Seguir o design clean e profissional, com painéis bem separados, cards coloridos para status, e organização lateral como na imagem referência (estilo CRM moderno).
