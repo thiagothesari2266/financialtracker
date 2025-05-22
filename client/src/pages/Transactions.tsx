@@ -43,8 +43,8 @@ export default function Transactions() {
   };
 
   const filteredTransactions = transactions.filter(transaction =>
-    transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    transaction.category?.name.toLowerCase().includes(searchTerm.toLowerCase())
+    transaction?.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    transaction?.category?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
