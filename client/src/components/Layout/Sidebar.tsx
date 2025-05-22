@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { ChevronDown, Plus } from "lucide-react";
 import { useAccount } from "@/contexts/AccountContext";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const { currentAccount, accounts, setCurrentAccount } = useAccount();
 
@@ -118,28 +118,19 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <ul className="space-y-2">
             {navigationItems.map((item) => (
               <li key={item.path}>
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (item.path === "/dashboard") {
-                      setLocation("/dashboard");
-                    }
-                  }}
-                  className={`flex items-center space-x-3 p-3 rounded-lg transition-colors duration-200 ${
-                    item.active
-                      ? "bg-blue-50 text-primary font-medium"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
+                <Link
+                  href={item.path}
+                  onClick={onClose}
+                  className="flex items-center space-x-3 p-3 rounded-lg transition-colors duration-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 >
                   <i className={`${item.icon} text-sm`}></i>
                   <span>{item.label}</span>
-                </a>
+                </Link>
               </li>
             ))}
 
             {/* Business Account Exclusive Features */}
-            {currentAccount.type === 'business' && (
+            {currentAccount?.type === 'business' && (
               <>
                 <li className="pt-4 border-t border-slate-200">
                   <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
