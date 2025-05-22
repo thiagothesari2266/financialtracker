@@ -37,7 +37,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const navigationItems = [
     { icon: "fas fa-chart-pie", label: "Dashboard", path: "/dashboard", active: true },
     { icon: "fas fa-exchange-alt", label: "Transações", path: "/transactions" },
-    { icon: "fas fa-credit-card", label: "Cartões", path: "/cards" },
+    { icon: "fas fa-tags", label: "Categorias", path: "/categories" },
+    { icon: "fas fa-credit-card", label: "Cartões", path: "/credit-cards" },
     { icon: "fas fa-chart-bar", label: "Relatórios", path: "/reports" },
   ];
 
