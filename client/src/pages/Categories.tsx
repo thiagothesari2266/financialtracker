@@ -1,15 +1,25 @@
 import { useState } from "react";
 import { useAccount } from "@/contexts/AccountContext";
+import { useCategories, useDeleteCategory } from "@/hooks/useCategories";
 import Sidebar from "@/components/Layout/Sidebar";
 import Header from "@/components/Layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import CategoryModal from "@/components/Modals/CategoryModal";
+import type { Category } from "@shared/schema";
 
 export default function Categories() {
   const { currentAccount } = useAccount();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const { toast } = useToast();
+  
+  const { data: categories = [], isLoading } = useCategories(currentAccount?.id || 0);
+  const deleteMutation = useDeleteCategory();
 
   if (!currentAccount) {
     return (
@@ -22,15 +32,31 @@ export default function Categories() {
     );
   }
 
-  // Categorias de exemplo para demonstração
-  const sampleCategories = [
-    { id: 1, name: "Alimentação", color: "#ef4444", icon: "🍽️", type: "expense" },
-    { id: 2, name: "Transporte", color: "#3b82f6", icon: "🚗", type: "expense" },
-    { id: 3, name: "Moradia", color: "#8b5cf6", icon: "🏠", type: "expense" },
-    { id: 4, name: "Salário", color: "#10b981", icon: "💰", type: "income" },
-    { id: 5, name: "Freelance", color: "#06b6d4", icon: "💻", type: "income" },
-    { id: 6, name: "Lazer", color: "#f59e0b", icon: "🎯", type: "expense" },
-  ];
+  const handleEdit = (category: Category) => {
+    setEditingCategory(category);
+    setIsCategoryModalOpen(true);
+  };
+
+  const handleDelete = async (categoryId: number) => {
+    if (confirm("Tem certeza que deseja excluir esta categoria?")) {
+      try {
+        await deleteMutation.mutateAsync(categoryId);
+        toast({
+          title: "Sucesso!",
+          description: "Categoria excluída com sucesso.",
+        });
+      } catch (error) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível excluir a categoria.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const incomeCategories = categories.filter(cat => cat.name.toLowerCase().includes('salário') || cat.name.toLowerCase().includes('freelance') || cat.name.toLowerCase().includes('renda'));
+  const expenseCategories = categories.filter(cat => !incomeCategories.includes(cat));
 
   return (
     <div className="flex min-h-screen bg-slate-50">
