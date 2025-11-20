@@ -6,12 +6,17 @@ import MetricsCards from "@/components/Dashboard/MetricsCards";
 import ExpenseChart from "@/components/Dashboard/ExpenseChart";
 import RecentTransactions from "@/components/Dashboard/RecentTransactions";
 import CreditCards from "@/components/Dashboard/CreditCards";
+import TopCategories from "@/components/Dashboard/TopCategories";
 import TransactionModal from "@/components/Modals/TransactionModal";
+import FinancialChat from "@/components/Chat/FinancialChat";
+import { MessageCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
   const { currentAccount } = useAccount();
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(() => {
     return new Date().toISOString().substring(0, 7); // YYYY-MM format
   });
@@ -46,11 +51,7 @@ export default function Dashboard() {
         onClose={() => setIsMobileMenuOpen(false)} 
       />
       
-      <main className="flex-1 lg:ml-64">
-        <Header 
-          currentMonth={currentMonth}
-          onPreviousMonth={handlePreviousMonth}
-          onNextMonth={handleNextMonth}
+      <main className="flex-1 lg:ml-64">        <Header 
           onAddTransaction={() => setIsTransactionModalOpen(true)}
           onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
@@ -63,16 +64,7 @@ export default function Dashboard() {
               <ExpenseChart currentMonth={currentMonth} />
             </div>
             <div>
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
-                <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-4 sm:mb-6">Top Categorias</h3>
-                <div className="space-y-4">
-                  <div className="text-center py-6 sm:py-8">
-                    <i className="fas fa-chart-pie text-3xl sm:text-4xl text-slate-400 mb-3 sm:mb-4"></i>
-                    <p className="text-sm sm:text-base text-slate-600">Estatísticas por categoria</p>
-                    <p className="text-xs sm:text-sm text-slate-500 mt-1">Baseado nas transações do mês</p>
-                  </div>
-                </div>
-              </div>
+              <TopCategories />
             </div>
           </div>
           
@@ -83,9 +75,23 @@ export default function Dashboard() {
         </div>
       </main>
 
+      {/* Botão flutuante do chat */}
+      <Button
+        onClick={() => setIsChatOpen(true)}
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg bg-primary hover:bg-blue-600 z-40"
+        size="icon"
+      >
+        <MessageCircle className="w-6 h-6" />
+      </Button>
+
       <TransactionModal 
         isOpen={isTransactionModalOpen}
         onClose={() => setIsTransactionModalOpen(false)}
+      />
+      
+      <FinancialChat 
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
       />
     </div>
   );

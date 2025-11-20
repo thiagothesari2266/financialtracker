@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { Transaction, InsertTransaction, TransactionWithCategory } from "@shared/schema";
 
-export function useTransactions(accountId: number, options?: { limit?: number; startDate?: string; endDate?: string }) {
+export function useTransactions(accountId: number, options?: { limit?: number; startDate?: string; endDate?: string; enabled?: boolean }) {
   const params = new URLSearchParams();
   if (options?.limit) params.append('limit', options.limit.toString());
   if (options?.startDate) params.append('startDate', options.startDate);
@@ -13,7 +13,13 @@ export function useTransactions(accountId: number, options?: { limit?: number; s
 
   return useQuery<TransactionWithCategory[]>({
     queryKey: ['/api/accounts', accountId, 'transactions', options],
-    enabled: !!accountId,
+    queryFn: async () => {
+      if (!accountId) return [];
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Erro ao buscar transações');
+      return response.json();
+    },
+    enabled: options?.enabled ?? !!accountId,
   });
 }
 
@@ -38,28 +44,49 @@ export function useCreateTransaction(accountId: number) {
   });
 }
 
-export function useUpdateTransaction() {
+export function useUpdateTransaction(accountId: number) {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertTransaction> }) => {
       const response = await apiRequest('PATCH', `/api/transactions/${id}`, data);
-      return response.json();
+      // Se não for 2xx, apiRequest já lança erro e o onError do mutation será chamado
+      // Se for 204 No Content, não tente fazer response.json()
+      if (response.status === 204) return { id, accountId };
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        return { ...result, accountId };
+      }
+      return { id, accountId };
     },
-    onSuccess: (transaction: Transaction) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', transaction.accountId] });
-      queryClient.invalidateQueries({ queryKey: ['/api/transactions', transaction.id] });
+    onSuccess: (data) => {
+      if (data) {
+        queryClient.invalidateQueries({ queryKey: ['/api/accounts', data.accountId] });
+        queryClient.invalidateQueries({ queryKey: ['/api/transactions', data.id] });
+      }
     },
   });
 }
 
 export function useDeleteTransaction() {
   const queryClient = useQueryClient();
-  
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (input: number | { id: number; data?: any }) => {
+      let id: number;
+      let data: any = undefined;
+      if (typeof input === 'number') {
+        id = input;
+      } else {
+        id = input.id;
+        data = input.data;
+      }
       const transaction = await queryClient.getQueryData<TransactionWithCategory>(['/api/transactions', id]);
-      await apiRequest('DELETE', `/api/transactions/${id}`);
+      if (data) {
+        await apiRequest('DELETE', `/api/transactions/${id}`, data);
+      } else {
+        await apiRequest('DELETE', `/api/transactions/${id}`);
+      }
       return transaction;
     },
     onSuccess: (transaction) => {

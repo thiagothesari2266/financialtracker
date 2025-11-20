@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run check:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm install)",
+      "Bash(cross-env:*)",
+      "Bash(npx cross-env:*)",
+      "Bash(set NODE_ENV=development)",
+      "Bash(npx tsx:*)",
+      "Bash(taskkill:*)",
+      "Bash(curl:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(sed:*)",
+      "Bash(del \"D:\\dev\\financialtracker\\client\\src\\components\\Modals\\CreditCardInvoicesModal_temp.tsx\")",
+      "Bash(rm:*)",
+      "Bash(npm run:*)",
+      "Bash(node:*)",
+      "Bash(npm start)",
+      "Bash(wmic:*)",
+      "Bash(cmd /c:*)",
+      "Bash(powershell:*)",
+      "Bash(npm install:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(mv:*)",
+      "Bash(npx dotenv -e .env tsx:*)"
+    ],
+    "deny": []
+  }
+}

@@ -3,7 +3,9 @@ import { useAccount } from "@/contexts/AccountContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CreditCard, ArrowUp, ArrowDown } from "lucide-react";
 import type { TransactionWithCategory } from "@shared/schema";
+import { getCategoryIcon, categoryColors } from "@/lib/categoryIcons";
 
 export default function RecentTransactions() {
   const { currentAccount } = useAccount();
@@ -13,8 +15,14 @@ export default function RecentTransactions() {
     enabled: !!currentAccount,
   });
 
-  const formatCurrency = (value: string) => {
-    const numValue = parseFloat(value);
+  const formatCurrency = (value: string | number) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(numValue) || numValue === null || numValue === undefined) {
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(0);
+    }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
@@ -22,8 +30,15 @@ export default function RecentTransactions() {
   };
 
   const formatDate = (date: string) => {
+    if (!date) return 'Data inválida';
     const today = new Date();
     const transactionDate = new Date(date);
+    
+    // Verifica se a data é válida
+    if (isNaN(transactionDate.getTime())) {
+      return 'Data inválida';
+    }
+    
     const diffTime = Math.abs(today.getTime() - transactionDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -38,16 +53,17 @@ export default function RecentTransactions() {
   };
 
   const getTransactionIcon = (category: any, type: string) => {
-    if (type === 'income') return "fas fa-arrow-up";
-    return category?.icon || "fas fa-exchange-alt";
+    if (type === 'income') {
+      return <ArrowUp className="w-4 h-4" style={{ color: categoryColors.income }} />;
+    }
+    if (category?.icon) {
+      return getCategoryIcon(category.icon, "w-4 h-4", categoryColors.expense);
+    }
+    return <ArrowDown className="w-4 h-4" style={{ color: categoryColors.expense }} />;
   };
 
   const getTransactionIconBg = (type: string) => {
     return type === 'income' ? "bg-green-100" : "bg-red-100";
-  };
-
-  const getTransactionIconColor = (type: string) => {
-    return type === 'income' ? "text-green-600" : "text-red-600";
   };
 
   if (isLoading) {
@@ -103,20 +119,22 @@ export default function RecentTransactions() {
               <div key={transaction.id} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-b-0">
                 <div className="flex items-center space-x-3">
                   <div className={`w-10 h-10 ${getTransactionIconBg(transaction.type)} rounded-lg flex items-center justify-center`}>
-                    <i className={`${getTransactionIcon(transaction.category, transaction.type)} ${getTransactionIconColor(transaction.type)} text-sm`}></i>
-                  </div>
-                  <div>
-                    <div className="font-medium text-slate-900">{transaction.description}</div>
+                    {getTransactionIcon(transaction.category, transaction.type)}
+                  </div>                  <div>
+                    <div className="font-medium text-slate-900">                      {(transaction as any).isInvoiceTransaction && (
+                        <CreditCard className="inline h-4 w-4 text-blue-600 mr-2" />
+                      )}
+                      {transaction.description}
+                    </div>
                     <div className="text-sm text-slate-500">
                       {transaction.category?.name || 'Sem categoria'} • {transaction.paymentMethod || 'Não especificado'}
                     </div>
                   </div>
-                </div>
-                <div className="text-right">
+                </div>                <div className="text-right">
                   <div className={`font-medium ${
                     transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                    {formatCurrency(transaction.amount)}
                   </div>
                   <div className="text-xs text-slate-500">{formatDate(transaction.date)}</div>
                 </div>

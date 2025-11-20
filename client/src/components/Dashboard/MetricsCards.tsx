@@ -18,6 +18,13 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
 
   const formatCurrency = (value: string | number) => {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    // Se o valor for NaN, null, undefined ou inválido, retorna R$ 0,00
+    if (isNaN(numValue) || numValue === null || numValue === undefined) {
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(0);
+    }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
@@ -26,9 +33,9 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
 
   const calculateProjectedBalance = () => {
     if (!stats) return 0;
-    const income = parseFloat(stats.monthlyIncome);
-    const expenses = parseFloat(stats.monthlyExpenses);
-    const currentBalance = parseFloat(stats.totalBalance);
+    const income = parseFloat(stats.monthlyIncome) || 0;
+    const expenses = parseFloat(stats.monthlyExpenses) || 0;
+    const currentBalance = parseFloat(stats.totalBalance) || 0;
     return currentBalance + income - expenses;
   };
 
@@ -64,6 +71,9 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
 
   if (!stats) return null;
 
+  const currentBalance = parseFloat(stats.totalBalance) || 0;
+  const projectedBalance = calculateProjectedBalance();
+
   const metrics = [
     {
       title: "Saldo Atual",
@@ -73,6 +83,7 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
       icon: "fas fa-wallet",
       bgColor: "bg-blue-100",
       iconColor: "text-primary",
+      isNegative: currentBalance < 0,
     },
     {
       title: "Receitas",
@@ -82,6 +93,7 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
       icon: "fas fa-arrow-up",
       bgColor: "bg-green-100",
       iconColor: "text-green-600",
+      isNegative: false,
     },
     {
       title: "Despesas",
@@ -91,15 +103,17 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
       icon: "fas fa-arrow-down",
       bgColor: "bg-red-100",
       iconColor: "text-red-600",
+      isNegative: false,
     },
     {
       title: "Saldo Previsto",
-      value: formatCurrency(calculateProjectedBalance()),
+      value: formatCurrency(projectedBalance),
       change: "+6.8%",
       changeType: "positive" as const,
       icon: "fas fa-chart-line",
       bgColor: "bg-amber-100",
       iconColor: "text-amber-600",
+      isNegative: projectedBalance < 0,
     },
   ];
 
@@ -112,6 +126,7 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
               <div>
                 <p className="text-slate-600 text-xs sm:text-sm font-medium">{metric.title}</p>
                 <p className={`text-lg sm:text-xl lg:text-2xl font-bold mt-1 ${
+                  metric.isNegative ? "text-red-600" :
                   metric.title === "Receitas" ? "text-green-600" :
                   metric.title === "Despesas" ? "text-red-600" :
                   "text-slate-900"

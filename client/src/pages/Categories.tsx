@@ -5,11 +5,12 @@ import Sidebar from "@/components/Layout/Sidebar";
 import Header from "@/components/Layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, Folder } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import CategoryModal from "@/components/Modals/CategoryModal";
 import type { Category } from "@shared/schema";
+import { getCategoryIcon, categoryColors } from "@/lib/categoryIcons";
 
 export default function Categories() {
   const { currentAccount } = useAccount();
@@ -55,8 +56,8 @@ export default function Categories() {
     }
   };
 
-  const incomeCategories = categories.filter(cat => cat.name.toLowerCase().includes('salário') || cat.name.toLowerCase().includes('freelance') || cat.name.toLowerCase().includes('renda'));
-  const expenseCategories = categories.filter(cat => !incomeCategories.includes(cat));
+  const incomeCategories = categories.filter(cat => cat.type === "income");
+  const expenseCategories = categories.filter(cat => cat.type === "expense");
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -102,7 +103,7 @@ export default function Categories() {
             <div className="text-center py-12">
               <div className="text-center">
                 <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">📂</span>
+                  <Folder className="w-8 h-8 text-slate-400" />
                 </div>
                 <h3 className="text-lg font-medium text-slate-900 mb-2">Nenhuma categoria criada</h3>
                 <p className="text-slate-600 mb-6">Comece criando sua primeira categoria para organizar suas transações</p>
@@ -137,10 +138,10 @@ export default function Categories() {
                         >
                           <div className="flex items-center space-x-3">
                             <div 
-                              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold"
-                              style={{ backgroundColor: category.color }}
+                              className="w-10 h-10 rounded-full flex items-center justify-center"
+                              style={{ backgroundColor: categoryColors.income }}
                             >
-                              {category.icon}
+                              {getCategoryIcon(category.icon, "w-5 h-5", "white")}
                             </div>
                             <div>
                               <h3 className="font-medium text-slate-900">{category.name}</h3>
@@ -190,10 +191,10 @@ export default function Categories() {
                         >
                           <div className="flex items-center space-x-3">
                             <div 
-                              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold"
-                              style={{ backgroundColor: category.color }}
+                              className="w-10 h-10 rounded-full flex items-center justify-center"
+                              style={{ backgroundColor: categoryColors.expense }}
                             >
-                              {category.icon}
+                              {getCategoryIcon(category.icon, "w-5 h-5", "white")}
                             </div>
                             <div>
                               <h3 className="font-medium text-slate-900">{category.name}</h3>

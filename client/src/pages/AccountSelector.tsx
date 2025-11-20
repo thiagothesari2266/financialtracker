@@ -6,12 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAccount } from "@/contexts/AccountContext";
 import AccountModal from "@/components/Modals/AccountModal";
+import { useUpdateAccount, useDeleteAccount } from "@/hooks/useAccounts";
+import { useTransactions } from "@/hooks/useTransactions";
 import type { Account } from "@shared/schema";
+import { AccountCard } from "./AccountCard";
+import { useQuery } from "@tanstack/react-query";
 
 export default function AccountSelector() {
   const [, setLocation] = useLocation();
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const { accounts, setCurrentAccount, isLoading } = useAccount();
+  const updateAccount = useUpdateAccount();
+  const deleteAccount = useDeleteAccount();
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
 
   const handleSelectAccount = (account: Account) => {
     setCurrentAccount(account);
@@ -26,6 +33,27 @@ export default function AccountSelector() {
     setCurrentAccount(account);
     setIsAccountModalOpen(false);
     setLocation("/dashboard");
+  };
+
+  // Busca todas as transações de todas as contas (apenas 1 por conta para checagem)
+  const { data: allTransactions = [] } = useQuery({
+    queryKey: ["all-accounts-transactions", accounts.map(a => a.id)],
+    queryFn: async () => {
+      if (!accounts.length) return [];
+      const results = await Promise.all(accounts.map(async (acc) => {
+        const res = await fetch(`/api/accounts/${acc.id}/transactions?limit=1`);
+        if (!res.ok) return { accountId: acc.id, hasTransactions: false };
+        const data = await res.json();
+        return { accountId: acc.id, hasTransactions: data.length > 0 };
+      }));
+      return results;
+    },
+    enabled: accounts.length > 0,
+  });
+
+  // Função utilitária
+  const hasTransactions = (accountId: number) => {
+    return allTransactions.find(t => t.accountId === accountId)?.hasTransactions || false;
   };
 
   if (isLoading) {
@@ -50,74 +78,30 @@ export default function AccountSelector() {
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             {accounts.map((account: Account) => (
-              <Card 
-                key={account.id} 
-                className="cursor-pointer hover:shadow-lg transition-all duration-200 border-2 hover:border-primary/50"
-                onClick={() => handleSelectAccount(account)}
-              >
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-                      <i className={`fas ${account.type === 'business' ? 'fa-building' : 'fa-user'} text-white text-lg`}></i>
-                    </div>
-                    <Badge variant={account.type === 'business' ? 'default' : 'secondary'}>
-                      {account.type === 'business' ? 'Empresarial' : 'Pessoal'}
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-xl">{account.name}</CardTitle>
-                  <CardDescription>
-                    {account.type === 'business' 
-                      ? 'Conta empresarial com recursos avançados'
-                      : 'Conta pessoal para controle financeiro individual'
-                    }
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button className="w-full" variant="outline">
-                    Acessar Conta
-                  </Button>
-                </CardContent>
-              </Card>
+              <AccountCard
+                key={account.id}
+                account={account}
+                onSelect={handleSelectAccount}
+                onEdit={setEditingAccount}
+                onDelete={(acc) => deleteAccount.mutateAsync(acc.id)}
+                hasTransactions={hasTransactions(account.id)}
+              />
             ))}
-
-            {/* Create New Account Card */}
-            <Card 
-              className="cursor-pointer hover:shadow-lg transition-all duration-200 border-2 border-dashed border-slate-300 hover:border-primary/50"
-              onClick={handleCreateAccount}
-            >
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center mb-4">
-                  <Plus className="h-8 w-8 text-slate-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">Nova Conta</h3>
-                <p className="text-sm text-slate-600 text-center">
-                  Crie uma nova conta financeira
-                </p>
-              </CardContent>
-            </Card>
           </div>
+        </div>
 
-          {accounts.length === 0 && (
-            <div className="text-center mt-12">
-              <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <i className="fas fa-wallet text-3xl text-slate-400"></i>
-              </div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-4">Nenhuma conta encontrada</h2>
-              <p className="text-slate-600 mb-8 max-w-md mx-auto">
-                Comece criando sua primeira conta financeira para gerenciar suas transações e acompanhar seu orçamento.
-              </p>
-              <Button onClick={handleCreateAccount} size="lg">
-                <Plus className="h-5 w-5 mr-2" />
-                Criar Primeira Conta
-              </Button>
-            </div>
-          )}
+        <div className="flex justify-center mt-8">
+          <Button onClick={handleCreateAccount} className="bg-primary text-white hover:bg-blue-600">
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Conta
+          </Button>
         </div>
       </div>
 
-      <AccountModal 
-        isOpen={isAccountModalOpen}
-        onClose={() => setIsAccountModalOpen(false)}
+      <AccountModal
+        isOpen={isAccountModalOpen || !!editingAccount}
+        onClose={() => { setIsAccountModalOpen(false); setEditingAccount(null); }}
+        account={editingAccount}
         onAccountCreated={handleAccountCreated}
       />
     </div>

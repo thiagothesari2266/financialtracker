@@ -1,3 +1,4 @@
+import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -39,30 +40,47 @@ interface AccountModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAccountCreated: (account: Account) => void;
+  account?: Account | null;
+  isEdit?: boolean;
 }
 
-export default function AccountModal({ isOpen, onClose, onAccountCreated }: AccountModalProps) {
+export default function AccountModal({ isOpen, onClose, onAccountCreated, account, isEdit }: AccountModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const form = useForm<z.infer<typeof accountSchema>>({
     resolver: zodResolver(accountSchema),
     defaultValues: {
-      name: "",
-      type: "personal",
+      name: account?.name || "",
+      type: account?.type || "personal",
     },
+    values: account ? { name: account.name, type: account.type } : undefined,
   });
+
+  // Atualiza o formulário ao abrir para edição
+  useEffect(() => {
+    if (account) {
+      form.reset({ name: account.name, type: account.type });
+    } else {
+      form.reset({ name: "", type: "personal" });
+    }
+  }, [account, form]);
 
   const createAccountMutation = useMutation({
     mutationFn: async (data: z.infer<typeof accountSchema>) => {
-      const response = await apiRequest('POST', '/api/accounts', data);
-      return response.json();
+      if (isEdit && account) {
+        const response = await apiRequest('PATCH', `/api/accounts/${account.id}`, data);
+        return response.json();
+      } else {
+        const response = await apiRequest('POST', '/api/accounts', data);
+        return response.json();
+      }
     },
     onSuccess: (newAccount: Account) => {
       queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
       toast({
-        title: "Sucesso",
-        description: "Conta criada com sucesso",
+        title: isEdit ? "Conta atualizada" : "Sucesso",
+        description: isEdit ? "Conta editada com sucesso" : "Conta criada com sucesso",
       });
       form.reset();
       onAccountCreated(newAccount);
@@ -70,7 +88,7 @@ export default function AccountModal({ isOpen, onClose, onAccountCreated }: Acco
     onError: (error: any) => {
       toast({
         title: "Erro",
-        description: error.message || "Erro ao criar conta",
+        description: error.message || (isEdit ? "Erro ao editar conta" : "Erro ao criar conta"),
         variant: "destructive",
       });
     },

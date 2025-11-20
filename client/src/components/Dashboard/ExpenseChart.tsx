@@ -16,19 +16,31 @@ export default function ExpenseChart({ currentMonth }: ExpenseChartProps) {
     enabled: !!currentAccount,
   });
 
-  const chartData = categoryStats
-    .filter((stat: any) => parseFloat(stat.total) > 0)
+  const safeParseFloat = (value: any): number => {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const chartData = (categoryStats as any[])
+    .filter((stat: any) => stat && stat.total && safeParseFloat(stat.total) > 0)
     .map((stat: any) => ({
-      name: stat.categoryName,
-      value: parseFloat(stat.total),
-      color: stat.color,
+      name: stat.categoryName || 'Sem nome',
+      value: safeParseFloat(stat.total),
+      color: stat.color || '#64748b',
     }));
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: string | number) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(numValue) || numValue === null || numValue === undefined) {
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(0);
+    }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
-    }).format(value);
+    }).format(numValue);
   };
 
   const CustomTooltip = ({ active, payload }: any) => {
@@ -100,7 +112,7 @@ export default function ExpenseChart({ currentMonth }: ExpenseChartProps) {
                   outerRadius={100}
                   dataKey="value"
                 >
-                  {chartData.map((entry, index) => (
+                  {chartData.map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>

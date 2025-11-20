@@ -40,6 +40,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     { icon: "fas fa-tags", label: "Categorias", path: "/categories" },
     { icon: "fas fa-credit-card", label: "Cartões", path: "/credit-cards" },
     { icon: "fas fa-chart-bar", label: "Relatórios", path: "/reports" },
+    { icon: "fas fa-university", label: "Contas Bancárias", path: "/bank-accounts" }, // Corrigido para rota correta
   ];
 
   const businessNavigationItems = [
@@ -152,6 +153,18 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 ))}
               </>
             )}
+            
+            {/* Settings Link */}
+            <li className="pt-4 mt-4 border-t border-slate-200">
+              <Link
+                href="/settings"
+                onClick={onClose}
+                className="flex items-center space-x-3 p-3 rounded-lg transition-colors duration-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              >
+                <i className="fas fa-cog text-sm"></i>
+                <span>Configurações</span>
+              </Link>
+            </li>
           </ul>
         </nav>
       </aside>

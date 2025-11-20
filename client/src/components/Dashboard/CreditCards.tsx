@@ -16,8 +16,14 @@ export default function CreditCards() {
     enabled: !!currentAccount,
   });
 
-  const formatCurrency = (value: string) => {
-    const numValue = parseFloat(value);
+  const formatCurrency = (value: string | number) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(numValue) || numValue === null || numValue === undefined) {
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(0);
+    }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
@@ -25,7 +31,7 @@ export default function CreditCards() {
   };
 
   const formatDueDate = (dueDate: number) => {
-    if (!dueDate) return '--/--';
+    if (!dueDate || isNaN(dueDate) || dueDate < 1 || dueDate > 31) return '--/--';
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
@@ -45,15 +51,6 @@ export default function CreditCards() {
     if (brandLower.includes('master')) return 'fab fa-cc-mastercard';
     if (brandLower.includes('amex') || brandLower.includes('american')) return 'fab fa-cc-amex';
     return 'fas fa-credit-card';
-  };
-
-  const getCardGradient = (index: number) => {
-    const gradients = [
-      'card-gradient-blue',
-      'card-gradient-purple',
-      'card-gradient-green',
-    ];
-    return gradients[index % gradients.length];
   };
 
   if (isLoading) {
@@ -100,13 +97,10 @@ export default function CreditCards() {
         {creditCards.length > 0 ? (
           <div className="space-y-4">
             {creditCards.map((card, index) => (
-              <div key={card.id} className={`${getCardGradient(index)} rounded-xl p-4 text-white`}>
+              <div key={card.id} className="p-0">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm opacity-90">{card.name}</span>
                   <i className={`${getBrandIcon(card.brand)} text-2xl`}></i>
-                </div>
-                <div className="font-mono text-lg tracking-wider mb-2">
-                  **** **** **** {card.lastFourDigits}
                 </div>
                 <div className="flex items-center justify-between">
                   <div>

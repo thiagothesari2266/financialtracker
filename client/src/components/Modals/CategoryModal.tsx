@@ -10,6 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { insertCategorySchema, type InsertCategory, type Category } from "@shared/schema";
 import { useCreateCategory, useUpdateCategory } from "@/hooks/useCategories";
+import { 
+  Utensils, Car, Home, DollarSign, Laptop, Target, Shirt, 
+  Heart, BookOpen, Zap, ShoppingCart, Film, Plane, Lightbulb,
+  CreditCard, Fuel, Phone, Wifi, Building, Users, Coffee,
+  Gift, Gamepad2, Music, Camera, Dumbbell, Briefcase, Handshake, Receipt
+} from "lucide-react";
 
 interface CategoryModalProps {
   isOpen: boolean;
@@ -19,34 +25,50 @@ interface CategoryModalProps {
 }
 
 const categoryIcons = [
-  { value: "🍽️", label: "Alimentação" },
-  { value: "🚗", label: "Transporte" },
-  { value: "🏠", label: "Moradia" },
-  { value: "💰", label: "Salário" },
-  { value: "💻", label: "Freelance" },
-  { value: "🎯", label: "Lazer" },
-  { value: "👕", label: "Roupas" },
-  { value: "🏥", label: "Saúde" },
-  { value: "📚", label: "Educação" },
-  { value: "⚡", label: "Utilidades" },
-  { value: "🛒", label: "Compras" },
-  { value: "🎬", label: "Entretenimento" },
-  { value: "✈️", label: "Viagens" },
-  { value: "💡", label: "Outros" }
+  { value: "Utensils", label: "Alimentação", component: Utensils },
+  { value: "Car", label: "Transporte", component: Car },
+  { value: "Home", label: "Moradia", component: Home },
+  { value: "DollarSign", label: "Salário", component: DollarSign },
+  { value: "Laptop", label: "Freelance", component: Laptop },
+  { value: "Target", label: "Lazer", component: Target },
+  { value: "Shirt", label: "Roupas", component: Shirt },
+  { value: "Heart", label: "Saúde", component: Heart },
+  { value: "BookOpen", label: "Educação", component: BookOpen },
+  { value: "Zap", label: "Utilidades", component: Zap },
+  { value: "ShoppingCart", label: "Compras", component: ShoppingCart },
+  { value: "Film", label: "Entretenimento", component: Film },
+  { value: "Plane", label: "Viagens", component: Plane },
+  { value: "CreditCard", label: "Cartão", component: CreditCard },
+  { value: "Fuel", label: "Combustível", component: Fuel },
+  { value: "Phone", label: "Telefone", component: Phone },
+  { value: "Wifi", label: "Internet", component: Wifi },
+  { value: "Building", label: "Escritório", component: Building },
+  { value: "Users", label: "Família", component: Users },
+  { value: "Coffee", label: "Café", component: Coffee },
+  { value: "Gift", label: "Presentes", component: Gift },
+  { value: "Gamepad2", label: "Jogos", component: Gamepad2 },
+  { value: "Music", label: "Música", component: Music },
+  { value: "Camera", label: "Fotografia", component: Camera },
+  { value: "Dumbbell", label: "Academia", component: Dumbbell },
+  { value: "Briefcase", label: "Negócios", component: Briefcase },
+  { value: "Handshake", label: "Empréstimos", component: Handshake },
+  { value: "Receipt", label: "Taxas", component: Receipt },
+  { value: "Lightbulb", label: "Outros", component: Lightbulb }
 ];
 
-const categoryColors = [
-  "#ef4444", "#f97316", "#f59e0b", "#eab308",
-  "#84cc16", "#22c55e", "#10b981", "#14b8a6",
-  "#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1",
-  "#8b5cf6", "#a855f7", "#d946ef", "#ec4899"
-];
+// Cores simplificadas: verde para receitas, vermelho para despesas
+const categoryColors = {
+  income: "#22c55e",  // Verde
+  expense: "#ef4444"  // Vermelho
+};
 
 export default function CategoryModal({ isOpen, onClose, accountId, category }: CategoryModalProps) {
   const { toast } = useToast();
-  const [selectedColor, setSelectedColor] = useState(category?.color || categoryColors[0]);
   const [selectedIcon, setSelectedIcon] = useState(category?.icon || categoryIcons[0].value);
   const [selectedType, setSelectedType] = useState<"income" | "expense">(category?.type || "expense");
+  
+  // Cor baseada no tipo
+  const selectedColor = categoryColors[selectedType];
 
   const createMutation = useCreateCategory(accountId);
   const updateMutation = useUpdateCategory();
@@ -56,7 +78,7 @@ export default function CategoryModal({ isOpen, onClose, accountId, category }: 
     defaultValues: {
       name: category?.name || "",
       type: category?.type || "expense",
-      color: category?.color || categoryColors[0],
+      color: category?.color || categoryColors.expense,
       icon: category?.icon || categoryIcons[0].value,
       accountId: accountId,
     },
@@ -67,26 +89,30 @@ export default function CategoryModal({ isOpen, onClose, accountId, category }: 
       form.reset({
         name: category.name,
         type: category.type,
-        color: category.color,
+        color: categoryColors[category.type],
         icon: category.icon,
         accountId: accountId,
       });
-      setSelectedColor(category.color);
       setSelectedIcon(category.icon);
       setSelectedType(category.type);
     } else {
       form.reset({
         name: "",
         type: "expense",
-        color: categoryColors[0],
+        color: categoryColors.expense,
         icon: categoryIcons[0].value,
         accountId: accountId,
       });
-      setSelectedColor(categoryColors[0]);
       setSelectedIcon(categoryIcons[0].value);
       setSelectedType("expense");
     }
   }, [category, accountId, form]);
+
+  // Sempre sincroniza o tipo selecionado com o formulário e atualiza a cor
+  useEffect(() => {
+    form.setValue("type", selectedType);
+    form.setValue("color", categoryColors[selectedType]);
+  }, [selectedType, form]);
 
   const onSubmit = async (data: InsertCategory) => {
     const categoryData = {
@@ -99,7 +125,7 @@ export default function CategoryModal({ isOpen, onClose, accountId, category }: 
 
     try {
       if (category) {
-        await updateMutation.mutateAsync({ id: category.id, ...categoryData });
+        await updateMutation.mutateAsync({ id: category.id, data: categoryData });
         toast({
           title: "Categoria atualizada!",
           description: `A categoria "${data.name}" foi atualizada com sucesso.`,
@@ -170,47 +196,54 @@ export default function CategoryModal({ isOpen, onClose, accountId, category }: 
                 <SelectTrigger>
                   <SelectValue>
                     <span className="flex items-center space-x-2">
-                      <span>{selectedIcon}</span>
-                      <span>{categoryIcons.find(icon => icon.value === selectedIcon)?.label}</span>
+                      {(() => {
+                        const iconData = categoryIcons.find(icon => icon.value === selectedIcon);
+                        const IconComponent = iconData?.component;
+                        return (
+                          <>
+                            {IconComponent && <IconComponent className="w-4 h-4" style={{ color: selectedColor }} />}
+                            <span>{iconData?.label}</span>
+                          </>
+                        );
+                      })()}
                     </span>
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {categoryIcons.map((icon) => (
-                    <SelectItem key={icon.value} value={icon.value}>
-                      <span className="flex items-center space-x-2">
-                        <span>{icon.value}</span>
-                        <span>{icon.label}</span>
-                      </span>
-                    </SelectItem>
-                  ))}
+                  {categoryIcons.map((icon) => {
+                    const IconComponent = icon.component;
+                    return (
+                      <SelectItem key={icon.value} value={icon.value}>
+                        <span className="flex items-center space-x-2">
+                          <IconComponent className="w-4 h-4" style={{ color: selectedColor }} />
+                          <span>{icon.label}</span>
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
               <Label>Cor</Label>
-              <div className="grid grid-cols-8 gap-2">
-                {categoryColors.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className={`w-8 h-8 rounded-full border-2 ${
-                      selectedColor === color ? "border-gray-800" : "border-gray-300"
-                    }`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setSelectedColor(color)}
-                  />
-                ))}
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <div 
+                  className="w-4 h-4 rounded-full" 
+                  style={{ backgroundColor: selectedColor }}
+                />
+                <span>
+                  {selectedType === 'income' ? 'Verde (Receitas)' : 'Vermelho (Despesas)'}
+                </span>
               </div>
             </div>
 
             <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+              <Button type="button" variant="outline" onClick={onClose} disabled={createMutation.isPending || updateMutation.isPending}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Salvando..." : category ? "Atualizar" : "Criar"}
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                {(createMutation.isPending || updateMutation.isPending) ? "Salvando..." : category ? "Atualizar" : "Criar"}
               </Button>
             </div>
           </form>

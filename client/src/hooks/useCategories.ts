@@ -8,7 +8,7 @@ export function useCategories(accountId: number) {
     queryFn: async () => {
       const response = await fetch(`/api/accounts/${accountId}/categories`);
       if (!response.ok) throw new Error('Failed to fetch categories');
-      return response.json() as Category[];
+      return (await response.json()) as Category[];
     },
     enabled: !!accountId,
   });
@@ -18,8 +18,8 @@ export function useCategory(id: number) {
   return useQuery({
     queryKey: ["/api/categories", id],
     queryFn: async () => {
-      const response = await apiRequest(`/api/categories/${id}`);
-      return response as Category;
+      const response = await apiRequest("GET", `/api/categories/${id}`);
+      return (await response.json()) as Category;
     },
     enabled: !!id,
   });
@@ -38,7 +38,7 @@ export function useCreateCategory(accountId: number) {
         body: JSON.stringify(data),
       });
       if (!response.ok) throw new Error('Failed to create category');
-      return response.json() as Category;
+      return (await response.json()) as Category;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories", accountId] });
@@ -48,14 +48,14 @@ export function useCreateCategory(accountId: number) {
 
 export function useUpdateCategory() {
   const queryClient = useQueryClient();
-  
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertCategory> }) => {
-      const response = await apiRequest(`/api/categories/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      });
-      return response as Category;
+      const response = await apiRequest(
+        "PATCH",
+        `/api/categories/${id}`,
+        data
+      );
+      return (await response.json()) as Category;
     },
     onSuccess: (category: Category) => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories", category.accountId] });
@@ -65,12 +65,12 @@ export function useUpdateCategory() {
 
 export function useDeleteCategory() {
   const queryClient = useQueryClient();
-  
   return useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest(`/api/categories/${id}`, {
-        method: "DELETE",
-      });
+      await apiRequest(
+        "DELETE",
+        `/api/categories/${id}`
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });

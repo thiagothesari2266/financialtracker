@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountType {
+  personal
+  business
+}
+
+enum CategoryType {
+  income
+  expense
+}
+
+enum InvoicePaymentStatus {
+  pending
+  paid
+  overdue
+}
+
+enum InvoiceImportStatus {
+  processing
+  completed
+  failed
+}
+
+enum ProjectStatus {
+  planning
+  active
+  on_hold    @map("on-hold")
+  completed
+  cancelled
+}
+
+model Account {
+  id         Int          @id @default(autoincrement())
+  name       String
+  type       AccountType
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  categories          Category[]
+  transactions        Transaction[]
+  creditCards         CreditCard[]
+  creditCardTransactions CreditCardTransaction[]
+  bankAccounts        BankAccount[]
+  invoicePayments     InvoicePayment[]
+  invoiceImports      InvoiceImport[]
+  projects            Project[]
+  costCenters         CostCenter[]
+  clients             Client[]
+
+  @@map("accounts")
+}
+
+model Category {
+  id        Int        @id @default(autoincrement())
+  name      String
+  color     String
+  icon      String
+  type      CategoryType @default(expense)
+  accountId Int          @map("account_id")
+
+  account               Account              @relation(fields: [accountId], references: [id])
+  transactions          Transaction[]
+  creditCardTransactions CreditCardTransaction[]
+
+  @@map("categories")
+}
+
+model Transaction {
+  id                   Int       @id @default(autoincrement())
+  description          String
+  amount               Decimal   @db.Decimal(12, 2)
+  type                 CategoryType
+  date                 DateTime  @db.Date
+  categoryId           Int       @map("category_id")
+  accountId            Int       @map("account_id")
+  bankAccountId        Int?      @map("bank_account_id")
+  paymentMethod        String?   @map("payment_method")
+  clientName           String?   @map("client_name")
+  projectName          String?   @map("project_name")
+  costCenter           String?   @map("cost_center")
+  installments         Int       @default(1)
+  currentInstallment   Int       @default(1) @map("current_installment")
+  installmentsGroupId  String?   @map("installments_group_id")
+  recurrenceFrequency  String?   @map("recurrence_frequency")
+  recurrenceEndDate    DateTime? @db.Date @map("recurrence_end_date")
+  launchType           String?   @map("launch_type")
+  recurrenceGroupId    String?   @map("recurrence_group_id")
+  creditCardInvoiceId  String?   @map("credit_card_invoice_id")
+  creditCardId         Int?      @map("credit_card_id")
+  isInvoiceTransaction Boolean   @default(false) @map("is_invoice_transaction")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  paid                 Boolean   @default(false)
+
+  account        Account        @relation(fields: [accountId], references: [id])
+  category       Category       @relation(fields: [categoryId], references: [id])
+  bankAccount    BankAccount?   @relation(fields: [bankAccountId], references: [id])
+  creditCard     CreditCard?    @relation("TransactionCreditCard", fields: [creditCardId], references: [id])
+  invoicePayment InvoicePayment? @relation("TransactionInvoicePayment")
+
+  @@map("transactions")
+}
+
+model CreditCard {
+  id             Int        @id @default(autoincrement())
+  name           String
+  brand          String
+  currentBalance Decimal    @default("0") @db.Decimal(12, 2) @map("current_balance")
+  creditLimit    Decimal    @db.Decimal(12, 2) @map("credit_limit")
+  dueDate        Int        @map("due_date")
+  closingDay     Int        @map("closing_day")
+  accountId      Int        @map("account_id")
+  createdAt      DateTime   @default(now()) @map("created_at")
+
+  account             Account                @relation(fields: [accountId], references: [id])
+  cardTransactions    CreditCardTransaction[] @relation("CardOwnTransactions")
+  invoicePayments     InvoicePayment[]
+  invoiceImports      InvoiceImport[]
+  transactions        Transaction[]          @relation("TransactionCreditCard")
+
+  @@map("credit_cards")
+}
+
+model CreditCardTransaction {
+  id                 Int       @id @default(autoincrement())
+  description        String
+  amount             Decimal   @db.Decimal(12, 2)
+  date               DateTime  @db.Date
+  installments       Int       @default(1)
+  currentInstallment Int       @default(1) @map("current_installment")
+  categoryId         Int       @map("category_id")
+  creditCardId       Int       @map("credit_card_id")
+  accountId          Int       @map("account_id")
+  invoiceMonth       String    @map("invoice_month")
+  clientName         String?   @map("client_name")
+  projectName        String?   @map("project_name")
+  costCenter         String?   @map("cost_center")
+  launchType         String?   @map("launch_type")
+  recurrenceFrequency String?  @map("recurrence_frequency")
+  recurrenceEndDate  DateTime? @db.Date @map("recurrence_end_date")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  account    Account   @relation(fields: [accountId], references: [id])
+  category   Category  @relation(fields: [categoryId], references: [id])
+  creditCard CreditCard @relation("CardOwnTransactions", fields: [creditCardId], references: [id])
+
+  @@map("credit_card_transactions")
+}
+
+model BankAccount {
+  id             Int       @id @default(autoincrement())
+  name           String
+  initialBalance Decimal   @default("0") @db.Decimal(12, 2) @map("initial_balance")
+  pix            String    @default("")
+  accountId      Int       @map("account_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  account      Account      @relation(fields: [accountId], references: [id])
+  transactions Transaction[]
+
+  @@map("bank_accounts")
+}
+
+model InvoicePayment {
+  id           Int                 @id @default(autoincrement())
+  creditCardId Int                 @map("credit_card_id")
+  accountId    Int                 @map("account_id")
+  invoiceMonth String              @map("invoice_month")
+  totalAmount  Decimal             @db.Decimal(12, 2) @map("total_amount")
+  dueDate      DateTime            @db.Date @map("due_date")
+  transactionId Int?               @unique @map("transaction_id")
+  status       InvoicePaymentStatus @default(pending)
+  createdAt    DateTime            @default(now()) @map("created_at")
+  paidAt       DateTime?           @map("paid_at")
+
+  account     Account     @relation(fields: [accountId], references: [id])
+  creditCard  CreditCard  @relation(fields: [creditCardId], references: [id])
+  transaction Transaction? @relation("TransactionInvoicePayment", fields: [transactionId], references: [id])
+
+  @@map("invoice_payments")
+}
+
+model InvoiceImport {
+  id                  Int                 @id @default(autoincrement())
+  creditCardId        Int                 @map("credit_card_id")
+  accountId           Int                 @map("account_id")
+  filename            String
+  fileSize            Int                 @map("file_size")
+  fileType            String              @map("file_type")
+  filePath            String              @map("file_path")
+  status              InvoiceImportStatus @default(processing)
+  extractedData       Json?               @map("extracted_data")
+  transactionsImported Int               @default(0) @map("transactions_imported")
+  errorMessage        String?            @map("error_message")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  processedAt         DateTime?          @map("processed_at")
+
+  account     Account    @relation(fields: [accountId], references: [id])
+  creditCard  CreditCard @relation(fields: [creditCardId], references: [id])
+
+  @@map("invoice_imports")
+}
+
+model Project {
+  id          Int          @id @default(autoincrement())
+  name        String
+  description String?      @map("description")
+  clientId    Int?         @map("client_id")
+  budget      Decimal?     @db.Decimal(12, 2) @map("budget")
+  startDate   DateTime?    @db.Date @map("start_date")
+  endDate     DateTime?    @db.Date @map("end_date")
+  status      ProjectStatus @default(planning)
+  accountId   Int          @map("account_id")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  account Account @relation(fields: [accountId], references: [id])
+  client  Client? @relation(fields: [clientId], references: [id])
+
+  @@map("projects")
+}
+
+model CostCenter {
+  id          Int       @id @default(autoincrement())
+  name        String
+  code        String
+  description String?    @map("description")
+  budget      Decimal?   @db.Decimal(12, 2) @map("budget")
+  department  String?    @map("department")
+  manager     String?    @map("manager")
+  accountId   Int        @map("account_id")
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@map("cost_centers")
+}
+
+model Client {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String?  @map("email")
+  phone     String?  @map("phone")
+  address   String?  @map("address")
+  document  String?  @map("document")
+  notes     String?  @map("notes")
+  accountId Int      @map("account_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  account Account  @relation(fields: [accountId], references: [id])
+  projects Project[]
+
+  @@map("clients")
+}

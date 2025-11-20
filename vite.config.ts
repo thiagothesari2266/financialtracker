@@ -28,4 +28,20 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        // Permite todos os métodos HTTP, incluindo PATCH e DELETE
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            // Apenas para log/debug, pode ser removido depois
+            console.log(`[Vite Proxy] ${req.method} ${req.url}`);
+          });
+        },
+      },
+    },
+  },
 });

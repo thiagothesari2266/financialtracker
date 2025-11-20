@@ -18,19 +18,42 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     queryKey: ['/api/accounts'],
   });
 
-  // Set the first account as current if none is selected
+  // Load saved account from localStorage or set first account as current
   useEffect(() => {
-    if (accounts.length > 0 && !currentAccount) {
-      setCurrentAccount(accounts[0]);
+    if ((accounts as Account[]).length > 0 && !currentAccount) {
+      // Try to load saved account ID from localStorage
+      const savedAccountId = localStorage.getItem('selectedAccountId');
+      
+      if (savedAccountId) {
+        // Find the saved account in the list
+        const savedAccount = (accounts as Account[]).find(
+          account => account.id === parseInt(savedAccountId)
+        );
+        
+        if (savedAccount) {
+          setCurrentAccount(savedAccount);
+          return;
+        }
+      }
+      
+      // If no saved account or saved account not found, prioritize personal account
+      const personalAccount = (accounts as Account[]).find(account => account.type === 'personal');
+      setCurrentAccount(personalAccount || (accounts as Account[])[0]);
     }
   }, [accounts, currentAccount]);
+
+  // Custom setCurrentAccount that saves to localStorage
+  const handleSetCurrentAccount = (account: Account) => {
+    setCurrentAccount(account);
+    localStorage.setItem('selectedAccountId', account.id.toString());
+  };
 
   return (
     <AccountContext.Provider
       value={{
         currentAccount,
-        accounts,
-        setCurrentAccount,
+        accounts: accounts as Account[],
+        setCurrentAccount: handleSetCurrentAccount,
         isLoading,
       }}
     >
