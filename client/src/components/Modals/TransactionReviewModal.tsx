@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -32,6 +33,8 @@ import {
   Tag
 } from "lucide-react";
 import type { CreditCard } from "@shared/schema";
+import { DatePicker } from "@/components/ui/date-picker";
+import { format, parse } from "date-fns";
 
 interface ExtractedTransaction {
   date: string;
@@ -544,25 +547,31 @@ export default function TransactionReviewModal({
                         
                         <div>
                           <Label htmlFor={`amount-${transaction.id}`}>Valor</Label>
-                          <Input
+                          <CurrencyInput
                             id={`amount-${transaction.id}`}
-                            type="number"
-                            step="0.01"
-                            value={transaction.amount}
-                            onChange={(e) => 
-                              handleEditTransaction(transaction.id, 'amount', parseFloat(e.target.value))
+                            value={
+                              typeof transaction.amount === 'number'
+                                ? transaction.amount
+                                : transaction.amount
+                                ? parseFloat(transaction.amount)
+                                : null
+                            }
+                            onValueChange={(val) =>
+                              handleEditTransaction(transaction.id, 'amount', val ?? 0)
                             }
                           />
                         </div>
                         
                         <div>
                           <Label htmlFor={`date-${transaction.id}`}>Data</Label>
-                          <Input
-                            id={`date-${transaction.id}`}
-                            type="date"
-                            value={transaction.date}
-                            onChange={(e) => 
-                              handleEditTransaction(transaction.id, 'date', e.target.value)
+                          <DatePicker
+                            date={transaction.date ? parse(transaction.date, "yyyy-MM-dd", new Date()) : undefined}
+                            onSelect={(date) =>
+                              handleEditTransaction(
+                                transaction.id,
+                                'date',
+                                date ? format(date, "yyyy-MM-dd") : ''
+                              )
                             }
                           />
                         </div>
@@ -636,12 +645,18 @@ export default function TransactionReviewModal({
                             
                             <div>
                               <Label htmlFor={`recurrence-end-${transaction.id}`}>Data Final (opcional)</Label>
-                              <Input
-                                id={`recurrence-end-${transaction.id}`}
-                                type="date"
-                                value={transaction.recurrenceEndDate || ''}
-                                onChange={(e) => 
-                                  handleEditTransaction(transaction.id, 'recurrenceEndDate', e.target.value)
+                              <DatePicker
+                                date={
+                                  transaction.recurrenceEndDate
+                                    ? parse(transaction.recurrenceEndDate, "yyyy-MM-dd", new Date())
+                                    : undefined
+                                }
+                                onSelect={(date) =>
+                                  handleEditTransaction(
+                                    transaction.id,
+                                    'recurrenceEndDate',
+                                    date ? format(date, "yyyy-MM-dd") : ''
+                                  )
                                 }
                               />
                             </div>

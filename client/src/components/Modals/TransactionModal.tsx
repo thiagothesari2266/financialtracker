@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
+import { format, parse } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -35,6 +37,7 @@ import { useBankAccounts } from "@/hooks/useBankAccounts";
 import { useCreditCards, useDeleteCreditCardTransaction, useUpdateCreditCardTransaction } from "@/hooks/useCreditCards";
 import type { Category } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
 
 // Adiciona ao schema
 const transactionSchema = z.object({
@@ -152,10 +155,6 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
      transaction.creditCardId !== undefined && 
      transaction.creditCardId !== 0);
   
-  console.log('[TransactionModal] Transação recebida:', transaction);
-  console.log('[TransactionModal] transaction.creditCardId:', transaction?.creditCardId);
-  console.log('[TransactionModal] isCreditCardTransaction:', isCreditCardTransaction);
-  
   const deleteTransactionMutation = useDeleteTransaction();
   const deleteCreditCardTransactionMutation = useDeleteCreditCardTransaction();
   const updateTransactionMutation = useUpdateTransaction(currentAccount?.id || 0);
@@ -239,9 +238,11 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
         categoryId: Number(data.categoryId),
         amount: data.amount,
         installments: data.installments ? Number(data.installments) : undefined,
+        invoiceMonth: calculateInvoiceMonth(data.date, selectedCard.closingDay),
         // Remove campos que não fazem parte do schema de cartão de crédito
         bankAccountId: undefined,
-      };      // Remove campos undefined
+      };
+      // Remove campos undefined
       Object.keys(payload).forEach(key => {
         if ((payload as any)[key] === undefined) {
           delete (payload as any)[key];
@@ -267,6 +268,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
         // Invalida queries relacionadas a cartões de crédito
         queryClient.invalidateQueries({ queryKey: ['/api/accounts', currentAccount?.id, 'credit-card-invoices'] });
         queryClient.invalidateQueries({ queryKey: ['/api/accounts', currentAccount?.id, 'credit-card-transactions'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/accounts', currentAccount?.id, 'transactions'], exact: false });
           toast({ 
           title: 'Sucesso', 
           description: `Transação lançada na fatura de ${formatInvoiceMonth(data.date, selectedCard.closingDay)}!` 
@@ -698,7 +700,8 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-md">          <DialogHeader>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-slate-900">
               {transaction ? 'Editar Transação' : 'Nova Transação'}
             </DialogTitle>
@@ -718,21 +721,21 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
           )}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descrição</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Digite a descrição..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Descrição</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Digite a descrição..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="amount"
@@ -740,18 +743,19 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                     <FormItem>
                       <FormLabel>Valor</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
+                        <CurrencyInput
                           placeholder="0,00"
-                          {...field}
+                          value={field.value ? parseFloat(field.value) : null}
+                          onValueChange={(val) => field.onChange(val == null ? "" : val.toString())}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+              </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="type"
@@ -773,9 +777,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                     </FormItem>
                   )}
                 />
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="date"
@@ -783,7 +785,10 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                     <FormItem>
                       <FormLabel>Data</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <DatePicker
+                          date={field.value ? parse(field.value, "yyyy-MM-dd", new Date()) : undefined}
+                          onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -793,36 +798,33 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                 <FormField
                   control={form.control}
                   name="categoryId"
-                  render={({ field }) => {
-                    // Filtra categorias pelo tipo selecionado no formulário
-                    const selectedType = form.watch("type");
-                    const filteredCategories = categories.filter((category) => category.type === selectedType);
-                    return (
-                      <FormItem>
-                        <FormLabel>Categoria</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {filteredCategories.map((category) => (
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Categoria</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {categories
+                            .filter((category) => category.type === form.watch("type"))
+                            .map((category) => (
                               <SelectItem key={category.id} value={category.id.toString()}>
                                 {category.name}
-                            </SelectItem>
-                          ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
 
               {/* Seleção de destino */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <FormItem>
                   <FormLabel>Lançar em</FormLabel>
                   <Select value={destinationType} onValueChange={v => setDestinationType(v as 'bank' | 'credit')}>
@@ -837,6 +839,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                     </SelectContent>
                   </Select>
                 </FormItem>
+
                 {destinationType === 'bank' && (
                   <FormField
                     control={form.control}
@@ -862,7 +865,9 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                       </FormItem>
                     )}
                   />
-                )}                {destinationType === 'credit' && (
+                )}
+
+                {destinationType === 'credit' && (
                   <FormField
                     control={form.control}
                     name="creditCardId"
@@ -870,7 +875,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                       const selectedCardId = field.value;
                       const selectedCard = selectedCardId ? creditCards.find(cc => cc.id === Number(selectedCardId)) : null;
                       const transactionDate = form.watch("date");
-                        // Calcula qual fatura será afetada
+                      // Calcula qual fatura será afetada
                       let invoiceInfo = "";
                       if (selectedCard && transactionDate) {
                         invoiceInfo = `Esta transação será lançada na fatura de ${formatInvoiceMonth(transactionDate, selectedCard.closingDay || 1)}`;
@@ -1010,7 +1015,10 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                       <FormItem>
                         <FormLabel>Até quando?</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} />
+                          <DatePicker
+                            date={field.value ? parse(field.value, "yyyy-MM-dd", new Date()) : undefined}
+                            onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

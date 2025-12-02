@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { insertCostCenterSchema, type InsertCostCenter, type CostCenter } from "@shared/schema";
@@ -177,19 +178,21 @@ export default function CostCenterModal({ isOpen, onClose, accountId, costCenter
             <FormField
               control={form.control}
               name="budget"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Orçamento</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      step="0.01"
-                      placeholder="0.00" 
-                      {...field} 
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const numericValue = field.value && !isNaN(Number(field.value)) ? Number(field.value) : null;
+                return (
+                  <FormItem>
+                    <FormLabel>Orçamento</FormLabel>
+                    <FormControl>
+                      <CurrencyInput
+                        placeholder="0,00"
+                        value={numericValue}
+                        onValueChange={(val) => field.onChange(val == null ? "" : val.toString())}
+                      />
+                    </FormControl>
+                  </FormItem>
+                );
+              }}
             />
 
             <div className="flex justify-end space-x-2 pt-4">

@@ -1,25 +1,30 @@
-import { useState } from "react";
-import { useAccount } from "@/contexts/AccountContext";
-import Sidebar from "@/components/Layout/Sidebar";
-import Header from "@/components/Layout/Header";
+import { useMemo, useState } from "react";
+import { format, parse } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { AppShell } from "@/components/Layout/AppShell";
 import MetricsCards from "@/components/Dashboard/MetricsCards";
 import ExpenseChart from "@/components/Dashboard/ExpenseChart";
 import RecentTransactions from "@/components/Dashboard/RecentTransactions";
 import CreditCards from "@/components/Dashboard/CreditCards";
 import TopCategories from "@/components/Dashboard/TopCategories";
 import TransactionModal from "@/components/Modals/TransactionModal";
-import FinancialChat from "@/components/Chat/FinancialChat";
-import { MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useAccount } from "@/contexts/AccountContext";
 
 export default function Dashboard() {
   const { currentAccount } = useAccount();
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(() => {
-    return new Date().toISOString().substring(0, 7); // YYYY-MM format
-  });
+  const [currentMonth, setCurrentMonth] = useState(() => format(new Date(), "yyyy-MM"));
+
+  const formattedMonth = useMemo(() => {
+    try {
+      const date = parse(currentMonth, "yyyy-MM", new Date());
+      return format(date, "MMMM yyyy", { locale: ptBR });
+    } catch (_) {
+      return currentMonth;
+    }
+  }, [currentMonth]);
 
   if (!currentAccount) {
     return (
@@ -33,66 +38,66 @@ export default function Dashboard() {
   }
 
   const handlePreviousMonth = () => {
-    const date = new Date(currentMonth + "-01");
+    const date = parse(currentMonth, "yyyy-MM", new Date());
     date.setMonth(date.getMonth() - 1);
-    setCurrentMonth(date.toISOString().substring(0, 7));
+    setCurrentMonth(format(date, "yyyy-MM"));
   };
 
   const handleNextMonth = () => {
-    const date = new Date(currentMonth + "-01");
+    const date = parse(currentMonth, "yyyy-MM", new Date());
     date.setMonth(date.getMonth() + 1);
-    setCurrentMonth(date.toISOString().substring(0, 7));
+    setCurrentMonth(format(date, "yyyy-MM"));
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar 
-        isOpen={isMobileMenuOpen} 
-        onClose={() => setIsMobileMenuOpen(false)} 
-      />
-      
-      <main className="flex-1 lg:ml-64">        <Header 
-          onAddTransaction={() => setIsTransactionModalOpen(true)}
-          onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        />
-        
-        <div className="p-4 sm:p-6 lg:p-8">
+    <>
+      <AppShell
+        title="Dashboard"
+        description="Resumo do mês com indicadores essenciais e atalhos compactos."
+        actions={
+          <Button size="sm" onClick={() => setIsTransactionModalOpen(true)}>
+            Nova transação
+          </Button>
+        }
+      >
+        <div className="space-y-6">
+          <div className="rounded-xl border bg-card/60 p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase text-muted-foreground">Período</p>
+                <p className="text-base font-semibold capitalize">{formattedMonth}</p>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" onClick={handlePreviousMonth}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={handleNextMonth}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
           <MetricsCards currentMonth={currentMonth} />
-          
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 mb-6 lg:mb-8">
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
             <div className="xl:col-span-2">
               <ExpenseChart currentMonth={currentMonth} />
             </div>
-            <div>
-              <TopCategories />
-            </div>
+            <TopCategories />
           </div>
-          
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             <RecentTransactions />
             <CreditCards />
           </div>
         </div>
-      </main>
+      </AppShell>
 
-      {/* Botão flutuante do chat */}
-      <Button
-        onClick={() => setIsChatOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg bg-primary hover:bg-blue-600 z-40"
-        size="icon"
-      >
-        <MessageCircle className="w-6 h-6" />
-      </Button>
-
-      <TransactionModal 
+      <TransactionModal
         isOpen={isTransactionModalOpen}
         onClose={() => setIsTransactionModalOpen(false)}
       />
-      
-      <FinancialChat 
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-      />
-    </div>
+    </>
   );
 }

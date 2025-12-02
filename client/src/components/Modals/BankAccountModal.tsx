@@ -1,8 +1,9 @@
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Button } from "@/components/ui/button";
 import { insertBankAccountSchema, type InsertBankAccount, type BankAccount } from "@shared/schema";
 
@@ -67,7 +68,17 @@ export default function BankAccountModal({ isOpen, onClose, onSaved, accountId, 
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <Input placeholder="Nome da Conta (ex: Itaú, Nubank)" {...form.register("name")} />
-          <Input placeholder="Saldo Inicial" type="number" step="0.01" {...form.register("initialBalance")} />
+          <Controller
+            control={form.control}
+            name="initialBalance"
+            render={({ field }) => (
+              <CurrencyInput
+                placeholder="Saldo Inicial"
+                value={field.value && !isNaN(Number(field.value)) ? Number(field.value) : null}
+                onValueChange={(val) => field.onChange(val == null ? "" : val.toString())}
+              />
+            )}
+          />
           <Input placeholder="Pix (chave obrigatória)" {...form.register("pix")} />
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>

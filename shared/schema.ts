@@ -25,6 +25,18 @@ export const projectStatusEnum = z.enum([
 ]);
 export type ProjectStatus = z.infer<typeof projectStatusEnum>;
 
+export const insertUserSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+export type LoginInput = z.infer<typeof loginSchema>;
+
 export const insertAccountSchema = z.object({
   name: z.string().min(1),
   type: accountTypeEnum,
@@ -68,10 +80,10 @@ export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 
 export const insertCreditCardSchema = z.object({
   name: z.string().min(1),
-  brand: z.string().min(1),
+  brand: z.string().optional(),
   accountId: z.number(),
   currentBalance: z.string().optional(),
-  creditLimit: z.string().min(1),
+  creditLimit: z.string().optional(),
   dueDate: z.number(),
   closingDay: z.number(),
 });
@@ -164,6 +176,12 @@ export const insertClientSchema = z.object({
   accountId: z.number(),
 });
 export type InsertClient = z.infer<typeof insertClientSchema>;
+
+export interface AuthenticatedUser {
+  id: number;
+  email: string;
+  createdAt: string;
+}
 
 export interface Account {
   id: number;

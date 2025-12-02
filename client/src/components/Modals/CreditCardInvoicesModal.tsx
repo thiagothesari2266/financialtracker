@@ -129,7 +129,9 @@ function CreditCardInvoicesModal({
               {cardInvoices.map((invoice: Invoice) => {
                 const isOverdue = isInvoiceOverdue(invoice);
                 const daysOverdue = getDaysOverdue(invoice);
-                const hasInstallments = invoice.transactions.some((t: any) => t.installments && t.installments > 1);
+                const hasInstallments = Array.isArray(invoice.transactions)
+                  ? invoice.transactions.some((t: any) => t.installments && t.installments > 1)
+                  : false;
                 return (
                   <Card key={`${invoice.creditCardId}-${invoice.month}`} className={`hover:shadow-lg transition-shadow ${isOverdue ? 'border-red-200 bg-red-50' : ''}`}>
                     <CardHeader className="pb-3">
@@ -152,7 +154,7 @@ function CreditCardInvoicesModal({
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-slate-600">
-                            {invoice.transactions.length} transações
+                            {(invoice.transactions?.length ?? 0)} transações
                           </Badge>
                           <Button
                             variant="outline"
@@ -196,8 +198,8 @@ function CreditCardInvoicesModal({
                         <h4 className="text-sm font-medium text-slate-700 border-b pb-1">
                           Transações desta fatura:
                         </h4>
-                        {invoice.transactions.length > 0 ? (
-                          invoice.transactions.slice(0, 3).map((transaction: any, index: number) => (
+                        {(invoice.transactions?.length ?? 0) > 0 ? (
+                            (invoice.transactions ?? []).slice(0, 3).map((transaction: any, index: number) => (
                             <div 
                               key={index}
                               className="flex items-center justify-between p-2 bg-slate-50 rounded hover:bg-slate-100 transition-colors"
@@ -246,11 +248,11 @@ function CreditCardInvoicesModal({
                             Nenhuma transação nesta fatura
                           </p>
                         )}
-                        {invoice.transactions.length > 3 && (
-                          <p className="text-xs text-slate-500 text-center pt-2">
-                            E mais {invoice.transactions.length - 3} transações...
-                          </p>
-                        )}
+                          {(invoice.transactions?.length ?? 0) > 3 && (
+                            <p className="text-xs text-slate-500 text-center pt-2">
+                              E mais {(invoice.transactions!.length - 3)} transações...
+                            </p>
+                          )}
                       </div>
                     </CardContent>
                   </Card>

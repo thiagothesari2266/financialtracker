@@ -1,18 +1,19 @@
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Button } from "@/components/ui/button";
 import { z } from "zod";
 import { useDeleteCreditCard } from "@/hooks/useCreditCards";
 
 const creditCardSchema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
-  brand: z.string().min(1, "Bandeira obrigatória"),
-  creditLimit: z.string().min(1, "Limite obrigatório"),
+  brand: z.string().optional(),
+  creditLimit: z.string().optional(),
   dueDate: z.string().min(1, "Vencimento obrigatório"),
-  closingDay: z.string().min(1, "Dia de fechamento obrigatória"),
+  closingDay: z.string().min(1, "Dia de fechamento obrigatório"),
 });
 
 type CreditCardForm = z.infer<typeof creditCardSchema>;
@@ -89,7 +90,17 @@ export default function CreditCardModal({ isOpen, onClose, onSaved, accountId, c
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <Input placeholder="Nome do Cartão" {...form.register("name")} />
           <Input placeholder="Bandeira (ex: Visa, Mastercard)" {...form.register("brand")} />
-          <Input placeholder="Limite" type="number" step="0.01" {...form.register("creditLimit")} />
+          <Controller
+            control={form.control}
+            name="creditLimit"
+            render={({ field }) => (
+              <CurrencyInput
+                placeholder="Limite"
+                value={field.value && !isNaN(Number(field.value)) ? Number(field.value) : null}
+                onValueChange={(val) => field.onChange(val == null ? "" : val.toString())}
+              />
+            )}
+          />
           <Input placeholder="Dia de vencimento" type="number" min={1} max={31} {...form.register("dueDate")} />
           <Input placeholder="Dia de fechamento" type="number" min={1} max={31} {...form.register("closingDay")} />
           <div className="flex gap-2 pt-2">

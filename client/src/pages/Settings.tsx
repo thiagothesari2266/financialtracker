@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useAccount } from "@/contexts/AccountContext";
-import Sidebar from "@/components/Layout/Sidebar";
-import Header from "@/components/Layout/Header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,10 +23,10 @@ import {
   Save
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { AppShell } from "@/components/Layout/AppShell";
 
 export default function SettingsPage() {
   const { currentAccount } = useAccount();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -176,27 +174,25 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar 
-        isOpen={isMobileMenuOpen} 
-        onClose={() => setIsMobileMenuOpen(false)} 
-      />
-      <div className="flex-1 flex flex-col min-h-screen">
-        <Header onMenuClick={() => setIsMobileMenuOpen(true)} />
-        <main className="flex-1 p-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-                <Settings className="h-8 w-8" />
-                Configurações
-              </h1>
-              <p className="text-slate-600 mt-2">
-                Gerencie suas preferências e configurações da conta
-              </p>
-            </div>
-
-            {/* Account Settings */}
-            <Card className="mb-6">
+    <AppShell
+      title="Configurações"
+      description="Gerencie suas preferências e configurações da conta"
+      actions={
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleExportData}>
+            <Download className="h-4 w-4 mr-2" />
+            Exportar dados
+          </Button>
+          <Button onClick={handleSaveAccount} disabled={updateAccountMutation.isPending}>
+            <Save className="h-4 w-4 mr-2" />
+            Salvar alterações
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-6">
+        {/* Account Settings */}
+        <Card className="mb-6">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-5 w-5" />
@@ -249,8 +245,8 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Preferences */}
-            <Card className="mb-6">
+        {/* Preferences */}
+        <Card className="mb-6">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Palette className="h-5 w-5" />
@@ -305,8 +301,8 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Notifications */}
-            <Card className="mb-6">
+        {/* Notifications */}
+        <Card className="mb-6">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Bell className="h-5 w-5" />
@@ -381,8 +377,8 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Data Management */}
-            <Card className="mb-6">
+        {/* Data Management */}
+        <Card className="mb-6">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Database className="h-5 w-5" />
@@ -458,8 +454,8 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Payment Methods */}
-            <Card>
+        {/* Payment Methods */}
+        <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CreditCard className="h-5 w-5" />
@@ -485,10 +481,8 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
-          </div>
-        </main>
+        </Card>
       </div>
-    </div>
+    </AppShell>
   );
 }

@@ -3,17 +3,15 @@ import { useAccount } from "@/contexts/AccountContext";
 import { useBankAccounts, useCreateBankAccount, useUpdateBankAccount, useDeleteBankAccount } from "@/hooks/useBankAccounts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import Sidebar from "@/components/Layout/Sidebar";
-import Header from "@/components/Layout/Header";
+import { Plus, Landmark } from "lucide-react";
 import BankAccountModal from "@/components/Modals/BankAccountModal";
 import { useToast } from "@/hooks/use-toast";
 import type { BankAccount, InsertBankAccount } from "@shared/schema";
+import { AppShell } from "@/components/Layout/AppShell";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default function BankAccounts() {
   const { currentAccount } = useAccount();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [editingBankAccount, setEditingBankAccount] = useState<BankAccount | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { data: bankAccounts = [], isLoading } = useBankAccounts(currentAccount?.id || 0);
@@ -64,57 +62,78 @@ export default function BankAccounts() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
-      <main className="flex-1 lg:ml-64">
-        <Header
-          currentMonth={new Date().toISOString().substring(0, 7)}
-          onPreviousMonth={() => {}}
-          onNextMonth={() => {}}
-          onAddTransaction={() => {}}
-          onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        />
-        <div className="p-4 sm:p-6 lg:p-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Contas Bancárias</h1>
-              <p className="text-slate-600 mt-1">Gerencie suas contas bancárias vinculadas</p>
+    <>
+      <AppShell
+        title="Contas Bancárias"
+        description="Gerencie suas contas bancárias vinculadas"
+        actions={
+          <Button onClick={() => setIsModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Conta Bancária
+          </Button>
+        }
+      >
+        <div className="space-y-6">
+          {isLoading ? (
+            <EmptyState title="Carregando contas bancárias..." className="border-dashed bg-transparent" />
+          ) : bankAccounts.length === 0 ? (
+            <EmptyState
+              icon={<Landmark className="h-10 w-10 text-slate-400" />}
+              title="Nenhuma conta bancária cadastrada"
+              description="Cadastre uma conta para acompanhar saldos e transações."
+              action={{
+                label: "Adicionar conta",
+                onClick: () => {
+                  setEditingBankAccount(null);
+                  setIsModalOpen(true);
+                },
+                variant: "outline",
+              }}
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {bankAccounts.map((ba) => (
+                <Card key={ba.id} className="relative">
+                  <CardHeader>
+                    <CardTitle className="text-xl">{ba.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mb-2 text-xs text-slate-500">Pix: {ba.pix}</div>
+                    <div className="mb-2 text-xs text-slate-500">
+                      Saldo Inicial: R$ {parseFloat(ba.initialBalance || "0").toFixed(2)}
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingBankAccount(ba);
+                          setIsModalOpen(true);
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleDeleteBankAccount(ba.id)}>
+                        Excluir
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-            <Button className="bg-primary text-white hover:bg-blue-600" onClick={() => setIsModalOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Conta Bancária
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {bankAccounts.map((ba) => (
-              <Card key={ba.id} className="relative">
-                <CardHeader>
-                  <CardTitle className="text-xl">{ba.name}</CardTitle>
-                  {/* <Badge variant="secondary" className="mt-2">{ba.bank}</Badge> */}
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xs text-slate-500 mb-2">Pix: {ba.pix}</div>
-                  <div className="text-xs text-slate-500 mb-2">Saldo Inicial: R$ {parseFloat(ba.initialBalance || '0').toFixed(2)}</div>
-                  <div className="flex gap-2 mt-4">
-                    <Button size="sm" variant="outline" onClick={() => { setEditingBankAccount(ba); setIsModalOpen(true); }}>Editar</Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleDeleteBankAccount(ba.id)}>Excluir</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-            {bankAccounts.length === 0 && !isLoading && (
-              <div className="col-span-full text-center text-slate-500 py-12">Nenhuma conta bancária cadastrada.</div>
-            )}
-          </div>
+          )}
         </div>
-      </main>
+      </AppShell>
       <BankAccountModal
         isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setEditingBankAccount(null); }}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingBankAccount(null);
+        }}
         onSaved={handleSaveBankAccount}
         accountId={currentAccount?.id || 0}
         bankAccount={editingBankAccount}
       />
-    </div>
+    </>
   );
 }

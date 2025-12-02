@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useAccount } from "@/contexts/AccountContext";
-import Sidebar from "@/components/Layout/Sidebar";
-import Header from "@/components/Layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Calendar, BarChart3, PieChart, TrendingUp, DollarSign } from "lucide-react";
@@ -23,10 +21,11 @@ import {
   LineChart,
   Line,
 } from "recharts";
+import { AppShell } from "@/components/Layout/AppShell";
+import { SummaryCard } from "@/components/ui/summary-card";
 
 export default function Reports() {
   const { currentAccount } = useAccount();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState("2025-01");
   const { toast } = useToast();
 
@@ -83,7 +82,7 @@ export default function Reports() {
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       
       const monthTransactions = transactions.filter((t: any) => 
-        t.date.startsWith(monthKey)
+        typeof t.date === "string" && t.date.startsWith(monthKey)
       );
       
       const income = monthTransactions
@@ -165,201 +164,132 @@ export default function Reports() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar 
-        isOpen={isMobileMenuOpen} 
-        onClose={() => setIsMobileMenuOpen(false)} 
-      />
-      <div className="flex-1 flex flex-col min-h-screen">
-        <Header onMenuClick={() => setIsMobileMenuOpen(true)} />
-        <main className="flex-1 p-6">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900">Relatórios</h1>
-                <p className="text-slate-600 mt-2">
-                  Análises detalhadas das suas finanças
-                </p>
-              </div>
-              <div className="flex items-center space-x-4">
-                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="2025-01">Janeiro 2025</SelectItem>
-                    <SelectItem value="2024-12">Dezembro 2024</SelectItem>
-                    <SelectItem value="2024-11">Novembro 2024</SelectItem>
-                    <SelectItem value="2024-10">Outubro 2024</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+    <AppShell
+      title="Relatórios"
+      description="Análises detalhadas das suas finanças"
+      actions={
+        <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="2025-01">Janeiro 2025</SelectItem>
+            <SelectItem value="2024-12">Dezembro 2024</SelectItem>
+            <SelectItem value="2024-11">Novembro 2024</SelectItem>
+            <SelectItem value="2024-10">Outubro 2024</SelectItem>
+          </SelectContent>
+        </Select>
+      }
+    >
+      <div className="space-y-8">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <SummaryCard
+            label="Receitas do mês"
+            value={formatCurrency(currentMonthStats.totalIncome)}
+            tone="positive"
+            icon={<TrendingUp className="h-5 w-5 text-green-600" />}
+          />
+          <SummaryCard
+            label="Despesas do mês"
+            value={formatCurrency(currentMonthStats.totalExpenses)}
+            tone="negative"
+            icon={<TrendingUp className="h-5 w-5 rotate-180 text-red-600" />}
+          />
+          <SummaryCard
+            label="Saldo total"
+            value={formatCurrency(currentMonthStats.balance)}
+            icon={<DollarSign className="h-5 w-5 text-blue-600" />}
+          />
+          <SummaryCard
+            label="Transações"
+            value={currentMonthStats.transactionCount.toString()}
+            icon={<Calendar className="h-5 w-5 text-slate-600" />}
+          />
+        </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Receitas do Mês</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-green-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">
-                    {formatCurrency(currentMonthStats.totalIncome)}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Despesas do Mês</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-red-600 rotate-180" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600">
-                    {formatCurrency(currentMonthStats.totalExpenses)}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Saldo Total</CardTitle>
-                  <DollarSign className="h-4 w-4 text-blue-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-slate-900">
-                    {formatCurrency(currentMonthStats.balance)}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Transações</CardTitle>
-                  <Calendar className="h-4 w-4 text-slate-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {currentMonthStats.transactionCount}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              {/* Expenses by Category */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Despesas por Categoria</CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleExportReport('categories')}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  {expensesByCategory.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <RechartsPieChart>
-                        <Pie
-                          data={expensesByCategory}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={100}
-                          dataKey="value"
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {expensesByCategory.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                      </RechartsPieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-[300px] text-slate-500">
-                      Nenhum dado disponível para o período
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Monthly Trend */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Tendência Mensal (Últimos 6 meses)</CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleExportReport('summary')}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={monthlySummary}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis tickFormatter={(value) => formatCurrency(value)} />
-                      <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="receitas"
-                        stroke="#22c55e"
-                        strokeWidth={2}
-                        name="Receitas"
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="despesas"
-                        stroke="#ef4444"
-                        strokeWidth={2}
-                        name="Despesas"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Monthly Comparison Bar Chart */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Comparativo Mensal - Receitas vs Despesas</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleExportReport('transactions')}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar Transações
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={monthlySummary}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis tickFormatter={(value) => formatCurrency(value)} />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Despesas por Categoria</CardTitle>
+              <Button variant="outline" size="sm" onClick={() => handleExportReport('categories')}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {expensesByCategory.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <RechartsPieChart>
+                    <Pie
+                      data={expensesByCategory}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {expensesByCategory.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
                     <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                    <Legend />
-                    <Bar dataKey="receitas" fill="#22c55e" name="Receitas" />
-                    <Bar dataKey="despesas" fill="#ef4444" name="Despesas" />
-                  </BarChart>
+                  </RechartsPieChart>
                 </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
+              ) : (
+                <div className="flex h-[300px] items-center justify-center text-slate-500">
+                  Nenhum dado disponível para o período
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Tendência Mensal (Últimos 6 meses)</CardTitle>
+              <Button variant="outline" size="sm" onClick={() => handleExportReport('summary')}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={monthlySummary}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis tickFormatter={(value) => formatCurrency(value)} />
+                  <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                  <Legend />
+                  <Line type="monotone" dataKey="receitas" stroke="#22c55e" strokeWidth={2} name="Receitas" />
+                  <Line type="monotone" dataKey="despesas" stroke="#ef4444" strokeWidth={2} name="Despesas" />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Comparativo Mensal - Receitas vs Despesas</CardTitle>
+            <Button variant="outline" size="sm" onClick={() => handleExportReport('transactions')}>
+              <Download className="mr-2 h-4 w-4" />
+              Exportar Transações
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={monthlySummary}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis tickFormatter={(value) => formatCurrency(value)} />
+                <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                <Legend />
+                <Bar dataKey="receitas" fill="#22c55e" name="Receitas" />
+                <Bar dataKey="despesas" fill="#ef4444" name="Despesas" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </AppShell>
   );
 }

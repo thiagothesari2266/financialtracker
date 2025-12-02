@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import bcrypt from "bcryptjs";
 import type {
   Prisma,
   Account as PrismaAccount,
@@ -11,6 +12,7 @@ import type {
   Project as PrismaProject,
   CostCenter as PrismaCostCenter,
   Client as PrismaClientEntity,
+  User as PrismaUser,
 } from "@prisma/client";
 import { prisma } from "./db";
 import type {
@@ -41,9 +43,14 @@ import type {
   Client,
   InsertClient,
   ClientWithProjects,
+  InsertUser,
+  AuthenticatedUser,
 } from "@shared/schema";
 
 const DATE_ONLY_LENGTH = 10;
+const INVOICE_CATEGORY_NAME = "Faturas de Cartão";
+const INVOICE_CATEGORY_COLOR = "#f87171";
+const INVOICE_CATEGORY_ICON = "CreditCard";
 
 const ensureDateString = (value: Date | string | null | undefined): string | null => {
   if (!value) return null;
@@ -73,6 +80,9 @@ const decimalToString = (value: Prisma.Decimal | string | number | null | undefi
 };
 
 const parseDateInput = (value: string): Date => {
+  if (value.includes("T")) {
+    return new Date(value);
+  }
   return new Date(`${value}T00:00:00.000Z`);
 };
 
@@ -97,6 +107,15 @@ const computeInvoiceDueDate = (invoiceMonth: string, dueDay: number): Date => {
     dueDate.setUTCDate(lastDay);
   }
   return dueDate;
+};
+
+const formatInvoiceDescription = (cardName: string, invoiceMonth: string): string => {
+  const [yearStr, monthStr] = invoiceMonth.split("-");
+  const year = Number.parseInt(yearStr, 10);
+  const month = Number.parseInt(monthStr, 10) - 1;
+  const formatter = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" });
+  const formatted = formatter.format(new Date(Date.UTC(year, month, 1)));
+  return `Fatura ${cardName} - ${formatted}`;
 };
 
 const mapAccount = (account: PrismaAccount): Account => ({
@@ -248,11 +267,24 @@ const mapClient = (client: PrismaClientEntity): Client => ({
   createdAt: ensureDateTimeString(client.createdAt) ?? "",
 });
 
+const mapUser = (user: PrismaUser): AuthenticatedUser => ({
+  id: user.id,
+  email: user.email,
+  createdAt: ensureDateTimeString(user.createdAt) ?? new Date().toISOString(),
+});
+
+const mapUserWithPassword = (user: PrismaUser): AuthenticatedUser & { passwordHash: string } => ({
+  ...mapUser(user),
+  passwordHash: user.passwordHash,
+});
+
 const sumTransactions = (transactions: Transaction[], type: "income" | "expense"): number => {
   return transactions
     .filter((t) => t.type === type)
     .reduce((acc, t) => acc + Number.parseFloat(t.amount), 0);
 };
+
+const PASSWORD_SALT_ROUNDS = 10;
 
 export interface IStorage {
   createAccount(account: InsertAccount): Promise<Account>;
@@ -322,6 +354,7 @@ export interface IStorage {
   deleteInvoicePayment(id: number): Promise<void>;
   processOverdueInvoices(accountId: number): Promise<InvoicePayment[]>;
   markInvoiceAsPaid(invoicePaymentId: number, transactionId: number): Promise<InvoicePayment | undefined>;
+  syncInvoiceTransactions(accountId: number): Promise<void>;
 
   getLegacyInvoiceTransactions(accountId: number): Promise<TransactionWithCategory[]>;
   deleteLegacyInvoiceTransactions(accountId: number): Promise<{ deletedCount: number }>;
@@ -346,6 +379,10 @@ export interface IStorage {
   updateClient(id: number, client: Partial<InsertClient>): Promise<Client | undefined>;
   deleteClient(id: number): Promise<void>;
   getClientWithProjects(clientId: number): Promise<ClientWithProjects | undefined>;
+
+  createUser(user: InsertUser): Promise<AuthenticatedUser>;
+  getUserById(id: number): Promise<AuthenticatedUser | undefined>;
+  getUserByEmail(email: string): Promise<(AuthenticatedUser & { passwordHash: string }) | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -400,24 +437,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   private async createDefaultCategories(accountId: number, accountType: string): Promise<void> {
-    const defaults: Array<Omit<InsertCategory, "accountId">> = [
-      { name: "Alimentação", color: "#3B82F6", icon: "fas fa-utensils", type: "expense" },
-      { name: "Transporte", color: "#10B981", icon: "fas fa-car", type: "expense" },
-      { name: "Saúde", color: "#EF4444", icon: "fas fa-heart", type: "expense" },
-      { name: "Lazer", color: "#8B5CF6", icon: "fas fa-gamepad", type: "expense" },
-      { name: "Educação", color: "#F59E0B", icon: "fas fa-graduation-cap", type: "expense" },
-      { name: "Casa", color: "#06B6D4", icon: "fas fa-home", type: "expense" },
-      { name: "Outros", color: "#6B7280", icon: "fas fa-ellipsis-h", type: "expense" },
+    const personalDefaults: Array<Omit<InsertCategory, "accountId">> = [
+      { name: "Alimentação", color: "#f97316", icon: "Utensils", type: "expense" },
+      { name: "Transporte", color: "#14b8a6", icon: "Car", type: "expense" },
+      { name: "Moradia", color: "#6366f1", icon: "Home", type: "expense" },
+      { name: "Saúde", color: "#ef4444", icon: "Heart", type: "expense" },
+      { name: "Educação", color: "#0ea5e9", icon: "BookOpen", type: "expense" },
+      { name: "Lazer", color: "#8b5cf6", icon: "Gamepad2", type: "expense" },
+      { name: "Compras", color: "#f472b6", icon: "ShoppingCart", type: "expense" },
+      { name: "Assinaturas", color: "#f59e0b", icon: "CreditCard", type: "expense" },
+      { name: "Salário", color: "#16a34a", icon: "DollarSign", type: "income" },
+      { name: "Investimentos", color: "#0f172a", icon: "Target", type: "income" },
     ];
 
-    if (accountType === "business") {
-      defaults.push(
-        { name: "Escritório", color: "#1F2937", icon: "fas fa-building", type: "expense" },
-        { name: "Marketing", color: "#EC4899", icon: "fas fa-bullhorn", type: "expense" },
-        { name: "Tecnologia", color: "#3B82F6", icon: "fas fa-laptop", type: "expense" },
-        { name: "Fornecedores", color: "#059669", icon: "fas fa-truck", type: "expense" },
-      );
-    }
+    const businessDefaults: Array<Omit<InsertCategory, "accountId">> = [
+      { name: "Vendas", color: "#16a34a", icon: "Receipt", type: "income" },
+      { name: "Serviços", color: "#22c55e", icon: "Handshake", type: "income" },
+      { name: "Assinaturas recorrentes", color: "#0ea5e9", icon: "Wifi", type: "income" },
+      { name: "Operacional", color: "#475569", icon: "Briefcase", type: "expense" },
+      { name: "Marketing", color: "#ec4899", icon: "Target", type: "expense" },
+      { name: "Tecnologia", color: "#3b82f6", icon: "Laptop", type: "expense" },
+      { name: "Folha de pagamento", color: "#1d4ed8", icon: "Users", type: "expense" },
+      { name: "Tributos e taxas", color: "#b45309", icon: "Receipt", type: "expense" },
+      { name: "Fornecedores", color: "#059669", icon: "Car", type: "expense" },
+      { name: "Viagens", color: "#0f766e", icon: "Plane", type: "expense" },
+      { name: "Outros custos", color: "#6b7280", icon: "Lightbulb", type: "expense" },
+    ];
+
+    const defaults = accountType === "business" ? businessDefaults : personalDefaults;
 
     await prisma.category.createMany({
       data: defaults.map((category) => ({
@@ -987,8 +1034,204 @@ export class DatabaseStorage implements IStorage {
   }
 
   private async updateAllInvoiceTransactions(accountId: number): Promise<void> {
-    // Placeholder simplificado: futuros aprimoramentos podem sincronizar transações de fatura.
-    void accountId;
+    const cards = await prisma.creditCard.findMany({ where: { accountId } });
+    const cardMap = new Map(cards.map((card) => [card.id, card]));
+    const invoiceCategory = await this.ensureInvoiceCategory(accountId);
+    const invoices = await this.buildCreditCardInvoiceSummaries(accountId);
+    const invoicePayments = await prisma.invoicePayment.findMany({ where: { accountId } });
+    const paymentMap = new Map(
+      invoicePayments.map((payment) => [`${payment.creditCardId}:${payment.invoiceMonth}`, payment]),
+    );
+
+    const existingTransactions = await prisma.transaction.findMany({
+      where: { accountId, isInvoiceTransaction: true },
+      select: { id: true, creditCardInvoiceId: true },
+      orderBy: { id: "asc" },
+    });
+    const existingMap = new Map<string, number>();
+    const duplicatesToDelete: number[] = [];
+    for (const transaction of existingTransactions) {
+      const key = transaction.creditCardInvoiceId ?? "";
+      if (!key) {
+        duplicatesToDelete.push(transaction.id);
+        continue;
+      }
+      if (existingMap.has(key)) {
+        duplicatesToDelete.push(transaction.id);
+      } else {
+        existingMap.set(key, transaction.id);
+      }
+    }
+    if (duplicatesToDelete.length > 0) {
+      await prisma.transaction.deleteMany({
+        where: { id: { in: duplicatesToDelete } },
+      });
+    }
+
+    const usedInvoiceIds = new Set<string>();
+
+    for (const invoice of invoices) {
+      const card = cardMap.get(invoice.creditCardId);
+      if (!card) continue;
+      const total = Number.parseFloat(invoice.total);
+      if (!Number.isFinite(total) || total <= 0) continue;
+
+      const invoiceId = `${card.id}-${invoice.month}`;
+      usedInvoiceIds.add(invoiceId);
+      const dueDate = computeInvoiceDueDate(invoice.month, card.dueDate);
+      const description = formatInvoiceDescription(card.name, invoice.month);
+      const paymentKey = `${card.id}:${invoice.month}`;
+      const payment = paymentMap.get(paymentKey);
+      const paid = payment?.status === "paid";
+      const amountStr = total.toFixed(2);
+
+      if (existingMap.has(invoiceId)) {
+        const txId = existingMap.get(invoiceId)!;
+        await prisma.transaction.update({
+          where: { id: txId },
+          data: {
+            description,
+            amount: amountStr,
+            date: dueDate,
+            categoryId: invoiceCategory.id,
+            type: "expense",
+            creditCardId: card.id,
+            creditCardInvoiceId: invoiceId,
+            isInvoiceTransaction: true,
+            paid,
+          },
+        });
+        if (payment && payment.transactionId !== txId) {
+          await prisma.invoicePayment.update({
+            where: { id: payment.id },
+            data: { transactionId: txId, totalAmount: amountStr },
+          });
+        }
+      } else {
+        const created = await prisma.transaction.create({
+          data: {
+            description,
+            amount: amountStr,
+            type: "expense",
+            date: dueDate,
+            categoryId: invoiceCategory.id,
+            accountId,
+            creditCardId: card.id,
+            creditCardInvoiceId: invoiceId,
+            isInvoiceTransaction: true,
+            installments: 1,
+            currentInstallment: 1,
+            paid,
+          },
+        });
+        if (payment && payment.transactionId !== created.id) {
+          await prisma.invoicePayment.update({
+            where: { id: payment.id },
+            data: { transactionId: created.id, totalAmount: amountStr },
+          });
+        }
+      }
+    }
+
+    const staleTransactions = await prisma.transaction.findMany({
+      where: {
+        accountId,
+        isInvoiceTransaction: true,
+        ...(usedInvoiceIds.size > 0 ? { creditCardInvoiceId: { notIn: Array.from(usedInvoiceIds) } } : {}),
+      },
+      select: { id: true },
+    });
+
+    if (staleTransactions.length > 0) {
+      const staleIds = staleTransactions.map((tx) => tx.id);
+      await prisma.invoicePayment.updateMany({
+        where: { transactionId: { in: staleIds } },
+        data: { transactionId: null, status: "pending", paidAt: null },
+      });
+      await prisma.transaction.deleteMany({ where: { id: { in: staleIds } } });
+    }
+  }
+
+  private async buildCreditCardInvoiceSummaries(
+    accountId: number,
+  ): Promise<
+    Array<{
+      creditCardId: number;
+      cardName: string;
+      month: string;
+      periodStart: string;
+      periodEnd: string;
+      total: number;
+      transactions: CreditCardTransactionWithCategory[];
+    }>
+  > {
+    const cards = await prisma.creditCard.findMany({ where: { accountId } });
+    const cardMap = new Map(cards.map((card) => [card.id, card]));
+    const transactions = await prisma.creditCardTransaction.findMany({
+      where: { accountId },
+      include: { category: true },
+      orderBy: [{ invoiceMonth: "asc" }, { date: "asc" }],
+    });
+
+    const invoices = new Map<
+      string,
+      {
+        creditCardId: number;
+        month: string;
+        total: number;
+        periodStart: string;
+        periodEnd: string;
+        transactions: CreditCardTransactionWithCategory[];
+      }
+    >();
+
+    for (const tx of transactions) {
+      const key = `${tx.creditCardId}:${tx.invoiceMonth}`;
+      const mapped = mapCreditCardTransaction(tx, tx.category);
+      const existing = invoices.get(key);
+      const dateStr = ensureDateString(tx.date) ?? new Date().toISOString().slice(0, DATE_ONLY_LENGTH);
+      if (existing) {
+        existing.total += Number.parseFloat(tx.amount.toString());
+        existing.periodStart = existing.periodStart < dateStr ? existing.periodStart : dateStr;
+        existing.periodEnd = existing.periodEnd > dateStr ? existing.periodEnd : dateStr;
+        existing.transactions.push(mapped);
+      } else {
+        invoices.set(key, {
+          creditCardId: tx.creditCardId,
+          month: tx.invoiceMonth,
+          total: Number.parseFloat(tx.amount.toString()),
+          periodStart: dateStr,
+          periodEnd: dateStr,
+          transactions: [mapped],
+        });
+      }
+    }
+
+    return Array.from(invoices.values()).map((invoice) => ({
+      creditCardId: invoice.creditCardId,
+      cardName: cardMap.get(invoice.creditCardId)?.name ?? "",
+      month: invoice.month,
+      periodStart: invoice.periodStart,
+      periodEnd: invoice.periodEnd,
+      total: invoice.total,
+      transactions: invoice.transactions,
+    }));
+  }
+
+  private async ensureInvoiceCategory(accountId: number): Promise<PrismaCategory> {
+    const existing = await prisma.category.findFirst({
+      where: { accountId, name: INVOICE_CATEGORY_NAME },
+    });
+    if (existing) return existing;
+    return prisma.category.create({
+      data: {
+        accountId,
+        name: INVOICE_CATEGORY_NAME,
+        color: INVOICE_CATEGORY_COLOR,
+        icon: INVOICE_CATEGORY_ICON,
+        type: "expense",
+      },
+    });
   }
 
   // Bank account methods
@@ -1040,19 +1283,24 @@ export class DatabaseStorage implements IStorage {
     const monthNumber = Number.parseInt(monthStr, 10) - 1;
     const yearNumber = Number.parseInt(year, 10);
     const startDate = new Date(Date.UTC(yearNumber, monthNumber, 1));
-    const endDate = new Date(Date.UTC(yearNumber, monthNumber + 1, 0));
+    const endDate = new Date(Date.UTC(yearNumber, monthNumber + 1, 0, 23, 59, 59, 999));
+
+    const startDateStr = `${startDate.toISOString().slice(0, DATE_ONLY_LENGTH)}T00:00:00.000Z`;
+    const endDateStr = endDate.toISOString();
 
     const monthlyTransactions = await this.getTransactionsByDateRange(
       accountId,
-      startDate.toISOString().slice(0, DATE_ONLY_LENGTH),
-      endDate.toISOString().slice(0, DATE_ONLY_LENGTH),
+      startDateStr,
+      endDateStr,
     );
 
-    const monthlyIncome = sumTransactions(monthlyTransactions, "income");
-    const monthlyExpenses = sumTransactions(monthlyTransactions, "expense");
+    const paidMonthlyTransactions = monthlyTransactions.filter((transaction) => transaction.paid);
 
-    const allTransactions = await this.getTransactions(accountId);
-    const balance = allTransactions.reduce((acc, transaction) => {
+    const monthlyIncome = sumTransactions(paidMonthlyTransactions, "income");
+    const monthlyExpenses = sumTransactions(paidMonthlyTransactions, "expense");
+
+    // Saldo considera apenas lançamentos pagos no período solicitado
+    const balance = paidMonthlyTransactions.reduce((acc, transaction) => {
       const amount = Number.parseFloat(transaction.amount);
       return transaction.type === "income" ? acc + amount : acc - amount;
     }, 0);
@@ -1062,7 +1310,7 @@ export class DatabaseStorage implements IStorage {
       totalBalance: balance.toFixed(2),
       monthlyIncome: monthlyIncome.toFixed(2),
       monthlyExpenses: monthlyExpenses.toFixed(2),
-      transactionCount: allTransactions.length,
+      transactionCount: paidMonthlyTransactions.length,
     };
   }
 
@@ -1095,27 +1343,27 @@ export class DatabaseStorage implements IStorage {
   // Invoice helpers
   async getCreditCardInvoices(
     accountId: number,
-  ): Promise<Array<{ creditCardId: number; month: string; total: string }>> {
-    const transactions = await prisma.creditCardTransaction.findMany({
-      where: { accountId },
-      select: { creditCardId: true, invoiceMonth: true, amount: true },
-    });
-
-    const totals = new Map<string, number>();
-    for (const tx of transactions) {
-      const key = `${tx.creditCardId}:${tx.invoiceMonth}`;
-      const current = totals.get(key) ?? 0;
-      totals.set(key, current + Number.parseFloat(tx.amount.toString()));
-    }
-
-    return Array.from(totals.entries()).map(([key, total]) => {
-      const [creditCardId, month] = key.split(":");
-      return {
-        creditCardId: Number.parseInt(creditCardId, 10),
-        month,
-        total: total.toFixed(2),
-      };
-    });
+  ): Promise<
+    Array<{
+      creditCardId: number;
+      cardName: string;
+      month: string;
+      periodStart: string;
+      periodEnd: string;
+      total: string;
+      transactions: CreditCardTransactionWithCategory[];
+    }>
+  > {
+    const invoices = await this.buildCreditCardInvoiceSummaries(accountId);
+    return invoices.map((invoice) => ({
+      creditCardId: invoice.creditCardId,
+      cardName: invoice.cardName,
+      month: invoice.month,
+      periodStart: invoice.periodStart,
+      periodEnd: invoice.periodEnd,
+      total: invoice.total.toFixed(2),
+      transactions: invoice.transactions,
+    }));
   }
 
   async createInvoicePayment(insertInvoicePayment: InsertInvoicePayment): Promise<InvoicePayment> {
@@ -1270,6 +1518,10 @@ export class DatabaseStorage implements IStorage {
     ]);
 
     return { deletedCount: ids.length };
+  }
+
+  async syncInvoiceTransactions(accountId: number): Promise<void> {
+    await this.updateAllInvoiceTransactions(accountId);
   }
 
   // Project methods
@@ -1495,6 +1747,27 @@ export class DatabaseStorage implements IStorage {
       totalRevenue: totalRevenue.toFixed(2),
       activeProjects: projects.filter((project) => project.status === "active").length,
     };
+  }
+
+  async createUser(insertUser: InsertUser): Promise<AuthenticatedUser> {
+    const passwordHash = await bcrypt.hash(insertUser.password, PASSWORD_SALT_ROUNDS);
+    const user = await prisma.user.create({
+      data: {
+        email: insertUser.email,
+        passwordHash,
+      },
+    });
+    return mapUser(user);
+  }
+
+  async getUserById(id: number): Promise<AuthenticatedUser | undefined> {
+    const user = await prisma.user.findUnique({ where: { id } });
+    return user ? mapUser(user) : undefined;
+  }
+
+  async getUserByEmail(email: string): Promise<(AuthenticatedUser & { passwordHash: string }) | undefined> {
+    const user = await prisma.user.findUnique({ where: { email } });
+    return user ? mapUserWithPassword(user) : undefined;
   }
 }
 

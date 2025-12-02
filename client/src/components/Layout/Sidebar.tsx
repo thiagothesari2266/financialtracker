@@ -1,179 +1,94 @@
-import { useState } from "react";
-import { useLocation, Link } from "wouter";
-import { ChevronDown, Plus } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { useAccount } from "@/contexts/AccountContext";
-import { Button } from "@/components/ui/button";
+import { AccountSwitcher } from "./AccountSwitcher";
+import { cn } from "@/lib/utils";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import AccountModal from "@/components/Modals/AccountModal";
-import type { Account } from "@shared/schema";
+  LayoutDashboard,
+  Receipt,
+  Tags,
+  CreditCard,
+  FileSpreadsheet,
+  Landmark,
+  Layers3,
+  Building2,
+  Settings2,
+} from "lucide-react";
 
 interface SidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
 }
 
+const navItems = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Transações", href: "/transactions", icon: Receipt },
+  { label: "Categorias", href: "/categories", icon: Tags },
+  { label: "Cartões", href: "/credit-cards", icon: CreditCard },
+  { label: "Faturas", href: "/credit-card-invoice", icon: FileSpreadsheet },
+  { label: "Relatórios", href: "/reports", icon: FileSpreadsheet },
+  { label: "Contas Bancárias", href: "/bank-accounts", icon: Landmark },
+  { label: "Projetos", href: "/projects", icon: Layers3 },
+  { label: "Centro de Custo", href: "/cost-centers", icon: Building2 },
+  { label: "Configurações", href: "/settings", icon: Settings2 },
+];
+
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
-  const [location, setLocation] = useLocation();
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
-  const { currentAccount, accounts, setCurrentAccount } = useAccount();
-
-  const handleAccountSelect = (account: Account) => {
-    setCurrentAccount(account);
-  };
-
-  const handleAccountCreated = (account: Account) => {
-    setCurrentAccount(account);
-    setIsAccountModalOpen(false);
-  };
+  const [location] = useLocation();
+  const { currentAccount } = useAccount();
 
   if (!currentAccount) return null;
 
-  const navigationItems = [
-    { icon: "fas fa-chart-pie", label: "Dashboard", path: "/dashboard", active: true },
-    { icon: "fas fa-exchange-alt", label: "Transações", path: "/transactions" },
-    { icon: "fas fa-tags", label: "Categorias", path: "/categories" },
-    { icon: "fas fa-credit-card", label: "Cartões", path: "/credit-cards" },
-    { icon: "fas fa-chart-bar", label: "Relatórios", path: "/reports" },
-    { icon: "fas fa-university", label: "Contas Bancárias", path: "/bank-accounts" }, // Corrigido para rota correta
-  ];
-
-  const businessNavigationItems = [
-    { icon: "fas fa-users", label: "Clientes", path: "/clients" },
-    { icon: "fas fa-project-diagram", label: "Projetos", path: "/projects" },
-    { icon: "fas fa-building", label: "Centro de Custo", path: "/cost-centers" },
-  ];
-
   return (
     <>
-      {/* Mobile Overlay */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
           onClick={onClose}
+          aria-hidden="true"
         />
       )}
-      
-      {/* Sidebar */}
-      <aside className={`w-64 bg-white shadow-sm border-r border-slate-200 fixed h-full z-50 transition-transform duration-300 ease-in-out ${
-        isOpen ? 'translate-x-0' : '-translate-x-full'
-      } lg:translate-x-0 lg:block`}>
-        {/* Account Selector */}
-        <div className="p-6 border-b border-slate-200">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="outline" 
-                className="w-full justify-between p-3 h-auto bg-slate-50 hover:bg-slate-100"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                    <i className={`fas ${currentAccount.type === 'business' ? 'fa-building' : 'fa-user'} text-white text-sm`}></i>
-                  </div>
-                  <div className="text-left">
-                    <div className="font-medium text-slate-900 text-sm">{currentAccount.name}</div>
-                    <div className="text-xs text-slate-500">
-                      {currentAccount.type === 'business' ? 'Empresarial' : 'Pessoal'}
-                    </div>
-                  </div>
-                </div>
-                <ChevronDown className="h-4 w-4 text-slate-400" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="start">
-              {accounts.map((account: Account) => (
-                <DropdownMenuItem 
-                  key={account.id}
-                  onClick={() => handleAccountSelect(account)}
-                  className="flex items-center space-x-3 p-3"
-                >
-                  <div className={`w-6 h-6 ${account.type === 'business' ? 'bg-primary' : 'bg-secondary'} rounded flex items-center justify-center`}>
-                    <i className={`fas ${account.type === 'business' ? 'fa-building' : 'fa-user'} text-white text-xs`}></i>
-                  </div>
-                  <div className="text-left">
-                    <div className="font-medium text-slate-900">{account.name}</div>
-                    <div className="text-xs text-slate-500">
-                      {account.type === 'business' ? 'Empresarial' : 'Pessoal'}
-                    </div>
-                  </div>
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={() => setIsAccountModalOpen(true)}
-                className="flex items-center space-x-3 p-3 text-primary"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="font-medium">Nova Conta</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        {/* Navigation Menu */}
-        <nav className="p-4">
-          <ul className="space-y-2">
-            {navigationItems.map((item) => (
-              <li key={item.path}>
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-64 border-r border-sidebar-border bg-sidebar transition-transform duration-200 ease-out",
+          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+        )}
+      >
+        <div className="flex h-full flex-col p-4">
+          <div className="mb-4">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+              Financial Tracker
+            </p>
+          </div>
+          <div className="mb-4">
+            <AccountSwitcher />
+          </div>
+          <nav className="flex-1 space-y-1 overflow-y-auto">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location === item.href;
+              return (
                 <Link
-                  href={item.path}
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center rounded-lg px-3 py-2 text-sm transition-colors",
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  )}
                   onClick={onClose}
-                  className="flex items-center space-x-3 p-3 rounded-lg transition-colors duration-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 >
-                  <i className={`${item.icon} text-sm`}></i>
-                  <span>{item.label}</span>
+                  <Icon className="mr-2 h-4 w-4" />
+                  {item.label}
                 </Link>
-              </li>
-            ))}
-
-            {/* Business Account Exclusive Features */}
-            {currentAccount?.type === 'business' && (
-              <>
-                <li className="pt-4 border-t border-slate-200">
-                  <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
-                    Empresarial
-                  </div>
-                </li>
-                {businessNavigationItems.map((item) => (
-                  <li key={item.path}>
-                    <a
-                      href="#"
-                      onClick={(e) => e.preventDefault()}
-                      className="flex items-center space-x-3 p-3 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors duration-200"
-                    >
-                      <i className={`${item.icon} text-sm`}></i>
-                      <span>{item.label}</span>
-                    </a>
-                  </li>
-                ))}
-              </>
-            )}
-            
-            {/* Settings Link */}
-            <li className="pt-4 mt-4 border-t border-slate-200">
-              <Link
-                href="/settings"
-                onClick={onClose}
-                className="flex items-center space-x-3 p-3 rounded-lg transition-colors duration-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              >
-                <i className="fas fa-cog text-sm"></i>
-                <span>Configurações</span>
-              </Link>
-            </li>
-          </ul>
-        </nav>
+              );
+            })}
+          </nav>
+          <div className="mt-4 rounded-lg border border-sidebar-border bg-muted/40 p-3 text-xs text-muted-foreground">
+            Layout compacto ativo para {currentAccount.name}.
+          </div>
+        </div>
       </aside>
-
-      <AccountModal 
-        isOpen={isAccountModalOpen}
-        onClose={() => setIsAccountModalOpen(false)}
-        onAccountCreated={handleAccountCreated}
-      />
     </>
   );
 }

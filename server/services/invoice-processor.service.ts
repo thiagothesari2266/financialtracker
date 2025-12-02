@@ -154,144 +154,34 @@ async function persistTransactions(
   return result.count;
 }
 
-export async function processInvoice(request: ProcessInvoiceRequest): Promise<ProcessInvoiceResult> {
+type Base64Supplier = () => Promise<string[]>;
+
+async function runInvoiceImport({
+  request,
+  importMeta,
+  getBase64Images,
+  messages,
+  cleanup,
+}: {
+  request: { creditCardId: number; accountId: number };
+  importMeta: { filename: string; fileSize: number; fileType: string; filePath: string };
+  getBase64Images: Base64Supplier;
+  messages: { emptyBase64: string; noTransactions: string };
+  cleanup?: () => void | Promise<void>;
+}): Promise<ProcessInvoiceResult> {
   const importRecord = await createImportRecord({
     accountId: request.accountId,
     creditCardId: request.creditCardId,
-    filename: request.filename,
-    fileSize: request.fileSize,
-    fileType: request.fileType,
-    filePath: request.filePath,
+    filename: importMeta.filename,
+    fileSize: importMeta.fileSize,
+    fileType: importMeta.fileType,
+    filePath: importMeta.filePath,
   });
 
   try {
-    const { imageBase64 } = await processFile(request.filePath, request.fileType);
-    if (!imageBase64) {
-      throw new Error("Não foi possível processar a imagem enviada");
-    }
-
-    const analysisResult = await analyzeInvoiceImage(imageBase64);
-    if (!analysisResult.transactions || analysisResult.transactions.length === 0) {
-      throw new Error("Nenhuma transação foi identificada na fatura");
-    }
-
-    const { categories, map } = await buildCategoryMap(request.accountId);
-    const fallbackCategoryId = categories[0].id;
-    const payload = buildTransactionPayload(analysisResult, request, map, fallbackCategoryId);
-    const insertedCount = await persistTransactions(payload);
-
-    await finalizeImport(importRecord.id, "completed", {
-      extractedData: analysisResult,
-      transactionsImported: insertedCount,
-    });
-
-    cleanupTempFile(request.filePath);
-
-    return {
-      importId: importRecord.id,
-      success: true,
-      transactionsCount: insertedCount,
-      extractedData: analysisResult,
-    };
-  } catch (error) {
-    await finalizeImport(importRecord.id, "failed", {
-      errorMessage: error instanceof Error ? error.message : "Erro desconhecido",
-    });
-    cleanupTempFile(request.filePath);
-
-    return {
-      importId: importRecord.id,
-      success: false,
-      transactionsCount: 0,
-      error: error instanceof Error ? error.message : "Erro desconhecido",
-    };
-  }
-}
-
-export async function processImageFromBuffer(
-  request: ProcessImageBufferRequest,
-): Promise<ProcessInvoiceResult> {
-  const importRecord = await createImportRecord({
-    accountId: request.accountId,
-    creditCardId: request.creditCardId,
-    filename: request.filename,
-    fileSize: request.imageBuffer.length,
-    fileType: request.fileType,
-    filePath: "clipboard-image",
-  });
-
-  try {
-    const { imageBase64 } = await processImageBuffer(request.imageBuffer, request.fileType);
-    if (!imageBase64) {
-      throw new Error("Não foi possível processar a imagem colada");
-    }
-
-    const analysisResult = await analyzeInvoiceImage(imageBase64);
-    if (!analysisResult.transactions || analysisResult.transactions.length === 0) {
-      throw new Error("Nenhuma transação foi identificada na fatura");
-    }
-
-    const { categories, map } = await buildCategoryMap(request.accountId);
-    const fallbackCategoryId = categories[0].id;
-    const payload = buildTransactionPayload(analysisResult, request, map, fallbackCategoryId);
-    const insertedCount = await persistTransactions(payload);
-
-    await finalizeImport(importRecord.id, "completed", {
-      extractedData: analysisResult,
-      transactionsImported: insertedCount,
-    });
-
-    return {
-      importId: importRecord.id,
-      success: true,
-      transactionsCount: insertedCount,
-      extractedData: analysisResult,
-    };
-  } catch (error) {
-    await finalizeImport(importRecord.id, "failed", {
-      errorMessage: error instanceof Error ? error.message : "Erro desconhecido",
-    });
-
-    return {
-      importId: importRecord.id,
-      success: false,
-      transactionsCount: 0,
-      error: error instanceof Error ? error.message : "Erro desconhecido",
-    };
-  }
-}
-
-export async function processMultipleImages(
-  request: ProcessMultipleImagesRequest,
-): Promise<ProcessInvoiceResult> {
-  const totalSize = request.fileSizes.reduce((sum, size) => sum + size, 0);
-  const importRecord = await createImportRecord({
-    accountId: request.accountId,
-    creditCardId: request.creditCardId,
-    filename: `${request.filenames.length} imagens: ${request.filenames.join(", ")}`,
-    fileSize: totalSize,
-    fileType: "multiple-images",
-    filePath: request.filePaths.join(";"),
-  });
-
-  try {
-    const base64Images: string[] = [];
-
-    for (let index = 0; index < request.filePaths.length; index++) {
-      const filePath = request.filePaths[index];
-      const fileType = request.fileTypes[index];
-      try {
-        const { imageBase64 } = await processFile(filePath, fileType);
-        if (imageBase64) {
-          base64Images.push(imageBase64);
-        }
-      } finally {
-        cleanupTempFile(filePath);
-      }
-    }
-
+    const base64Images = await getBase64Images();
     if (base64Images.length === 0) {
-      throw new Error("Não foi possível processar nenhuma das imagens enviadas");
+      throw new Error(messages.emptyBase64);
     }
 
     const analysisResult =
@@ -300,7 +190,7 @@ export async function processMultipleImages(
         : await analyzeMultipleInvoiceImages(base64Images);
 
     if (!analysisResult.transactions || analysisResult.transactions.length === 0) {
-      throw new Error("Nenhuma transação foi identificada nas imagens");
+      throw new Error(messages.noTransactions);
     }
 
     const { categories, map } = await buildCategoryMap(request.accountId);
@@ -330,7 +220,95 @@ export async function processMultipleImages(
       transactionsCount: 0,
       error: error instanceof Error ? error.message : "Erro desconhecido",
     };
+  } finally {
+    await cleanup?.();
   }
+}
+
+export async function processInvoice(request: ProcessInvoiceRequest): Promise<ProcessInvoiceResult> {
+  return runInvoiceImport({
+    request,
+    importMeta: {
+      filename: request.filename,
+      fileSize: request.fileSize,
+      fileType: request.fileType,
+      filePath: request.filePath,
+    },
+    messages: {
+      emptyBase64: "Não foi possível processar a imagem enviada",
+      noTransactions: "Nenhuma transação foi identificada na fatura",
+    },
+    getBase64Images: async () => {
+      const { imageBase64 } = await processFile(request.filePath, request.fileType);
+      if (!imageBase64) {
+        throw new Error("Não foi possível processar a imagem enviada");
+      }
+      return [imageBase64];
+    },
+    cleanup: () => cleanupTempFile(request.filePath),
+  });
+}
+
+export async function processImageFromBuffer(
+  request: ProcessImageBufferRequest,
+): Promise<ProcessInvoiceResult> {
+  return runInvoiceImport({
+    request,
+    importMeta: {
+      filename: request.filename,
+      fileSize: request.imageBuffer.length,
+      fileType: request.fileType,
+      filePath: "clipboard-image",
+    },
+    messages: {
+      emptyBase64: "Não foi possível processar a imagem colada",
+      noTransactions: "Nenhuma transação foi identificada na fatura",
+    },
+    getBase64Images: async () => {
+      const { imageBase64 } = await processImageBuffer(request.imageBuffer, request.fileType);
+      if (!imageBase64) {
+        throw new Error("Não foi possível processar a imagem colada");
+      }
+      return [imageBase64];
+    },
+  });
+}
+
+export async function processMultipleImages(
+  request: ProcessMultipleImagesRequest,
+): Promise<ProcessInvoiceResult> {
+  const totalSize = request.fileSizes.reduce((sum, size) => sum + size, 0);
+
+  return runInvoiceImport({
+    request,
+    importMeta: {
+      filename: `${request.filenames.length} imagens: ${request.filenames.join(", ")}`,
+      fileSize: totalSize,
+      fileType: "multiple-images",
+      filePath: request.filePaths.join(";"),
+    },
+    messages: {
+      emptyBase64: "Não foi possível processar nenhuma das imagens enviadas",
+      noTransactions: "Nenhuma transação foi identificada nas imagens",
+    },
+    getBase64Images: async () => {
+      const base64Images: string[] = [];
+
+      for (let index = 0; index < request.filePaths.length; index++) {
+        const filePath = request.filePaths[index];
+        const fileType = request.fileTypes[index];
+        const { imageBase64 } = await processFile(filePath, fileType);
+        if (imageBase64) {
+          base64Images.push(imageBase64);
+        }
+      }
+
+      return base64Images;
+    },
+    cleanup: () => {
+      request.filePaths.forEach((filePath) => cleanupTempFile(filePath));
+    },
+  });
 }
 
 function findMatchingCategory(

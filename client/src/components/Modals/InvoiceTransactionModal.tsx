@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar, CreditCard, Receipt, Eye } from "lucide-react";
@@ -12,6 +11,7 @@ import { useLocation } from "wouter";
 import { useAccount } from "@/contexts/AccountContext";
 import { useCreditCards } from "@/hooks/useCreditCards";
 import type { TransactionWithCategory } from "@shared/schema";
+import { DatePicker } from "@/components/ui/date-picker";
 
 interface InvoiceTransactionModalProps {
   isOpen: boolean;
@@ -57,17 +57,31 @@ export default function InvoiceTransactionModal({
   const calculateDueDate = (creditCardInvoiceId: string, dueDate: number): string => {
     const invoiceIdParts = creditCardInvoiceId.split('-');
     if (invoiceIdParts.length >= 3) {
-      const year = parseInt(invoiceIdParts[1]);
-      const month = parseInt(invoiceIdParts[2]);
-      
-      // Criar a data de vencimento para o mês da fatura
-      const dueDateObj = new Date(year, month - 1, dueDate);
-      return format(dueDateObj, "yyyy-MM-dd");
+      const year = Number(invoiceIdParts[1]);
+      const month = Number(invoiceIdParts[2]);
+      const dueDay = Number(dueDate);
+
+      if (
+        Number.isFinite(year) &&
+        Number.isFinite(month) &&
+        Number.isFinite(dueDay) &&
+        month >= 1 &&
+        month <= 12 &&
+        dueDay >= 1 &&
+        dueDay <= 31
+      ) {
+        const dueDateObj = new Date(year, month - 1, dueDay);
+        if (!Number.isNaN(dueDateObj.getTime())) {
+          return format(dueDateObj, "yyyy-MM-dd");
+        }
+      }
     }
     
     // Fallback para data atual se não conseguir calcular
     return format(new Date(), "yyyy-MM-dd");
-  };  // Mutação para atualizar data de pagamento
+  };
+
+  // Mutação para atualizar data de pagamento
   const updateTransactionMutation = useMutation({
     mutationFn: async (data: { id: number; date: string }) => {
       const response = await fetch(`/api/transactions/${data.id}`, {
@@ -251,13 +265,11 @@ export default function InvoiceTransactionModal({
               <Calendar className="h-4 w-4" />
               Data de Pagamento
             </Label>
-            <Input
-              id="paymentDate"
-              type="date"
-              value={paymentDate}
-              onChange={(e) => setPaymentDate(e.target.value)}
-              className="w-full"
-            />            <p className="text-xs text-slate-500">
+            <DatePicker
+              date={paymentDate ? parse(paymentDate, "yyyy-MM-dd", new Date()) : undefined}
+              onSelect={(date) => setPaymentDate(date ? format(date, "yyyy-MM-dd") : "")}
+            />
+            <p className="text-xs text-slate-500">
               Data de vencimento da fatura (calculada automaticamente baseada no cartão de crédito)
             </p>
           </div>

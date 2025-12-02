@@ -1,11 +1,20 @@
 import { useState, useMemo } from "react";
 import { useAccount } from "@/contexts/AccountContext";
 import { useCreditCards, useCreditCardInvoices } from "@/hooks/useCreditCards";
-import Sidebar from "@/components/Layout/Sidebar";
-import Header from "@/components/Layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Search, Filter, ArrowLeft, CreditCard as CreditCardIcon, Edit, Trash2, MoreHorizontal } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Filter,
+  ArrowLeft,
+  CreditCard as CreditCardIcon,
+  Edit,
+  Trash2,
+  MoreHorizontal,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,13 +29,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import TransactionModal from "@/components/Modals/TransactionModal";
 import { useLocation } from "wouter";
 import type { CreditCard } from "@shared/schema";
+import { AppShell } from "@/components/Layout/AppShell";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default function CreditCardInvoice() {
   const { currentAccount } = useAccount();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
@@ -260,360 +270,270 @@ export default function CreditCardInvoice() {
     navigate('/credit-cards');
   };
 
-  // Verificar se os parâmetros da URL são válidos
-  if (!creditCardId || !month) {
-    return (
-      <div className="flex min-h-screen bg-slate-50">
-        <Sidebar 
-          isOpen={isMobileMenuOpen} 
-          onClose={() => setIsMobileMenuOpen(false)} 
-        />
-        <main className="flex-1 lg:ml-64">
-          <Header 
-            currentMonth={month || ''}
-            onPreviousMonth={() => {}}
-            onNextMonth={() => {}}
-            onCurrentMonth={() => {}}
-            onAddTransaction={() => {}}
-            onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          />
-          <div className="p-4 sm:p-6 lg:p-8">
-            <div className="text-center py-8">
-              <CreditCardIcon className="h-12 w-12 mx-auto mb-4 opacity-50 text-slate-400" />
-              <p className="text-slate-600 font-medium">Parâmetros inválidos</p>
-              <p className="text-sm text-slate-500">Os parâmetros creditCardId e month são obrigatórios</p>
-              <Button 
-                onClick={() => navigate('/credit-cards')}
-                variant="outline"
-                className="mt-4"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Voltar aos Cartões
-              </Button>
-            </div>
+  const hasInvalidParams = !creditCardId || !month;
+  const isLoadingData = loadingInvoices || loadingCreditCards;
+  const pageTitle = creditCard ? `Fatura - ${creditCard.name}` : "Faturas";
+  const pageDescription =
+    creditCard && invoice
+      ? `${formatMonth(invoice.month)} • ${formatCurrency(invoice.total)}`
+      : "Selecione um cartão e mês para visualizar a fatura.";
+
+  const pageActions = creditCard && month
+    ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleGoBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar
+          </Button>
+          <div className="flex items-center gap-1 rounded-full border bg-card px-2 py-1 text-sm font-medium">
+            <Button variant="ghost" size="icon" onClick={handlePreviousMonth}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="px-2">{formatMonth(month)}</span>
+            <Button variant="ghost" size="icon" onClick={handleNextMonth}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-        </main>
-      </div>
-    );
-  }
-  if (loadingInvoices || loadingCreditCards) {
+          <Button variant="outline" size="sm" onClick={handleCurrentMonth}>
+            Hoje
+          </Button>
+          <Button onClick={handleAddTransaction}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Transação
+          </Button>
+        </div>
+      )
+    : undefined;
+
+  const renderContent = () => {
+    if (hasInvalidParams) {
+      return (
+        <EmptyState
+          icon={<CreditCardIcon className="h-12 w-12 text-slate-400" />}
+          title="Parâmetros inválidos"
+          description="Os parâmetros creditCardId e month são obrigatórios."
+          action={{
+            label: "Voltar aos cartões",
+            onClick: () => navigate('/credit-cards'),
+            variant: 'outline',
+          }}
+        />
+      );
+    }
+
+    if (isLoadingData) {
+      return <EmptyState title="Carregando fatura..." className="border-dashed bg-transparent" />;
+    }
+
+    if (!creditCard || !invoice) {
+      return (
+        <EmptyState
+          icon={<CreditCardIcon className="h-12 w-12 text-slate-400" />}
+          title="Fatura não encontrada"
+          description="A fatura solicitada não existe ou não pôde ser carregada."
+          action={{
+            label: "Voltar aos cartões",
+            onClick: handleGoBack,
+            variant: 'outline',
+          }}
+        />
+      );
+    }
+
     return (
-      <div className="flex min-h-screen bg-slate-50">
-        <Sidebar 
-          isOpen={isMobileMenuOpen} 
-          onClose={() => setIsMobileMenuOpen(false)} 
-        />
-        <main className="flex-1 lg:ml-64">
-          <Header 
-            currentMonth={month || ''}
-            onPreviousMonth={handlePreviousMonth}
-            onNextMonth={handleNextMonth}
-            onCurrentMonth={handleCurrentMonth}
-            onAddTransaction={handleAddTransaction}
-            onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          />
-          <div className="p-4 sm:p-6 lg:p-8">
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-slate-600">Carregando fatura...</p>
-            </div>
+      <div className="space-y-6">
+        {isSelectionMode && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed bg-muted/50 p-4 text-sm">
+            <Badge variant="secondary">{selectedTransactions.size} selecionada(s)</Badge>
+            <Button variant="outline" size="sm" onClick={handleCancelSelection}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteSelected}
+              disabled={selectedTransactions.size === 0 || deleteTransactionsMutation.isPending}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              {deleteTransactionsMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </Button>
           </div>
-        </main>
-      </div>
-    );
-  }
-  if (!creditCard || !invoice) {
-    return (
-      <div className="flex min-h-screen bg-slate-50">
-        <Sidebar 
-          isOpen={isMobileMenuOpen} 
-          onClose={() => setIsMobileMenuOpen(false)} 
-        />
-        <main className="flex-1 lg:ml-64">
-          <Header 
-            currentMonth={month || ''}
-            onPreviousMonth={handlePreviousMonth}
-            onNextMonth={handleNextMonth}
-            onCurrentMonth={handleCurrentMonth}
-            onAddTransaction={handleAddTransaction}
-            onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          />
-          <div className="p-4 sm:p-6 lg:p-8">
-            <div className="text-center py-8">
-              <CreditCardIcon className="h-12 w-12 mx-auto mb-4 opacity-50 text-slate-400" />
-              <p className="text-slate-600 font-medium">Fatura não encontrada</p>
-              <p className="text-sm text-slate-500">A fatura solicitada não existe ou não pôde ser carregada</p>
-              <Button 
-                onClick={handleGoBack}
-                variant="outline"
-                className="mt-4"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Voltar aos Cartões
-              </Button>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-  return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar 
-        isOpen={isMobileMenuOpen} 
-        onClose={() => setIsMobileMenuOpen(false)} 
-      />
-      <main className="flex-1 lg:ml-64">
-        <Header 
-          currentMonth={month || ''}
-          onPreviousMonth={handlePreviousMonth}
-          onNextMonth={handleNextMonth}
-          onCurrentMonth={handleCurrentMonth}
-          onAddTransaction={handleAddTransaction}
-          onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        />
-        <div className="p-4 sm:p-6 lg:p-8">
-          {/* Cabeçalho com botão de voltar e informações da fatura */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="outline"
-                size="sm"
-                onClick={handleGoBack}
-                className="text-slate-600 hover:text-slate-900"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Voltar
-              </Button>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <CreditCardIcon className="h-5 w-5" />
+              Resumo da Fatura
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               <div>
-                <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">
-                  Fatura - {creditCard.name}
-                </h1>
-                <p className="text-slate-600 mt-1">
-                  {formatMonth(invoice.month)} • {formatCurrency(invoice.total)}
+                <p className="text-sm text-slate-600">Período</p>
+                <p className="font-semibold">
+                  {formatDate(invoice.periodStart)} - {formatDate(invoice.periodEnd)}
                 </p>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {!isSelectionMode ? (
-                <Button 
-                  onClick={handleAddTransaction}
-                  className="bg-primary text-white hover:bg-blue-600"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Transação
-                </Button>
-              ) : (
-                <>
-                  <Badge variant="secondary" className="text-sm">
-                    {selectedTransactions.size} selecionada(s)
-                  </Badge>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCancelSelection}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleDeleteSelected}
-                    disabled={selectedTransactions.size === 0 || deleteTransactionsMutation.isPending}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    {deleteTransactionsMutation.isPending ? 'Excluindo...' : 'Excluir'}
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Resumo da Fatura */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CreditCardIcon className="h-5 w-5" />
-                Resumo da Fatura
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-sm text-slate-600">Período</p>
-                  <p className="font-semibold">
-                    {formatDate(invoice.periodStart)} - {formatDate(invoice.periodEnd)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600">Total da Fatura</p>
-                  <p className="font-semibold text-red-600 text-lg">
-                    {formatCurrency(invoice.total)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600">Transações</p>
-                  <p className="font-semibold">
-                    {invoice.transactions.length}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600">Cartão</p>
-                  <p className="font-semibold">{creditCard.brand}</p>
-                </div>
+              <div>
+                <p className="text-sm text-slate-600">Total da Fatura</p>
+                <p className="text-lg font-semibold text-red-600">{formatCurrency(invoice.total)}</p>
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <p className="text-sm text-slate-600">Transações</p>
+                <p className="font-semibold">{invoice.transactions.length}</p>
+              </div>
+              <div>
+                <p className="text-sm text-slate-600">Cartão</p>
+                <p className="font-semibold">{creditCard.brand}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Busca e Filtros */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-              <Input
-                placeholder="Buscar transações na fatura..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-                disabled={isSelectionMode}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="sm:w-auto" disabled={isSelectionMode}>
-                <Filter className="h-4 w-4 mr-2" />
-                Filtros
-              </Button>
-              {!isSelectionMode && filteredTransactions.length > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="sm:w-auto">
-                      <MoreHorizontal className="h-4 w-4 mr-2" />
-                      Ações
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={handleToggleSelectionMode}>
-                      Selecionar múltiplas
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-slate-400" />
+            <Input
+              placeholder="Buscar transações na fatura..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+              disabled={isSelectionMode}
+            />
           </div>
+          <div className="flex gap-2">
+            <Button variant="outline" className="sm:w-auto" disabled={isSelectionMode}>
+              <Filter className="h-4 w-4 mr-2" />
+              Filtros
+            </Button>
+            {!isSelectionMode && filteredTransactions.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="sm:w-auto">
+                    <MoreHorizontal className="h-4 w-4 mr-2" />
+                    Ações
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={handleToggleSelectionMode}>Selecionar múltiplas</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </div>
 
-          {/* Lista de Transações */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Transações da Fatura</CardTitle>
-              {isSelectionMode && filteredTransactions.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={isAllSelected}
-                    onCheckedChange={handleSelectAll}
-                    className="border-slate-400"
-                  />
-                  <span className="text-sm text-slate-600">Selecionar todas</span>
-                </div>
-              )}
-            </CardHeader>
-            <CardContent>
-              {filteredTransactions.length > 0 ? (
-                <div className="space-y-4">
-                  {filteredTransactions.map((transaction: any, index: number) => (
-                    <div 
-                      key={index}
-                      className={`flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors ${!isSelectionMode ? 'cursor-pointer' : ''} group ${selectedTransactions.has(transaction.id) ? 'bg-blue-50 border-blue-200' : ''}`}
-                      onClick={() => handleEditTransaction(transaction)}
-                    >                      <div className="flex items-center space-x-4">
-                        {isSelectionMode && (
-                          <Checkbox
-                            checked={selectedTransactions.has(transaction.id)}
-                            onCheckedChange={(checked) => 
-                              handleSelectTransaction(transaction.id, Boolean(checked), undefined, index)
-                            }
-                            onClick={(e) => {
-                              e.stopPropagation();
-                            }}
-                            onMouseDown={(e) => {
-                              if (e.shiftKey) {
-                                e.stopPropagation();
-                                handleSelectTransaction(transaction.id, true, e as any, index);
-                              }
-                            }}
-                            className="border-slate-400"
-                          />
-                        )}
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-red-100">
-                          <i className={`${transaction.category?.icon || 'fas fa-exchange-alt'} text-red-600`}></i>
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-slate-900">                            <CreditCardIcon className="inline h-4 w-4 text-blue-600 mr-2" />
-                            {transaction.description}
-                            {transaction.installments > 1 && (
-                              <span className="ml-2 text-xs text-slate-500 font-normal">
-                                {transaction.currentInstallment}/{transaction.installments}
-                              </span>
-                            )}
-                          </h3>
-                          <p className="text-sm text-slate-600">
-                            {transaction.category?.name || 'Sem categoria'} • {formatDate(transaction.date)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="font-semibold text-red-600">
-                            {formatCurrency(transaction.amount)}
-                          </p>
-                          {transaction.installments > 1 && (
-                            <Badge variant="outline" className="text-xs mt-1">
-                              Parcelado
-                            </Badge>
-                          )}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Transações da Fatura</CardTitle>
+            {isSelectionMode && filteredTransactions.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Checkbox checked={isAllSelected} onCheckedChange={handleSelectAll} className="border-slate-400" />
+                <span className="text-sm text-slate-600">Selecionar todas</span>
+              </div>
+            )}
+          </CardHeader>
+          <CardContent>
+            {filteredTransactions.length > 0 ? (
+              <div className="space-y-4">
+                {filteredTransactions.map((transaction: any, index: number) => (
+                  <div
+                    key={index}
+                    className={`flex items-center justify-between rounded-lg border border-slate-200 p-4 transition-colors hover:bg-slate-50 ${!isSelectionMode ? 'cursor-pointer' : ''} group ${selectedTransactions.has(transaction.id) ? 'bg-blue-50 border-blue-200' : ''}`}
+                    onClick={() => handleEditTransaction(transaction)}
+                  >
+                    <div className="flex items-center space-x-4">
+                      {isSelectionMode && (
+                        <Checkbox
+                          checked={selectedTransactions.has(transaction.id)}
+                          onCheckedChange={(checked) =>
+                            handleSelectTransaction(transaction.id, Boolean(checked), undefined, index)
+                          }
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleEditTransaction(transaction);
                           }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                          onMouseDown={(e) => {
+                            if (e.shiftKey) {
+                              e.stopPropagation();
+                              handleSelectTransaction(transaction.id, true, e as any, index);
+                            }
+                          }}
+                          className="border-slate-400"
+                        />
+                      )}
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
+                        <i className={`${transaction.category?.icon || 'fas fa-exchange-alt'} text-red-600`}></i>
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-slate-900">
+                          <CreditCardIcon className="mr-2 inline h-4 w-4 text-blue-600" />
+                          {transaction.description}
+                          {transaction.installments > 1 && (
+                            <span className="ml-2 text-xs font-normal text-slate-500">
+                              {transaction.currentInstallment}/{transaction.installments}
+                            </span>
+                          )}
+                        </h3>
+                        <p className="text-sm text-slate-600">
+                          {transaction.category?.name || 'Sem categoria'} • {formatDate(transaction.date)}
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <CreditCardIcon className="h-12 w-12 mx-auto mb-4 opacity-50 text-slate-400" />
-                  <p className="text-slate-600 font-medium">
-                    {searchTerm ? 'Nenhuma transação encontrada' : 'Nenhuma transação nesta fatura'}
-                  </p>
-                  <p className="text-sm text-slate-500 mb-4">
-                    {searchTerm ? 'Tente ajustar o termo de busca' : 'Adicione transações para começar'}
-                  </p>
-                  <Button 
-                    onClick={handleAddTransaction}
-                    variant="outline"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Adicionar Transação
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="font-semibold text-red-600">{formatCurrency(transaction.amount)}</p>
+                        {transaction.installments > 1 && (
+                          <Badge variant="outline" className="mt-1 text-xs">
+                            Parcelado
+                          </Badge>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="opacity-0 transition-opacity group-hover:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditTransaction(transaction);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <CreditCardIcon className="mx-auto mb-4 h-12 w-12 text-slate-400" />
+                <p className="font-medium text-slate-600">
+                  {searchTerm ? 'Nenhuma transação encontrada' : 'Nenhuma transação nesta fatura'}
+                </p>
+                <p className="mb-4 text-sm text-slate-500">
+                  {searchTerm ? 'Tente ajustar o termo de busca' : 'Adicione transações para começar'}
+                </p>
+                <Button onClick={handleAddTransaction} variant="outline">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Adicionar Transação
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
 
-      {/* Modal de transação */}
-      <TransactionModal 
+  return (
+    <>
+      <AppShell title={pageTitle} description={pageDescription} actions={pageActions}>
+        {renderContent()}
+      </AppShell>
+      <TransactionModal
         isOpen={isTransactionModalOpen}
         onClose={handleCloseTransactionModal}
         transaction={selectedTransaction}
       />
-    </div>
+    </>
   );
 }

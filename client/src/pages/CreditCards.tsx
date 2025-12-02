@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useAccount } from "@/contexts/AccountContext";
-import Sidebar from "@/components/Layout/Sidebar";
-import Header from "@/components/Layout/Header";
+import { AppShell } from "@/components/Layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, CreditCard, Calendar, DollarSign, RefreshCw, Upload } from "lucide-react";
@@ -12,11 +11,13 @@ import InvoiceUploadModal from "@/components/Modals/InvoiceUploadModal";
 import { useCreditCards, useCreateCreditCard, useUpdateCreditCard, useDeleteCreditCard } from "@/hooks/useCreditCards";
 import { useProcessOverdueInvoices } from "@/hooks/useProcessInvoices";
 import { useToast } from "@/hooks/use-toast";
+import { SummaryCard } from "@/components/ui/summary-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { cn } from "@/lib/utils";
 
 export default function CreditCards() {
   const { currentAccount } = useAccount();
   const { toast } = useToast();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCreditCardModalOpen, setIsCreditCardModalOpen] = useState(false);
   const [isInvoicesModalOpen, setIsInvoicesModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -32,14 +33,6 @@ export default function CreditCards() {
   const deleteCreditCard = useDeleteCreditCard();
   const processInvoices = useProcessOverdueInvoices();
 
-  console.log('[CreditCards] Debug info:', {
-    currentAccount,
-    accountId,
-    creditCards,
-    isLoading,
-    creditCardsLength: creditCards.length
-  });
-
   if (!currentAccount) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-background">
@@ -50,11 +43,12 @@ export default function CreditCards() {
       </div>
     );
   }
-  const formatCurrency = (amount: string) => {
+  const formatCurrency = (amount: string | number) => {
+    const value = typeof amount === "number" ? amount : parseFloat(amount);
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
-    }).format(parseFloat(amount));
+    }).format(Number.isFinite(value) ? value : 0);
   };
 
   // Função para calcular o mês da fatura atual baseado na data atual e dia de fechamento
@@ -181,55 +175,44 @@ export default function CreditCards() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar 
-        isOpen={isMobileMenuOpen} 
-        onClose={() => setIsMobileMenuOpen(false)} 
-      />
-      
-      <main className="flex-1 lg:ml-64">
-        <Header 
-          currentMonth={new Date().toISOString().substring(0, 7)}
-          onPreviousMonth={() => {}}
-          onNextMonth={() => {}}
-          onAddTransaction={() => {}}
-          onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        />
-          <div className="p-4 sm:p-6 lg:p-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Cartões de Crédito</h1>
-              <p className="text-slate-600 mt-1">Gerencie seus cartões e faturas</p>
-            </div>
-            
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={handleProcessInvoices}
-                disabled={processInvoices.isPending}
-                className="text-slate-700 hover:bg-slate-100"
-              >
-                {processInvoices.isPending ? (
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                )}
-                Processar Faturas
-              </Button>
-              <Button className="bg-primary text-white hover:bg-blue-600" onClick={() => setIsCreditCardModalOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Cartão
-              </Button>
-            </div>
+    <>
+      <AppShell
+        title="Cartões de Crédito"
+        description="Gerencie limites, faturas e importações com uma visão enxuta."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleProcessInvoices}
+              disabled={processInvoices.isPending}
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-2", processInvoices.isPending && "animate-spin")} />
+              Processar faturas
+            </Button>
+            <Button onClick={() => setIsCreditCardModalOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo cartão
+            </Button>
           </div>
-
-          {/* Cards Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+        }
+      >
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
             {isLoading ? (
-              <div className="col-span-full text-center text-slate-500 py-12">Carregando cartões...</div>
+              <EmptyState title="Carregando cartões..." className="col-span-full border-none bg-transparent" />
             ) : creditCards.length === 0 ? (
-              <div className="col-span-full text-center text-slate-500 py-12">Nenhum cartão cadastrado.</div>
-            ) : creditCards.map((card) => {
+              <EmptyState
+                className="col-span-full"
+                icon={<CreditCard className="h-10 w-10" />}
+                title="Nenhum cartão cadastrado"
+                description="Cadastre seu primeiro cartão para acompanhar limites, faturas e importações."
+                action={{
+                  label: "Adicionar cartão",
+                  onClick: () => setIsCreditCardModalOpen(true),
+                }}
+              />
+            ) : (
+              creditCards.map((card) => {
                 const usagePercentage = card.creditLimit && card.currentBalance ? (parseFloat(card.currentBalance) / parseFloat(card.creditLimit)) * 100 : 0;
                 
                 return (
@@ -316,105 +299,83 @@ export default function CreditCards() {
                     </CardContent>
                   </Card>
                 );
-              })}
+              })
+            )}
           </div>
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <DollarSign className="h-8 w-8 text-red-600" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-600">Total das Faturas</p>
-                    <p className="text-2xl font-bold text-red-600">
-                      {formatCurrency(
-                        creditCards.reduce((sum, card) => sum + parseFloat(card.currentBalance || "0.00"), 0).toString()
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <CreditCard className="h-8 w-8 text-blue-600" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-600">Limite Total</p>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {formatCurrency(
-                        creditCards.reduce((sum, card) => sum + parseFloat(card.creditLimit || "0.00"), 0).toString()
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
-                    <span className="text-green-600 font-bold">%</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-600">Limite Disponível</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {formatCurrency(
-                        (creditCards.reduce((sum, card) => sum + parseFloat(card.creditLimit || "0.00"), 0) -
-                         creditCards.reduce((sum, card) => sum + parseFloat(card.currentBalance || "0.00"), 0)).toString()
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <SummaryCard
+              label="Total das faturas"
+              value={formatCurrency(
+                creditCards.reduce((sum, card) => sum + parseFloat(card.currentBalance || "0.00"), 0),
+              )}
+              tone="negative"
+              icon={<DollarSign className="h-6 w-6 text-red-600" />}
+            />
+            <SummaryCard
+              label="Limite total"
+              value={formatCurrency(
+                creditCards.reduce((sum, card) => sum + parseFloat(card.creditLimit || "0.00"), 0),
+              )}
+              icon={<CreditCard className="h-6 w-6 text-blue-600" />}
+            />
+            <SummaryCard
+              label="Limite disponível"
+              value={formatCurrency(
+                creditCards.reduce((sum, card) => sum + parseFloat(card.creditLimit || "0.00"), 0) -
+                  creditCards.reduce((sum, card) => sum + parseFloat(card.currentBalance || "0.00"), 0),
+              )}
+              tone="positive"
+            />
           </div>
 
-          {/* Recent Transactions */}
           <Card>
             <CardHeader>
-              <CardTitle>Transações Recentes nos Cartões</CardTitle>
+              <CardTitle>Transações recentes nos cartões</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-slate-500">
-                <CreditCard className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Nenhuma transação encontrada</p>
-                <p className="text-sm">As transações dos cartões aparecerão aqui</p>
-              </div>
+              <EmptyState
+                icon={<CreditCard className="h-10 w-10 opacity-70" />}
+                title="Nenhuma transação encontrada"
+                description="As movimentações dos cartões aparecerão aqui depois da importação."
+                className="border-none bg-transparent p-0"
+              />
             </CardContent>
-          </Card>          <CreditCardModal 
-            isOpen={isCreditCardModalOpen} 
-            onClose={() => { setIsCreditCardModalOpen(false); setEditingCard(null); }} 
-            accountId={currentAccount.id} 
-            onSaved={handleSaveCreditCard}
-            creditCard={editingCard}
-          />
-
-          {selectedCardForInvoices && (
-            <CreditCardInvoicesModal
-              isOpen={isInvoicesModalOpen}
-              onClose={() => {
-                setIsInvoicesModalOpen(false);
-                setSelectedCardForInvoices(null);
-              }}
-              creditCard={selectedCardForInvoices}
-              accountId={currentAccount.id}
-            />
-          )}
-
-          <InvoiceUploadModal
-            isOpen={isUploadModalOpen}
-            onClose={() => {
-              setIsUploadModalOpen(false);
-              setSelectedCardForUpload(null);
-            }}
-            creditCard={selectedCardForUpload}
-          />
+          </Card>
         </div>
-      </main>
-    </div>
+      </AppShell>
+
+      <CreditCardModal
+        isOpen={isCreditCardModalOpen}
+        onClose={() => {
+          setIsCreditCardModalOpen(false);
+          setEditingCard(null);
+        }}
+        accountId={currentAccount.id}
+        onSaved={handleSaveCreditCard}
+        creditCard={editingCard}
+      />
+
+      {selectedCardForInvoices && (
+        <CreditCardInvoicesModal
+          isOpen={isInvoicesModalOpen}
+          onClose={() => {
+            setIsInvoicesModalOpen(false);
+            setSelectedCardForInvoices(null);
+          }}
+          creditCard={selectedCardForInvoices}
+          accountId={currentAccount.id}
+        />
+      )}
+
+      <InvoiceUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          setSelectedCardForUpload(null);
+        }}
+        creditCard={selectedCardForUpload}
+      />
+    </>
   );
 }

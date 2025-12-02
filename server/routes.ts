@@ -114,7 +114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/accounts/:id/ai-chat", createRateLimitMiddleware(aiChatRateLimit), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { message } = req.body;
+      const { message, conversationHistory = [] } = req.body;
       
       // Validação de entrada
       if (!message || typeof message !== 'string') {
@@ -139,7 +139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[AI Chat] Account ${id}: "${sanitizedMessage.substring(0, 50)}${sanitizedMessage.length > 50 ? '...' : ''}"`);
 
-      const response = await AIFinancialAdvisor.analyzeFinances(id, sanitizedMessage);
+      const response = await AIFinancialAdvisor.analyzeFinances(id, sanitizedMessage, conversationHistory);
       res.json({ response });
     } catch (error) {
       console.error("[POST /api/accounts/:id/ai-chat]", error);
@@ -228,6 +228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const startDate = req.query.startDate as string;
       const endDate = req.query.endDate as string;
+      await storage.syncInvoiceTransactions(accountId);
 
       let transactions;
       if (startDate && endDate) {
@@ -376,12 +377,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const accountId = parseInt(req.params.accountId);
       console.log('[POST /api/accounts/:accountId/credit-cards] Body recebido:', req.body);
-      const validatedData = insertCreditCardSchema.parse({
+      const rawData = {
         ...req.body,
         accountId,
-      });
+      };
+      const sanitizedInput = {
+        ...rawData,
+        brand: rawData.brand?.trim() || undefined,
+        creditLimit: rawData.creditLimit?.trim() || undefined,
+      };
+      const validatedData = insertCreditCardSchema.parse(sanitizedInput);
+      const normalizedData = {
+        ...validatedData,
+        brand: (validatedData.brand ?? "").trim(),
+        creditLimit:
+          validatedData.creditLimit && validatedData.creditLimit.trim() !== ""
+            ? validatedData.creditLimit
+            : "0",
+      };
       console.log('[POST /api/accounts/:accountId/credit-cards] Dados validados:', validatedData);
-      const card = await storage.createCreditCard(validatedData);
+      const card = await storage.createCreditCard(normalizedData);
       res.status(201).json(card);
     } catch (error) {
       console.error('[POST /api/accounts/:accountId/credit-cards] Erro:', error);
@@ -395,8 +410,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/credit-cards/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const validatedData = insertCreditCardSchema.partial().parse(req.body);
-      const creditCard = await storage.updateCreditCard(id, validatedData);
+      const sanitizedInput = {
+        ...req.body,
+        ...(req.body.brand !== undefined && { brand: req.body.brand?.trim() || undefined }),
+        ...(req.body.creditLimit !== undefined && {
+          creditLimit: req.body.creditLimit?.trim() || undefined,
+        }),
+      };
+      const validatedData = insertCreditCardSchema.partial().parse(sanitizedInput);
+      const normalizedData = {
+        ...validatedData,
+        ...(validatedData.brand !== undefined && {
+          brand: validatedData.brand?.trim() ?? "",
+        }),
+        ...(validatedData.creditLimit !== undefined && {
+          creditLimit:
+            validatedData.creditLimit && validatedData.creditLimit.trim() !== ""
+              ? validatedData.creditLimit
+              : "0",
+        }),
+      };
+      const creditCard = await storage.updateCreditCard(id, normalizedData);
       if (!creditCard) {
         return res.status(404).json({ message: "Credit card not found" });
       }
@@ -553,6 +587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const accountId = Number(req.params.accountId);
     if (!accountId) return res.status(400).json({ error: 'accountId obrigatório' });
     try {
+      await storage.syncInvoiceTransactions(accountId);
       const invoices = await storage.getCreditCardInvoices(accountId);
       res.json(invoices);
     } catch (error) {
@@ -957,28 +992,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[DELETE /api/accounts/:accountId/transactions/all]", error);
       res.status(500).json({ message: "Failed to delete all transactions" });
-    }
-  });
-
-  // AI Chat routes
-  app.post("/api/accounts/:accountId/ai-chat", createRateLimitMiddleware(aiChatRateLimit), async (req, res) => {
-    try {
-      const accountId = parseInt(req.params.accountId);
-      const { message, conversationHistory = [] } = req.body;
-
-      if (!message || typeof message !== 'string') {
-        return res.status(400).json({ message: "Message is required" });
-      }
-
-      if (message.length > 500) {
-        return res.status(400).json({ message: "Message too long (max 500 characters)" });
-      }
-
-      const response = await AIFinancialAdvisor.analyzeFinances(accountId, message, conversationHistory);
-      res.json({ response });
-    } catch (error) {
-      console.error("[POST /api/accounts/:accountId/ai-chat]", error);
-      res.status(500).json({ message: "Failed to process AI chat" });
     }
   });
 

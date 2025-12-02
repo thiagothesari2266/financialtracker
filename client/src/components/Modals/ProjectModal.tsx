@@ -5,12 +5,15 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { insertProjectSchema, type InsertProject, type ProjectWithClient } from "@shared/schema";
 import { useCreateProject, useUpdateProject } from "@/hooks/useProjects";
 import { useClients } from "@/hooks/useClients";
+import { DatePicker } from "@/components/ui/date-picker";
+import { format, parse } from "date-fns";
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -196,19 +199,21 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
               <FormField
                 control={form.control}
                 name="budget"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Orçamento</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01"
-                        placeholder="0.00" 
-                        {...field} 
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const numericValue = field.value && !isNaN(Number(field.value)) ? Number(field.value) : null;
+                  return (
+                    <FormItem>
+                      <FormLabel>Orçamento</FormLabel>
+                      <FormControl>
+                        <CurrencyInput
+                          placeholder="0,00"
+                          value={numericValue}
+                          onValueChange={(val) => field.onChange(val == null ? "" : val.toString())}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  );
+                }}
               />
             </div>
 
@@ -220,7 +225,10 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
                   <FormItem>
                     <FormLabel>Data de Início</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <DatePicker
+                        date={field.value ? parse(field.value, "yyyy-MM-dd", new Date()) : undefined}
+                        onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                      />
                     </FormControl>
                   </FormItem>
                 )}
@@ -233,7 +241,10 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
                   <FormItem>
                     <FormLabel>Data de Término</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <DatePicker
+                        date={field.value ? parse(field.value, "yyyy-MM-dd", new Date()) : undefined}
+                        onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                      />
                     </FormControl>
                   </FormItem>
                 )}
