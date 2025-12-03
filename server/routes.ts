@@ -17,6 +17,13 @@ import {
   insertClientSchema
 } from "@shared/schema";
 import { z } from "zod";
+import { insertFixedCashflowSchema } from "@shared/schema";
+
+const normalizeAmount = (value: unknown): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  const cleaned = value.replace(/\./g, "").replace(",", ".").trim();
+  return cleaned.length ? cleaned : undefined;
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Account routes
@@ -54,6 +61,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(stats);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch account stats" });
+    }
+  });
+
+  app.get("/api/accounts/:id/monthly-fixed", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const summary = await storage.getFixedCashflow(id);
+      res.json(summary);
+    } catch (error) {
+      console.error("[GET /api/accounts/:id/monthly-fixed]", error);
+      res.status(500).json({ message: "Failed to fetch monthly fixed cashflow" });
+    }
+  });
+
+  app.post("/api/accounts/:id/monthly-fixed", async (req, res) => {
+    try {
+      const accountId = parseInt(req.params.id);
+      const validated = insertFixedCashflowSchema.parse({
+        ...req.body,
+        amount: normalizeAmount(req.body.amount),
+        accountId,
+      });
+      const created = await storage.createFixedCashflow(validated);
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("[POST /api/accounts/:id/monthly-fixed]", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create monthly fixed entry" });
+    }
+  });
+
+  app.patch("/api/monthly-fixed/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validated = insertFixedCashflowSchema.partial().parse({
+        ...req.body,
+        amount: req.body.amount !== undefined ? normalizeAmount(req.body.amount) : undefined,
+      });
+      const updated = await storage.updateFixedCashflow(id, validated);
+      if (!updated) return res.status(404).json({ message: "Item not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("[PATCH /api/monthly-fixed/:id]", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update monthly fixed entry" });
+    }
+  });
+
+  app.delete("/api/monthly-fixed/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteFixedCashflow(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[DELETE /api/monthly-fixed/:id]", error);
+      res.status(500).json({ message: "Failed to delete monthly fixed entry" });
     }
   });
 

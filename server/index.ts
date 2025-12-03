@@ -9,6 +9,9 @@ import { setupVite, serveStatic, log } from "./vite";
 const shouldLogRequests = process.env.LOG_REQUESTS === "true";
 
 const app = express();
+// Necessário para cookies "secure" funcionarem atrás do Nginx/Cloudflare
+// (usa X-Forwarded-Proto para detectar HTTPS)
+app.set("trust proxy", 1);
 const PgSession = connectPgSimple(session);
 // Increase request size limits for image uploads
 app.use(express.json({ limit: '50mb' }));
@@ -95,6 +98,11 @@ app.use((req, res, next) => {
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
+
+    if (process.env.NODE_ENV === "production") {
+      console.error("[error]", err);
+      return res.status(status).json({ message });
+    }
 
     res.status(status).json({ message });
     throw err;

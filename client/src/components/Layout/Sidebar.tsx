@@ -12,6 +12,7 @@ import {
   Layers3,
   Building2,
   Settings2,
+  Repeat,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -25,6 +26,7 @@ const navItems = [
   { label: "Categorias", href: "/categories", icon: Tags },
   { label: "Cartões", href: "/credit-cards", icon: CreditCard },
   { label: "Faturas", href: "/credit-card-invoice", icon: FileSpreadsheet },
+  { label: "Fixos mensais", href: "/monthly-fixed", icon: Repeat },
   { label: "Relatórios", href: "/reports", icon: FileSpreadsheet },
   { label: "Contas Bancárias", href: "/bank-accounts", icon: Landmark },
   { label: "Projetos", href: "/projects", icon: Layers3 },

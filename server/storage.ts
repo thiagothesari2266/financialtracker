@@ -45,6 +45,9 @@ import type {
   ClientWithProjects,
   InsertUser,
   AuthenticatedUser,
+  MonthlyFixedSummary,
+  InsertFixedCashflow,
+  MonthlyFixedItem,
 } from "@shared/schema";
 
 const DATE_ONLY_LENGTH = 10;
@@ -343,6 +346,7 @@ export interface IStorage {
     accountId: number,
     month: string,
   ): Promise<Array<{ categoryId: number; categoryName: string; total: string; color: string }>>;
+  getMonthlyFixedSummary(accountId: number): Promise<MonthlyFixedSummary>;
 
   getCreditCardInvoices(accountId: number): Promise<Array<{ creditCardId: number; month: string; total: string }>>;
 
@@ -358,6 +362,11 @@ export interface IStorage {
 
   getLegacyInvoiceTransactions(accountId: number): Promise<TransactionWithCategory[]>;
   deleteLegacyInvoiceTransactions(accountId: number): Promise<{ deletedCount: number }>;
+
+  getFixedCashflow(accountId: number): Promise<MonthlyFixedSummary>;
+  createFixedCashflow(entry: InsertFixedCashflow): Promise<MonthlyFixedItem>;
+  updateFixedCashflow(id: number, entry: Partial<InsertFixedCashflow>): Promise<MonthlyFixedItem | undefined>;
+  deleteFixedCashflow(id: number): Promise<void>;
 
   createProject(project: InsertProject): Promise<Project>;
   getProjects(accountId: number): Promise<ProjectWithClient[]>;
@@ -1338,6 +1347,104 @@ export class DatabaseStorage implements IStorage {
       color: category.color,
       total: (totals.get(category.id) ?? 0).toFixed(2),
     }));
+  }
+
+  async getMonthlyFixedSummary(accountId: number): Promise<MonthlyFixedSummary> {
+    const todayMonth = new Date().toISOString().slice(0, 7);
+
+    const entries = await prisma.fixedCashflow.findMany({
+      where: {
+        accountId,
+        OR: [
+          { endMonth: null },
+          { endMonth: { gte: todayMonth } },
+        ],
+      },
+      orderBy: [
+        { startMonth: "asc" },
+        { createdAt: "asc" },
+      ],
+    });
+
+    const mapped: MonthlyFixedItem[] = entries
+      .filter((entry) => entry.startMonth <= todayMonth)
+      .map((entry) => ({
+        id: entry.id,
+        description: entry.description,
+        amount: decimalToString(entry.amount),
+        type: entry.type,
+        startMonth: entry.startMonth,
+        endMonth: entry.endMonth ?? null,
+      }));
+
+    const income = mapped.filter((item) => item.type === "income");
+    const expenses = mapped.filter((item) => item.type === "expense");
+    const incomeTotal = income.reduce((sum, item) => sum + Number.parseFloat(item.amount), 0);
+    const expenseTotal = expenses.reduce((sum, item) => sum + Number.parseFloat(item.amount), 0);
+
+    return {
+      income,
+      expenses,
+      totals: {
+        income: incomeTotal.toFixed(2),
+        expenses: expenseTotal.toFixed(2),
+        net: (incomeTotal - expenseTotal).toFixed(2),
+      },
+    };
+  }
+
+  async getFixedCashflow(accountId: number): Promise<MonthlyFixedSummary> {
+    return this.getMonthlyFixedSummary(accountId);
+  }
+
+  async createFixedCashflow(entry: InsertFixedCashflow): Promise<MonthlyFixedItem> {
+    const todayMonth = new Date().toISOString().slice(0, 7);
+    const created = await prisma.fixedCashflow.create({
+      data: {
+        ...entry,
+        startMonth: entry.startMonth ?? todayMonth,
+        endMonth: entry.endMonth ?? null,
+      },
+    });
+
+    return {
+      id: created.id,
+      description: created.description,
+      amount: decimalToString(created.amount),
+      type: created.type,
+      startMonth: created.startMonth,
+      endMonth: created.endMonth ?? null,
+    };
+  }
+
+  async updateFixedCashflow(
+    id: number,
+    entry: Partial<InsertFixedCashflow>,
+  ): Promise<MonthlyFixedItem | undefined> {
+    const todayMonth = new Date().toISOString().slice(0, 7);
+    const updated = await prisma.fixedCashflow.update({
+      where: { id },
+      data: {
+        ...entry,
+        startMonth: entry.startMonth ?? undefined,
+        endMonth: entry.endMonth ?? undefined,
+      },
+    });
+
+    if (!updated) return undefined;
+
+    return {
+      id: updated.id,
+      description: updated.description,
+      amount: decimalToString(updated.amount),
+      type: updated.type,
+      startMonth: updated.startMonth,
+      endMonth: updated.endMonth ?? null,
+    };
+  }
+
+  async deleteFixedCashflow(id: number): Promise<void> {
+    await prisma.fixedCashflow.delete({ where: { id } });
   }
 
   // Invoice helpers

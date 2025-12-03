@@ -43,6 +43,7 @@ import {
   Wallet,
   Layers3,
   CircleDollarSign,
+  Repeat,
 } from "lucide-react";
 import { AccountSwitcher } from "./AccountSwitcher";
 import { useAccount } from "@/contexts/AccountContext";
@@ -69,6 +70,7 @@ const primaryNavigation: NavigationItem[] = [
   { title: "Cartões", href: "/credit-cards", icon: CreditCard },
   { title: "Faturas", href: "/credit-card-invoice", icon: FileSpreadsheet },
   { title: "Relatórios", href: "/reports", icon: LineChart },
+  { title: "Fixos mensais", href: "/monthly-fixed", icon: Repeat },
   { title: "Contas Bancárias", href: "/bank-accounts", icon: Wallet },
 ];
 
@@ -168,14 +170,7 @@ function AppSidebar({ accountType }: { accountType: "personal" | "business" }) {
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter className="px-2 pb-4">
-          <div className="rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-xs text-sidebar-foreground/80">
-            <p className="font-semibold">Insights compactos</p>
-            <p className="text-[10px] opacity-70">
-              Utilize o layout compacto para navegar mais rápido pelo financeiro da sua empresa.
-            </p>
-          </div>
-        </SidebarFooter>
+        <SidebarFooter className="px-2 pb-4"></SidebarFooter>
       </Sidebar>
       <SidebarRail />
     </>

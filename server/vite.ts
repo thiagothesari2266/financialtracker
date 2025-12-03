@@ -68,17 +68,26 @@ export async function setupVite(app: Express, server: Server) {
 
 export function serveStatic(app: Express) {
   const distPath = path.resolve(import.meta.dirname, "public");
-
-  if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
-    );
-  }
+  const indexPath = path.resolve(distPath, "index.html");
 
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+    if (!fs.existsSync(indexPath)) {
+      res
+        .status(503)
+        .json({ message: "Aplicação em atualização, tente novamente em instantes." });
+      return;
+    }
+
+    res.sendFile(indexPath, (err) => {
+      if (err) {
+        log(`erro ao servir index.html: ${err.message}`, "express");
+        res
+          .status(503)
+          .json({ message: "Aplicação em atualização, tente novamente em instantes." });
+      }
+    });
   });
 }

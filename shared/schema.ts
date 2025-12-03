@@ -345,6 +345,25 @@ export type CreditCardWithTransactions = CreditCard & {
   transactions: CreditCardTransactionWithCategory[];
 };
 
+export interface MonthlyFixedItem {
+  id: number;
+  description: string;
+  amount: string;
+  type: CategoryType;
+  startMonth: string;
+  endMonth: string | null;
+}
+
+export interface MonthlyFixedSummary {
+  income: MonthlyFixedItem[];
+  expenses: MonthlyFixedItem[];
+  totals: {
+    income: string;
+    expenses: string;
+    net: string;
+  };
+}
+
 export interface AccountWithStats extends Account {
   totalBalance: string;
   monthlyIncome: string;
@@ -375,3 +394,13 @@ export interface ClientWithProjects extends Client {
   totalRevenue: string;
   activeProjects: number;
 }
+
+export const insertFixedCashflowSchema = z.object({
+  description: z.string().min(1),
+  amount: z.string().min(1),
+  type: categoryTypeEnum,
+  startMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(), // yyyy-mm
+  endMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
+  accountId: z.number(),
+});
+export type InsertFixedCashflow = z.infer<typeof insertFixedCashflowSchema>;

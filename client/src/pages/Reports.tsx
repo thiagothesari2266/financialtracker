@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAccount } from "@/contexts/AccountContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Calendar, BarChart3, PieChart, TrendingUp, DollarSign } from "lucide-react";
+import { Download, Calendar, TrendingUp, DollarSign } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -240,8 +240,8 @@ export default function Reports() {
                   Nenhum dado disponível para o período
                 </div>
               )}
-            </CardContent>
-          </Card>
+        </CardContent>
+      </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
