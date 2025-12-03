@@ -63,6 +63,7 @@ model Account {
   projects            Project[]
   costCenters         CostCenter[]
   clients             Client[]
+  fixedCashflows     FixedCashflow[]
 
   @@map("accounts")
 }
