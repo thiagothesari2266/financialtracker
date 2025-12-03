@@ -20,9 +20,34 @@ import { z } from "zod";
 import { insertFixedCashflowSchema } from "@shared/schema";
 
 const normalizeAmount = (value: unknown): string | undefined => {
-  if (typeof value !== "string") return undefined;
-  const cleaned = value.replace(/\./g, "").replace(",", ".").trim();
-  return cleaned.length ? cleaned : undefined;
+  if (value === null || value === undefined) return undefined;
+
+  const raw = String(value).trim();
+  if (!raw) return undefined;
+
+  const hasComma = raw.includes(",");
+  const hasDot = raw.includes(".");
+
+  // Vírgula como decimal: remove pontos de milhar e troca vírgula por ponto
+  if (hasComma && (!hasDot || raw.lastIndexOf(",") > raw.lastIndexOf("."))) {
+    const withoutThousands = raw.replace(/\./g, "");
+    const normalized = withoutThousands.replace(",", ".");
+    const parsed = Number.parseFloat(normalized);
+    if (Number.isFinite(parsed)) return parsed.toFixed(2);
+  }
+
+  // Ponto como decimal: remover vírgulas usadas como milhar
+  if (hasDot) {
+    const normalized = raw.replace(/,/g, "");
+    const parsed = Number.parseFloat(normalized);
+    if (Number.isFinite(parsed)) return parsed.toFixed(2);
+  }
+
+  // Fallback: manter apenas dígitos e assumir 2 casas decimais
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return undefined;
+  const asNumber = Number.parseInt(digits, 10) / 100;
+  return Number.isFinite(asNumber) ? asNumber.toFixed(2) : undefined;
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {

@@ -3,8 +3,8 @@ import { AppShell } from "@/components/Layout/AppShell";
 import { SummaryCard } from "@/components/ui/summary-card";
 import { useAccount } from "@/contexts/AccountContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DollarSign, Repeat, TrendingUp, Trash2, Plus } from "lucide-react";
-import type { InsertFixedCashflow, MonthlyFixedSummary } from "@shared/schema";
+import { DollarSign, Repeat, TrendingUp, Trash2, Plus, Pencil } from "lucide-react";
+import type { InsertFixedCashflow, MonthlyFixedItem, MonthlyFixedSummary } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -17,11 +17,36 @@ export default function MonthlyFixed() {
   const queryClient = useQueryClient();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<MonthlyFixedItem | null>(null);
 
   const { data: monthlyFixed, isLoading } = useQuery<MonthlyFixedSummary>({
     queryKey: [`/api/accounts/${currentAccount?.id}/monthly-fixed`],
     enabled: !!currentAccount,
   });
+
+  const normalizeAmountForApi = (raw: string) => {
+    const cleaned = raw.trim();
+    if (!cleaned) return raw;
+
+    const hasComma = cleaned.includes(",");
+    const hasDot = cleaned.includes(".");
+
+    if (hasComma && (!hasDot || cleaned.lastIndexOf(",") > cleaned.lastIndexOf("."))) {
+      const normalized = cleaned.replace(/\./g, "").replace(",", ".");
+      const parsed = Number.parseFloat(normalized);
+      if (Number.isFinite(parsed)) return parsed.toFixed(2);
+    }
+
+    if (hasDot) {
+      const normalized = cleaned.replace(/,/g, "");
+      const parsed = Number.parseFloat(normalized);
+      if (Number.isFinite(parsed)) return parsed.toFixed(2);
+    }
+
+    const digits = cleaned.replace(/\D/g, "");
+    const parsed = Number.parseInt(digits, 10) / 100;
+    return Number.isFinite(parsed) ? parsed.toFixed(2) : raw;
+  };
 
   const createMutation = useMutation({
     mutationFn: async (input: InsertFixedCashflow) => {
@@ -32,9 +57,26 @@ export default function MonthlyFixed() {
       queryClient.invalidateQueries({ queryKey: [`/api/accounts/${currentAccount?.id}/monthly-fixed`] });
       toast({ title: "Fixo criado", description: "Entrada/saída fixa adicionada." });
       setIsModalOpen(false);
+      setEditingItem(null);
     },
     onError: () => {
       toast({ title: "Erro ao salvar", description: "Não foi possível criar o fixo.", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, payload }: { id: number; payload: Partial<InsertFixedCashflow> }) => {
+      const res = await apiRequest("PATCH", `/api/monthly-fixed/${id}`, payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/accounts/${currentAccount?.id}/monthly-fixed`] });
+      toast({ title: "Fixo atualizado" });
+      setIsModalOpen(false);
+      setEditingItem(null);
+    },
+    onError: () => {
+      toast({ title: "Erro ao atualizar", description: "Não foi possível salvar o fixo.", variant: "destructive" });
     },
   });
 
@@ -52,9 +94,22 @@ export default function MonthlyFixed() {
     },
   });
 
-  const handleCreate = (data: Omit<InsertFixedCashflow, "accountId">) => {
+  const handleSubmit = (data: Omit<InsertFixedCashflow, "accountId">) => {
     if (!currentAccount) return;
-    const normalizedAmount = data.amount.replace(/\./g, "").replace(",", ".");
+    const normalizedAmount = normalizeAmountForApi(data.amount);
+
+    if (editingItem) {
+      updateMutation.mutate({
+        id: editingItem.id,
+        payload: {
+          description: data.description,
+          amount: normalizedAmount,
+          type: data.type,
+        },
+      });
+      return;
+    }
+
     createMutation.mutate({
       ...data,
       amount: normalizedAmount,
@@ -75,6 +130,11 @@ export default function MonthlyFixed() {
     totals: { income: "0.00", expenses: "0.00", net: "0.00" },
   };
 
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingItem(null);
+  };
+
   return (
     <AppShell
       title="Fixos mensais"
@@ -90,7 +150,13 @@ export default function MonthlyFixed() {
     >
       <div className="space-y-6">
         <div className="flex items-center justify-end">
-          <Button onClick={() => setIsModalOpen(true)} size="sm">
+          <Button
+            onClick={() => {
+              setEditingItem(null);
+              setIsModalOpen(true);
+            }}
+            size="sm"
+          >
             <Plus className="mr-2 h-4 w-4" />
             Novo fixo
           </Button>
@@ -133,7 +199,7 @@ export default function MonthlyFixed() {
                   <TableRow>
                     <TableHead>Descrição</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
-                    <TableHead className="w-12 text-right"> </TableHead>
+                    <TableHead className="w-20 text-right"> </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -146,14 +212,27 @@ export default function MonthlyFixed() {
                         {formatCurrency(item.amount)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <button
-                          type="button"
-                          onClick={() => deleteMutation.mutate(item.id)}
-                          className="text-xs text-muted-foreground hover:text-destructive"
-                          aria-label="Remover fixo"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingItem(item);
+                              setIsModalOpen(true);
+                            }}
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                            aria-label="Editar fixo"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteMutation.mutate(item.id)}
+                            className="text-xs text-muted-foreground hover:text-destructive"
+                            aria-label="Remover fixo"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -178,7 +257,7 @@ export default function MonthlyFixed() {
                   <TableRow>
                     <TableHead>Descrição</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
-                    <TableHead className="w-12 text-right"> </TableHead>
+                    <TableHead className="w-20 text-right"> </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -191,14 +270,27 @@ export default function MonthlyFixed() {
                         {formatCurrency(item.amount)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <button
-                          type="button"
-                          onClick={() => deleteMutation.mutate(item.id)}
-                          className="text-xs text-muted-foreground hover:text-destructive"
-                          aria-label="Remover fixo"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingItem(item);
+                              setIsModalOpen(true);
+                            }}
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                            aria-label="Editar fixo"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteMutation.mutate(item.id)}
+                            className="text-xs text-muted-foreground hover:text-destructive"
+                            aria-label="Remover fixo"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -213,9 +305,10 @@ export default function MonthlyFixed() {
 
       <FixedCashflowModal
         open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreate}
-        isSaving={createMutation.isPending}
+        onClose={handleCloseModal}
+        onSubmit={handleSubmit}
+        isSaving={createMutation.isPending || updateMutation.isPending}
+        editing={editingItem}
       />
     </AppShell>
   );
