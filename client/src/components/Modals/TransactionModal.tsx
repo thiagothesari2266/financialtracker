@@ -101,7 +101,12 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
       clientName: transaction.clientName || "",
       projectName: transaction.projectName || "",
       costCenter: transaction.costCenter || "",
-      launchType: transaction.installments && transaction.installments > 1 ? "parcelada" : "unica",
+      launchType:
+        transaction.launchType === "recorrente" || transaction.launchType === "parcelada" || transaction.launchType === "unica"
+          ? transaction.launchType
+          : transaction.installments && transaction.installments > 1
+            ? "parcelada"
+            : "unica",
       installments: transaction.installments ? String(transaction.installments) : "",
       recurrenceFrequency: transaction.recurrenceFrequency || "",
       recurrenceEndDate: transaction.recurrenceEndDate ? transaction.recurrenceEndDate.split('T')[0] : "",
@@ -111,7 +116,12 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
   // Atualiza valores do formulário ao abrir para edição
   React.useEffect(() => {
     if (transaction) {
-      const transactionLaunchType = transaction.installments && transaction.installments > 1 ? "parcelada" : "unica";
+      const transactionLaunchType =
+        transaction.launchType === "recorrente" || transaction.launchType === "parcelada" || transaction.launchType === "unica"
+          ? transaction.launchType
+          : transaction.installments && transaction.installments > 1
+            ? "parcelada"
+            : "unica";
       setLaunchType(transactionLaunchType);
       form.reset({
         description: transaction.description || "",
@@ -207,6 +217,10 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
     let launchTypeValue = launchType;
     if (launchTypeValue === "recorrente") {
       data.launchType = "recorrente";
+      // Força envio do campo mesmo quando removido para limpar no backend
+      if (!data.recurrenceEndDate) {
+        data.recurrenceEndDate = "";
+      }
     } else if (launchTypeValue === "parcelada") {
       data.launchType = "parcelada";
       // Validação extra para parcelada
@@ -388,12 +402,17 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
       if (
         payload[key] === null ||
         payload[key] === undefined ||
-        payload[key] === '' ||
+        (payload[key] === '' && key !== 'recurrenceEndDate') ||
         payload[key] === 'null' ||
-        (typeof payload[key] === 'string' && payload[key].trim() === '')
+        (typeof payload[key] === 'string' && payload[key].trim() === '' && key !== 'recurrenceEndDate')
       ) {
         // Nunca inclua o campo 'date' se for vazio/nulo
         if (key === 'date') continue;
+        continue;
+      }
+      // Permite limpar data de recorrência enviando string vazia
+      if (key === 'recurrenceEndDate' && payload[key] === '') {
+        cleaned[key] = '';
         continue;
       }
       // categoryId, bankAccountId, installments devem ser numéricos
@@ -985,7 +1004,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                 </div>
               )}
               {launchType === "recorrente" && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <FormField
                     control={form.control}
                     name="recurrenceFrequency"
@@ -1004,22 +1023,6 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                             <SelectItem value="anual">Anual</SelectItem>
                           </SelectContent>
                         </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="recurrenceEndDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Até quando?</FormLabel>
-                        <FormControl>
-                          <DatePicker
-                            date={field.value ? parse(field.value, "yyyy-MM-dd", new Date()) : undefined}
-                            onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
-                          />
-                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

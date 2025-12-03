@@ -558,16 +558,18 @@ export class DatabaseStorage implements IStorage {
 
     if (
       insertTransaction.launchType === "recorrente" &&
-      insertTransaction.recurrenceFrequency === "mensal" &&
-      insertTransaction.recurrenceEndDate
+      insertTransaction.recurrenceFrequency === "mensal"
     ) {
-      const recurrenceGroupId = randomUUID();
+      const recurrenceGroupId = insertTransaction.recurrenceGroupId ?? randomUUID();
+      const recurrenceEndDate = insertTransaction.recurrenceEndDate
+        ? parseDateInput(insertTransaction.recurrenceEndDate)
+        : null;
       const created = await prisma.transaction.create({
         data: {
           ...baseData,
           recurrenceGroupId,
           recurrenceFrequency: insertTransaction.recurrenceFrequency,
-          recurrenceEndDate: parseDateInput(insertTransaction.recurrenceEndDate),
+          recurrenceEndDate,
           installments: 1,
           currentInstallment: 1,
         },
@@ -719,13 +721,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTransaction(id: number, transaction: Partial<InsertTransaction>): Promise<Transaction | undefined> {
+    const updatePayload: Prisma.TransactionUpdateInput = {
+      ...transaction,
+      date: transaction.date ? parseDateInput(transaction.date) : undefined,
+    };
+
+    if ("recurrenceEndDate" in transaction) {
+      updatePayload.recurrenceEndDate = transaction.recurrenceEndDate
+        ? parseDateInput(transaction.recurrenceEndDate)
+        : null;
+    }
+
     const updated = await prisma.transaction.update({
       where: { id },
-      data: {
-        ...transaction,
-        date: transaction.date ? parseDateInput(transaction.date) : undefined,
-        recurrenceEndDate: transaction.recurrenceEndDate ? parseDateInput(transaction.recurrenceEndDate) : undefined,
-      },
+      data: updatePayload,
       include: { category: true },
     });
     return updated ? mapTransaction(updated, updated.category) : undefined;
