@@ -29,8 +29,19 @@
       "Bash(git stash:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "mcp__ssh__ssh_exec",
+      "mcp__ssh__ssh_connect",
+      "mcp__nexfin-postgres__query",
+      "mcp__nexfin-postgres-prod__query",
+      "Bash(cat:*)",
+      "Bash(ssh nexfin:*)"
     ],
     "deny": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "ssh",
+    "nexfin-postgres",
+    "nexfin-postgres-prod"
+  ]
 }
