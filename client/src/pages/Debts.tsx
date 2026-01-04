@@ -92,6 +92,7 @@ export default function Debts() {
       interestRate: values.interestRate,
       ratePeriod: values.ratePeriod,
       targetDate: values.targetDate?.trim() ? values.targetDate : undefined,
+      notes: values.notes?.trim() ? values.notes.trim() : undefined,
     };
 
     try {
