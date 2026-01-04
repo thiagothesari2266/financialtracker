@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Menu, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Menu, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 interface HeaderProps {
   onMenuToggle?: () => void;
@@ -31,9 +31,7 @@ export default function Header({
               <span className="sr-only">Abrir menu</span>
             </Button>
           )}
-          <span className="text-sm font-semibold text-muted-foreground">
-            Operação financeira
-          </span>
+          <span className="text-sm font-semibold text-muted-foreground">Operação financeira</span>
         </div>
         <div className="flex items-center gap-2">
           {currentMonth && (

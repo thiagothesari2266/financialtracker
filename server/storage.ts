@@ -1,5 +1,5 @@
-import { randomUUID } from "crypto";
-import bcrypt from "bcryptjs";
+import { randomUUID } from 'crypto';
+import bcrypt from 'bcryptjs';
 import type {
   Prisma,
   Account as PrismaAccount,
@@ -14,8 +14,8 @@ import type {
   Client as PrismaClientEntity,
   Debt as PrismaDebt,
   User as PrismaUser,
-} from "@prisma/client";
-import { prisma } from "./db";
+} from '@prisma/client';
+import { prisma } from './db';
 import type {
   Account,
   AccountWithStats,
@@ -51,12 +51,12 @@ import type {
   MonthlyFixedItem,
   Debt,
   InsertDebt,
-} from "@shared/schema";
+} from '@shared/schema';
 
 const DATE_ONLY_LENGTH = 10;
-const INVOICE_CATEGORY_NAME = "Faturas de Cartão";
-const INVOICE_CATEGORY_COLOR = "#f87171";
-const INVOICE_CATEGORY_ICON = "CreditCard";
+const INVOICE_CATEGORY_NAME = 'Faturas de Cartão';
+const INVOICE_CATEGORY_COLOR = '#f87171';
+const INVOICE_CATEGORY_ICON = 'CreditCard';
 
 const ensureDateString = (value: Date | string | null | undefined): string | null => {
   if (!value) return null;
@@ -72,13 +72,13 @@ const ensureDateTimeString = (value: Date | string | null | undefined): string |
 
 const decimalToString = (value: Prisma.Decimal | string | number | null | undefined): string => {
   if (value === null || value === undefined) {
-    return "0.00";
+    return '0.00';
   }
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) ? parsed.toFixed(2) : value;
   }
-  if (typeof value === "number") {
+  if (typeof value === 'number') {
     return value.toFixed(2);
   }
   const parsed = Number.parseFloat(value.toString());
@@ -86,7 +86,7 @@ const decimalToString = (value: Prisma.Decimal | string | number | null | undefi
 };
 
 const parseDateInput = (value: string): Date => {
-  if (value.includes("T")) {
+  if (value.includes('T')) {
     return new Date(value);
   }
   return new Date(`${value}T00:00:00.000Z`);
@@ -115,7 +115,7 @@ const differenceInDays = (to: Date, from: Date): number => {
 };
 
 const computeInvoiceDueDate = (invoiceMonth: string, dueDay: number): Date => {
-  const [yearStr, monthStr] = invoiceMonth.split("-");
+  const [yearStr, monthStr] = invoiceMonth.split('-');
   const year = Number.parseInt(yearStr, 10);
   const month = Number.parseInt(monthStr, 10); // 1-12
   const dueDate = new Date(Date.UTC(year, month - 1, dueDay));
@@ -127,10 +127,10 @@ const computeInvoiceDueDate = (invoiceMonth: string, dueDay: number): Date => {
 };
 
 const formatInvoiceDescription = (cardName: string, invoiceMonth: string): string => {
-  const [yearStr, monthStr] = invoiceMonth.split("-");
+  const [yearStr, monthStr] = invoiceMonth.split('-');
   const year = Number.parseInt(yearStr, 10);
   const month = Number.parseInt(monthStr, 10) - 1;
-  const formatter = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" });
+  const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
   const formatted = formatter.format(new Date(Date.UTC(year, month, 1)));
   return `Fatura ${cardName} - ${formatted}`;
 };
@@ -153,13 +153,13 @@ const mapCategory = (category: PrismaCategory): Category => ({
 
 const mapTransaction = (
   transaction: PrismaTransaction,
-  category?: PrismaCategory | null,
+  category?: PrismaCategory | null
 ): TransactionWithCategory => ({
   id: transaction.id,
   description: transaction.description,
   amount: decimalToString(transaction.amount),
   type: transaction.type,
-  date: ensureDateString(transaction.date) ?? "",
+  date: ensureDateString(transaction.date) ?? '',
   categoryId: transaction.categoryId,
   accountId: transaction.accountId,
   bankAccountId: transaction.bankAccountId ?? null,
@@ -177,7 +177,7 @@ const mapTransaction = (
   creditCardInvoiceId: transaction.creditCardInvoiceId ?? null,
   creditCardId: transaction.creditCardId ?? null,
   isInvoiceTransaction: transaction.isInvoiceTransaction ?? false,
-  createdAt: ensureDateTimeString(transaction.createdAt) ?? "",
+  createdAt: ensureDateTimeString(transaction.createdAt) ?? '',
   paid: transaction.paid ?? false,
   category: category ? mapCategory(category) : null,
 });
@@ -191,7 +191,7 @@ const mapCreditCard = (card: PrismaCreditCard): CreditCard => ({
   dueDate: card.dueDate,
   closingDay: card.closingDay,
   accountId: card.accountId,
-  createdAt: ensureDateTimeString(card.createdAt) ?? "",
+  createdAt: ensureDateTimeString(card.createdAt) ?? '',
 });
 
 const mapDebt = (debt: PrismaDebt): Debt => ({
@@ -203,17 +203,17 @@ const mapDebt = (debt: PrismaDebt): Debt => ({
   interestRate: decimalToString(debt.interestRate),
   ratePeriod: debt.ratePeriod,
   targetDate: ensureDateString(debt.targetDate),
-  createdAt: ensureDateTimeString(debt.createdAt) ?? "",
+  createdAt: ensureDateTimeString(debt.createdAt) ?? '',
 });
 
 const mapCreditCardTransaction = (
   transaction: PrismaCreditCardTransaction,
-  category?: PrismaCategory | null,
+  category?: PrismaCategory | null
 ): CreditCardTransactionWithCategory => ({
   id: transaction.id,
   description: transaction.description,
   amount: decimalToString(transaction.amount),
-  date: ensureDateString(transaction.date) ?? "",
+  date: ensureDateString(transaction.date) ?? '',
   installments: transaction.installments,
   currentInstallment: transaction.currentInstallment,
   categoryId: transaction.categoryId,
@@ -226,12 +226,12 @@ const mapCreditCardTransaction = (
   launchType: transaction.launchType ?? null,
   recurrenceFrequency: transaction.recurrenceFrequency ?? null,
   recurrenceEndDate: ensureDateString(transaction.recurrenceEndDate),
-  createdAt: ensureDateTimeString(transaction.createdAt) ?? "",
+  createdAt: ensureDateTimeString(transaction.createdAt) ?? '',
   category: category ? mapCategory(category) : null,
 });
 
 const stripCategoryFromCardTx = (
-  transaction: CreditCardTransactionWithCategory,
+  transaction: CreditCardTransactionWithCategory
 ): CreditCardTransaction => {
   const { category: _category, ...rest } = transaction;
   return rest;
@@ -244,7 +244,7 @@ const mapBankAccount = (bankAccount: PrismaBankAccount): BankAccount => ({
   pix: bankAccount.pix ?? null,
   shared: bankAccount.shared,
   accountId: bankAccount.accountId,
-  createdAt: ensureDateTimeString(bankAccount.createdAt) ?? "",
+  createdAt: ensureDateTimeString(bankAccount.createdAt) ?? '',
 });
 
 const mapInvoicePayment = (payment: PrismaInvoicePayment): InvoicePayment => ({
@@ -253,10 +253,10 @@ const mapInvoicePayment = (payment: PrismaInvoicePayment): InvoicePayment => ({
   accountId: payment.accountId,
   invoiceMonth: payment.invoiceMonth,
   totalAmount: decimalToString(payment.totalAmount),
-  dueDate: ensureDateString(payment.dueDate) ?? "",
+  dueDate: ensureDateString(payment.dueDate) ?? '',
   transactionId: payment.transactionId ?? null,
   status: payment.status,
-  createdAt: ensureDateTimeString(payment.createdAt) ?? "",
+  createdAt: ensureDateTimeString(payment.createdAt) ?? '',
   paidAt: ensureDateTimeString(payment.paidAt),
 });
 
@@ -270,7 +270,7 @@ const mapProject = (project: PrismaProject): Project => ({
   endDate: ensureDateString(project.endDate),
   status: project.status,
   accountId: project.accountId,
-  createdAt: ensureDateTimeString(project.createdAt) ?? "",
+  createdAt: ensureDateTimeString(project.createdAt) ?? '',
 });
 
 const mapCostCenter = (costCenter: PrismaCostCenter): CostCenter => ({
@@ -282,7 +282,7 @@ const mapCostCenter = (costCenter: PrismaCostCenter): CostCenter => ({
   department: costCenter.department ?? null,
   manager: costCenter.manager ?? null,
   accountId: costCenter.accountId,
-  createdAt: ensureDateTimeString(costCenter.createdAt) ?? "",
+  createdAt: ensureDateTimeString(costCenter.createdAt) ?? '',
 });
 
 const mapClient = (client: PrismaClientEntity): Client => ({
@@ -294,7 +294,7 @@ const mapClient = (client: PrismaClientEntity): Client => ({
   document: client.document ?? null,
   notes: client.notes ?? null,
   accountId: client.accountId,
-  createdAt: ensureDateTimeString(client.createdAt) ?? "",
+  createdAt: ensureDateTimeString(client.createdAt) ?? '',
 });
 
 const mapUser = (user: PrismaUser): AuthenticatedUser => ({
@@ -308,7 +308,7 @@ const mapUserWithPassword = (user: PrismaUser): AuthenticatedUser & { passwordHa
   passwordHash: user.passwordHash,
 });
 
-const sumTransactions = (transactions: Transaction[], type: "income" | "expense"): number => {
+const sumTransactions = (transactions: Transaction[], type: 'income' | 'expense'): number => {
   return transactions
     .filter((t) => t.type === type)
     .reduce((acc, t) => acc + Number.parseFloat(t.amount), 0);
@@ -331,42 +331,62 @@ export interface IStorage {
 
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   getTransactions(accountId: number, limit?: number): Promise<TransactionWithCategory[]>;
-  getTransactionsByDateRange(accountId: number, startDate: string, endDate: string): Promise<TransactionWithCategory[]>;
+  getTransactionsByDateRange(
+    accountId: number,
+    startDate: string,
+    endDate: string
+  ): Promise<TransactionWithCategory[]>;
   getTransaction(id: number): Promise<TransactionWithCategory | undefined>;
-  updateTransaction(id: number, transaction: Partial<InsertTransaction>): Promise<Transaction | undefined>;
+  updateTransaction(
+    id: number,
+    transaction: Partial<InsertTransaction>
+  ): Promise<Transaction | undefined>;
   updateTransactionWithScope(
     id: number,
     data: Partial<InsertTransaction> & {
-      editScope?: "single" | "all" | "future";
+      editScope?: 'single' | 'all' | 'future';
       installmentsGroupId?: string;
       recurrenceGroupId?: string;
-    },
+    }
   ): Promise<Transaction | undefined>;
   deleteTransaction(
     id: number,
-    options?: { editScope?: "single" | "all" | "future"; installmentsGroupId?: string },
+    options?: { editScope?: 'single' | 'all' | 'future'; installmentsGroupId?: string }
   ): Promise<void>;
-  deleteAllTransactions(accountId: number): Promise<{ deletedTransactions: number; deletedCreditCardTransactions: number }>;
+  deleteAllTransactions(
+    accountId: number
+  ): Promise<{ deletedTransactions: number; deletedCreditCardTransactions: number }>;
 
   createCreditCard(creditCard: InsertCreditCard): Promise<CreditCard>;
   getCreditCards(accountId: number): Promise<CreditCard[]>;
   getCreditCard(id: number): Promise<CreditCard | undefined>;
-  updateCreditCard(id: number, creditCard: Partial<InsertCreditCard>): Promise<CreditCard | undefined>;
+  updateCreditCard(
+    id: number,
+    creditCard: Partial<InsertCreditCard>
+  ): Promise<CreditCard | undefined>;
   deleteCreditCard(id: number): Promise<void>;
 
-  createCreditCardTransaction(transaction: InsertCreditCardTransaction): Promise<CreditCardTransaction>;
-  getCreditCardTransactions(accountId: number, creditCardId?: number): Promise<CreditCardTransactionWithCategory[]>;
+  createCreditCardTransaction(
+    transaction: InsertCreditCardTransaction
+  ): Promise<CreditCardTransaction>;
+  getCreditCardTransactions(
+    accountId: number,
+    creditCardId?: number
+  ): Promise<CreditCardTransactionWithCategory[]>;
   getCreditCardTransaction(id: number): Promise<CreditCardTransactionWithCategory | undefined>;
   updateCreditCardTransaction(
     id: number,
-    transaction: Partial<InsertCreditCardTransaction>,
+    transaction: Partial<InsertCreditCardTransaction>
   ): Promise<CreditCardTransaction | undefined>;
   deleteCreditCardTransaction(id: number): Promise<void>;
 
   createBankAccount(bankAccount: InsertBankAccount): Promise<BankAccount>;
   getBankAccounts(accountId: number): Promise<BankAccount[]>;
   getBankAccount(id: number): Promise<BankAccount | undefined>;
-  updateBankAccount(id: number, bankAccount: Partial<InsertBankAccount>): Promise<BankAccount | undefined>;
+  updateBankAccount(
+    id: number,
+    bankAccount: Partial<InsertBankAccount>
+  ): Promise<BankAccount | undefined>;
   deleteBankAccount(id: number): Promise<void>;
 
   createDebt(debt: InsertDebt): Promise<Debt>;
@@ -378,20 +398,28 @@ export interface IStorage {
   getAccountStats(accountId: number, month: string): Promise<AccountWithStats | undefined>;
   getCategoryStats(
     accountId: number,
-    month: string,
+    month: string
   ): Promise<Array<{ categoryId: number; categoryName: string; total: string; color: string }>>;
   getMonthlyFixedSummary(accountId: number): Promise<MonthlyFixedSummary>;
 
-  getCreditCardInvoices(accountId: number): Promise<Array<{ creditCardId: number; month: string; total: string }>>;
+  getCreditCardInvoices(
+    accountId: number
+  ): Promise<Array<{ creditCardId: number; month: string; total: string }>>;
 
   createInvoicePayment(invoicePayment: InsertInvoicePayment): Promise<InvoicePayment>;
   getInvoicePayments(accountId: number): Promise<InvoicePayment[]>;
   getPendingInvoicePayments(accountId: number): Promise<InvoicePayment[]>;
   getInvoicePayment(id: number): Promise<InvoicePayment | undefined>;
-  updateInvoicePayment(id: number, invoicePayment: Partial<InsertInvoicePayment>): Promise<InvoicePayment | undefined>;
+  updateInvoicePayment(
+    id: number,
+    invoicePayment: Partial<InsertInvoicePayment>
+  ): Promise<InvoicePayment | undefined>;
   deleteInvoicePayment(id: number): Promise<void>;
   processOverdueInvoices(accountId: number): Promise<InvoicePayment[]>;
-  markInvoiceAsPaid(invoicePaymentId: number, transactionId: number): Promise<InvoicePayment | undefined>;
+  markInvoiceAsPaid(
+    invoicePaymentId: number,
+    transactionId: number
+  ): Promise<InvoicePayment | undefined>;
   syncInvoiceTransactions(accountId: number): Promise<void>;
 
   getLegacyInvoiceTransactions(accountId: number): Promise<TransactionWithCategory[]>;
@@ -399,7 +427,10 @@ export interface IStorage {
 
   getFixedCashflow(accountId: number): Promise<MonthlyFixedSummary>;
   createFixedCashflow(entry: InsertFixedCashflow): Promise<MonthlyFixedItem>;
-  updateFixedCashflow(id: number, entry: Partial<InsertFixedCashflow>): Promise<MonthlyFixedItem | undefined>;
+  updateFixedCashflow(
+    id: number,
+    entry: Partial<InsertFixedCashflow>
+  ): Promise<MonthlyFixedItem | undefined>;
   deleteFixedCashflow(id: number): Promise<void>;
 
   createProject(project: InsertProject): Promise<Project>;
@@ -412,7 +443,10 @@ export interface IStorage {
   createCostCenter(costCenter: InsertCostCenter): Promise<CostCenter>;
   getCostCenters(accountId: number): Promise<CostCenter[]>;
   getCostCenter(id: number): Promise<CostCenter | undefined>;
-  updateCostCenter(id: number, costCenter: Partial<InsertCostCenter>): Promise<CostCenter | undefined>;
+  updateCostCenter(
+    id: number,
+    costCenter: Partial<InsertCostCenter>
+  ): Promise<CostCenter | undefined>;
   deleteCostCenter(id: number): Promise<void>;
   getCostCenterStats(costCenterId: number): Promise<CostCenterWithStats | undefined>;
 
@@ -425,7 +459,9 @@ export interface IStorage {
 
   createUser(user: InsertUser): Promise<AuthenticatedUser>;
   getUserById(id: number): Promise<AuthenticatedUser | undefined>;
-  getUserByEmail(email: string): Promise<(AuthenticatedUser & { passwordHash: string }) | undefined>;
+  getUserByEmail(
+    email: string
+  ): Promise<(AuthenticatedUser & { passwordHash: string }) | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -442,7 +478,7 @@ export class DatabaseStorage implements IStorage {
   async getAccounts(): Promise<Account[]> {
     const result = await prisma.account.findMany({
       orderBy: {
-        createdAt: "desc",
+        createdAt: 'desc',
       },
     });
     return result.map(mapAccount);
@@ -481,34 +517,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   private async createDefaultCategories(accountId: number, accountType: string): Promise<void> {
-    const personalDefaults: Array<Omit<InsertCategory, "accountId">> = [
-      { name: "Alimentação", color: "#f97316", icon: "Utensils", type: "expense" },
-      { name: "Transporte", color: "#14b8a6", icon: "Car", type: "expense" },
-      { name: "Moradia", color: "#6366f1", icon: "Home", type: "expense" },
-      { name: "Saúde", color: "#ef4444", icon: "Heart", type: "expense" },
-      { name: "Educação", color: "#0ea5e9", icon: "BookOpen", type: "expense" },
-      { name: "Lazer", color: "#8b5cf6", icon: "Gamepad2", type: "expense" },
-      { name: "Compras", color: "#f472b6", icon: "ShoppingCart", type: "expense" },
-      { name: "Assinaturas", color: "#f59e0b", icon: "CreditCard", type: "expense" },
-      { name: "Salário", color: "#16a34a", icon: "DollarSign", type: "income" },
-      { name: "Investimentos", color: "#0f172a", icon: "Target", type: "income" },
+    const personalDefaults: Array<Omit<InsertCategory, 'accountId'>> = [
+      { name: 'Alimentação', color: '#f97316', icon: 'Utensils', type: 'expense' },
+      { name: 'Transporte', color: '#14b8a6', icon: 'Car', type: 'expense' },
+      { name: 'Moradia', color: '#6366f1', icon: 'Home', type: 'expense' },
+      { name: 'Saúde', color: '#ef4444', icon: 'Heart', type: 'expense' },
+      { name: 'Educação', color: '#0ea5e9', icon: 'BookOpen', type: 'expense' },
+      { name: 'Lazer', color: '#8b5cf6', icon: 'Gamepad2', type: 'expense' },
+      { name: 'Compras', color: '#f472b6', icon: 'ShoppingCart', type: 'expense' },
+      { name: 'Assinaturas', color: '#f59e0b', icon: 'CreditCard', type: 'expense' },
+      { name: 'Salário', color: '#16a34a', icon: 'DollarSign', type: 'income' },
+      { name: 'Investimentos', color: '#0f172a', icon: 'Target', type: 'income' },
     ];
 
-    const businessDefaults: Array<Omit<InsertCategory, "accountId">> = [
-      { name: "Vendas", color: "#16a34a", icon: "Receipt", type: "income" },
-      { name: "Serviços", color: "#22c55e", icon: "Handshake", type: "income" },
-      { name: "Assinaturas recorrentes", color: "#0ea5e9", icon: "Wifi", type: "income" },
-      { name: "Operacional", color: "#475569", icon: "Briefcase", type: "expense" },
-      { name: "Marketing", color: "#ec4899", icon: "Target", type: "expense" },
-      { name: "Tecnologia", color: "#3b82f6", icon: "Laptop", type: "expense" },
-      { name: "Folha de pagamento", color: "#1d4ed8", icon: "Users", type: "expense" },
-      { name: "Tributos e taxas", color: "#b45309", icon: "Receipt", type: "expense" },
-      { name: "Fornecedores", color: "#059669", icon: "Car", type: "expense" },
-      { name: "Viagens", color: "#0f766e", icon: "Plane", type: "expense" },
-      { name: "Outros custos", color: "#6b7280", icon: "Lightbulb", type: "expense" },
+    const businessDefaults: Array<Omit<InsertCategory, 'accountId'>> = [
+      { name: 'Vendas', color: '#16a34a', icon: 'Receipt', type: 'income' },
+      { name: 'Serviços', color: '#22c55e', icon: 'Handshake', type: 'income' },
+      { name: 'Assinaturas recorrentes', color: '#0ea5e9', icon: 'Wifi', type: 'income' },
+      { name: 'Operacional', color: '#475569', icon: 'Briefcase', type: 'expense' },
+      { name: 'Marketing', color: '#ec4899', icon: 'Target', type: 'expense' },
+      { name: 'Tecnologia', color: '#3b82f6', icon: 'Laptop', type: 'expense' },
+      { name: 'Folha de pagamento', color: '#1d4ed8', icon: 'Users', type: 'expense' },
+      { name: 'Tributos e taxas', color: '#b45309', icon: 'Receipt', type: 'expense' },
+      { name: 'Fornecedores', color: '#059669', icon: 'Car', type: 'expense' },
+      { name: 'Viagens', color: '#0f766e', icon: 'Plane', type: 'expense' },
+      { name: 'Outros custos', color: '#6b7280', icon: 'Lightbulb', type: 'expense' },
     ];
 
-    const defaults = accountType === "business" ? businessDefaults : personalDefaults;
+    const defaults = accountType === 'business' ? businessDefaults : personalDefaults;
 
     await prisma.category.createMany({
       data: defaults.map((category) => ({
@@ -529,7 +565,7 @@ export class DatabaseStorage implements IStorage {
   async getCategories(accountId: number): Promise<Category[]> {
     const categories = await prisma.category.findMany({
       where: { accountId },
-      orderBy: { name: "asc" },
+      orderBy: { name: 'asc' },
     });
     return categories.map(mapCategory);
   }
@@ -541,7 +577,10 @@ export class DatabaseStorage implements IStorage {
     return category ? mapCategory(category) : undefined;
   }
 
-  async updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category | undefined> {
+  async updateCategory(
+    id: number,
+    category: Partial<InsertCategory>
+  ): Promise<Category | undefined> {
     const updated = await prisma.category.update({
       where: { id },
       data: category,
@@ -557,12 +596,14 @@ export class DatabaseStorage implements IStorage {
 
   // Transaction methods
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
-    const installments = insertTransaction.installments && insertTransaction.installments > 0
-      ? insertTransaction.installments
-      : 1;
-    const currentInstallment = insertTransaction.currentInstallment && insertTransaction.currentInstallment > 0
-      ? insertTransaction.currentInstallment
-      : 1;
+    const installments =
+      insertTransaction.installments && insertTransaction.installments > 0
+        ? insertTransaction.installments
+        : 1;
+    const currentInstallment =
+      insertTransaction.currentInstallment && insertTransaction.currentInstallment > 0
+        ? insertTransaction.currentInstallment
+        : 1;
 
     const baseData: Prisma.TransactionUncheckedCreateInput = {
       description: insertTransaction.description,
@@ -592,8 +633,8 @@ export class DatabaseStorage implements IStorage {
     };
 
     if (
-      insertTransaction.launchType === "recorrente" &&
-      insertTransaction.recurrenceFrequency === "mensal"
+      insertTransaction.launchType === 'recorrente' &&
+      insertTransaction.recurrenceFrequency === 'mensal'
     ) {
       const recurrenceGroupId = insertTransaction.recurrenceGroupId ?? randomUUID();
       const recurrenceEndDate = insertTransaction.recurrenceEndDate
@@ -613,7 +654,7 @@ export class DatabaseStorage implements IStorage {
       return mapTransaction(created, created.category);
     }
 
-    if (insertTransaction.launchType === "parcelada" && installments > 1) {
+    if (insertTransaction.launchType === 'parcelada' && installments > 1) {
       const installmentsGroupId = randomUUID();
       const baseDate = parseDateInput(insertTransaction.date);
       let first: PrismaTransaction | undefined;
@@ -640,7 +681,7 @@ export class DatabaseStorage implements IStorage {
       });
 
       if (!first) {
-        throw new Error("Falha ao criar transação parcelada");
+        throw new Error('Falha ao criar transação parcelada');
       }
 
       const withCategory = await prisma.transaction.findUnique({
@@ -648,7 +689,7 @@ export class DatabaseStorage implements IStorage {
         include: { category: true },
       });
       if (!withCategory) {
-        throw new Error("Falha ao carregar transação criada");
+        throw new Error('Falha ao carregar transação criada');
       }
       return mapTransaction(withCategory, withCategory.category);
     }
@@ -670,10 +711,7 @@ export class DatabaseStorage implements IStorage {
     const transactions = await prisma.transaction.findMany({
       where: { accountId },
       include: { category: true },
-      orderBy: [
-        { date: "desc" },
-        { createdAt: "desc" },
-      ],
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
       take: limit,
     });
 
@@ -683,7 +721,7 @@ export class DatabaseStorage implements IStorage {
   async getTransactionsByDateRange(
     accountId: number,
     startDate: string,
-    endDate: string,
+    endDate: string
   ): Promise<TransactionWithCategory[]> {
     const start = parseDateInput(startDate);
     const end = parseDateInput(endDate);
@@ -694,31 +732,28 @@ export class DatabaseStorage implements IStorage {
         date: { gte: start, lte: end },
         OR: [
           { launchType: null },
-          { launchType: "" },
-          { launchType: "unica" },
-          { launchType: "parcelada" },
+          { launchType: '' },
+          { launchType: 'unica' },
+          { launchType: 'parcelada' },
           {
-            launchType: "recorrente",
+            launchType: 'recorrente',
             OR: [
               { recurrenceFrequency: null },
-              { recurrenceFrequency: "" },
-              { recurrenceFrequency: "unica" },
+              { recurrenceFrequency: '' },
+              { recurrenceFrequency: 'unica' },
             ],
           },
         ],
       },
       include: { category: true },
-      orderBy: [
-        { date: "desc" },
-        { createdAt: "desc" },
-      ],
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
     });
 
     const recurrenceDefinitions = await prisma.transaction.findMany({
       where: {
         accountId,
-        launchType: "recorrente",
-        recurrenceFrequency: "mensal",
+        launchType: 'recorrente',
+        recurrenceFrequency: 'mensal',
         currentInstallment: 1,
       },
       include: { category: true },
@@ -755,13 +790,16 @@ export class DatabaseStorage implements IStorage {
     return transaction ? mapTransaction(transaction, transaction.category) : undefined;
   }
 
-  async updateTransaction(id: number, transaction: Partial<InsertTransaction>): Promise<Transaction | undefined> {
+  async updateTransaction(
+    id: number,
+    transaction: Partial<InsertTransaction>
+  ): Promise<Transaction | undefined> {
     const updatePayload: Prisma.TransactionUpdateInput = {
       ...transaction,
       date: transaction.date ? parseDateInput(transaction.date) : undefined,
     };
 
-    if ("recurrenceEndDate" in transaction) {
+    if ('recurrenceEndDate' in transaction) {
       updatePayload.recurrenceEndDate = transaction.recurrenceEndDate
         ? parseDateInput(transaction.recurrenceEndDate)
         : null;
@@ -778,12 +816,12 @@ export class DatabaseStorage implements IStorage {
   async updateTransactionWithScope(
     id: number,
     data: Partial<InsertTransaction> & {
-      editScope?: "single" | "all" | "future";
+      editScope?: 'single' | 'all' | 'future';
       installmentsGroupId?: string;
       recurrenceGroupId?: string;
-    },
+    }
   ): Promise<Transaction | undefined> {
-    const scope = data.editScope ?? "single";
+    const scope = data.editScope ?? 'single';
     console.log('[updateTransactionWithScope] start', {
       id,
       editScope: scope,
@@ -797,14 +835,15 @@ export class DatabaseStorage implements IStorage {
 
     // Edição de recorrente apenas para esta ocorrência: cria transação única, divide a recorrência e mantém futuras intactas
     if (
-      scope === "single" &&
-      (
-        current.launchType === "recorrente" ||
+      scope === 'single' &&
+      (current.launchType === 'recorrente' ||
         !!current.recurrenceFrequency ||
-        !!current.recurrenceGroupId
-      )
+        !!current.recurrenceGroupId)
     ) {
-      console.log('[updateTransactionWithScope] splitting recurrence (single scope)', { transactionId: id, targetDate: data.date ?? current.date });
+      console.log('[updateTransactionWithScope] splitting recurrence (single scope)', {
+        transactionId: id,
+        targetDate: data.date ?? current.date,
+      });
       const targetDate = parseDateInput(data.date ?? ensureDateString(current.date));
       const originalEndDate = current.recurrenceEndDate ?? null;
       const continuationGroupId = randomUUID();
@@ -827,7 +866,7 @@ export class DatabaseStorage implements IStorage {
           installmentsGroupId: null,
           recurrenceFrequency: null,
           recurrenceEndDate: null,
-          launchType: "unica",
+          launchType: 'unica',
           recurrenceGroupId: null,
           creditCardInvoiceId: current.creditCardInvoiceId,
           creditCardId: current.creditCardId,
@@ -878,16 +917,24 @@ export class DatabaseStorage implements IStorage {
       return mapTransaction(standalone, standalone.category);
     }
 
-    if (!data.editScope || data.editScope === "single") {
+    if (!data.editScope || data.editScope === 'single') {
       console.log('[updateTransactionWithScope] fallback single update');
       return this.updateTransaction(id, data);
     }
 
-    let groupId = data.installmentsGroupId ?? data.recurrenceGroupId ?? current.installmentsGroupId ?? current.recurrenceGroupId;
+    let groupId =
+      data.installmentsGroupId ??
+      data.recurrenceGroupId ??
+      current.installmentsGroupId ??
+      current.recurrenceGroupId;
     const isInstallmentGroup = Boolean(data.installmentsGroupId ?? current.installmentsGroupId);
 
     // Para recorrentes sem recurrenceGroupId, cria um grupo na hora para permitir escopos all/future
-    if (!groupId && !isInstallmentGroup && (current.launchType === "recorrente" || current.recurrenceFrequency)) {
+    if (
+      !groupId &&
+      !isInstallmentGroup &&
+      (current.launchType === 'recorrente' || current.recurrenceFrequency)
+    ) {
       groupId = randomUUID();
       await prisma.transaction.update({
         where: { id: current.id },
@@ -903,7 +950,7 @@ export class DatabaseStorage implements IStorage {
       ? { installmentsGroupId: groupId }
       : { recurrenceGroupId: groupId };
 
-    if (scope === "future") {
+    if (scope === 'future') {
       if (isInstallmentGroup) {
         where.currentInstallment = { gte: current.currentInstallment };
       } else {
@@ -913,31 +960,34 @@ export class DatabaseStorage implements IStorage {
 
     const transactionsToUpdate = await prisma.transaction.findMany({
       where,
-      orderBy: isInstallmentGroup ? { currentInstallment: "asc" } : { date: "asc" },
+      orderBy: isInstallmentGroup ? { currentInstallment: 'asc' } : { date: 'asc' },
     });
     if (transactionsToUpdate.length === 0) {
       return undefined;
     }
 
-    const scopeReferenceDate = scope === "future"
-      ? current.date
-      : transactionsToUpdate[0]?.date;
+    const scopeReferenceDate = scope === 'future' ? current.date : transactionsToUpdate[0]?.date;
 
     const baseDate = data.date ? parseDateInput(data.date) : undefined;
 
     await prisma.$transaction(
       transactionsToUpdate.map((transactionToUpdate) => {
-        const scopedBaseDate = baseDate && scope !== "single"
-          ? isInstallmentGroup
-            ? addMonthsPreserveDay(
-                baseDate,
-                transactionToUpdate.currentInstallment - transactionsToUpdate[0].currentInstallment,
-              )
-            : addDays(
-                baseDate,
-                differenceInDays(new Date(transactionToUpdate.date), new Date(scopeReferenceDate ?? transactionToUpdate.date)),
-              )
-          : undefined;
+        const scopedBaseDate =
+          baseDate && scope !== 'single'
+            ? isInstallmentGroup
+              ? addMonthsPreserveDay(
+                  baseDate,
+                  transactionToUpdate.currentInstallment -
+                    transactionsToUpdate[0].currentInstallment
+                )
+              : addDays(
+                  baseDate,
+                  differenceInDays(
+                    new Date(transactionToUpdate.date),
+                    new Date(scopeReferenceDate ?? transactionToUpdate.date)
+                  )
+                )
+            : undefined;
         const updatePayload: Prisma.TransactionUpdateInput = {
           description: data.description,
           amount: data.amount,
@@ -970,16 +1020,17 @@ export class DatabaseStorage implements IStorage {
         }
 
         if (data.date) {
-          updatePayload.date = scope === "single"
-            ? parseDateInput(data.date)
-            : scopedBaseDate ?? parseDateInput(data.date);
+          updatePayload.date =
+            scope === 'single'
+              ? parseDateInput(data.date)
+              : (scopedBaseDate ?? parseDateInput(data.date));
         }
 
         return prisma.transaction.update({
           where: { id: transactionToUpdate.id },
           data: updatePayload,
         });
-      }),
+      })
     );
 
     return this.getTransaction(id);
@@ -987,9 +1038,9 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTransaction(
     id: number,
-    options?: { editScope?: "single" | "all" | "future"; installmentsGroupId?: string },
+    options?: { editScope?: 'single' | 'all' | 'future'; installmentsGroupId?: string }
   ): Promise<void> {
-    if (!options?.editScope || !options.installmentsGroupId || options.editScope === "single") {
+    if (!options?.editScope || !options.installmentsGroupId || options.editScope === 'single') {
       await prisma.transaction.delete({ where: { id } });
       return;
     }
@@ -1002,14 +1053,16 @@ export class DatabaseStorage implements IStorage {
       installmentsGroupId: groupId,
     };
 
-    if (options.editScope === "future") {
+    if (options.editScope === 'future') {
       where.currentInstallment = { gte: current.currentInstallment };
     }
 
     await prisma.transaction.deleteMany({ where });
   }
 
-  async deleteAllTransactions(accountId: number): Promise<{ deletedTransactions: number; deletedCreditCardTransactions: number }> {
+  async deleteAllTransactions(
+    accountId: number
+  ): Promise<{ deletedTransactions: number; deletedCreditCardTransactions: number }> {
     const [transactionsResult, creditCardResult] = await prisma.$transaction([
       prisma.transaction.deleteMany({ where: { accountId } }),
       prisma.creditCardTransaction.deleteMany({ where: { accountId } }),
@@ -1032,7 +1085,7 @@ export class DatabaseStorage implements IStorage {
   async getCreditCards(accountId: number): Promise<CreditCard[]> {
     const cards = await prisma.creditCard.findMany({
       where: { accountId },
-      orderBy: { name: "asc" },
+      orderBy: { name: 'asc' },
     });
     return cards.map(mapCreditCard);
   }
@@ -1044,7 +1097,10 @@ export class DatabaseStorage implements IStorage {
     return card ? mapCreditCard(card) : undefined;
   }
 
-  async updateCreditCard(id: number, creditCard: Partial<InsertCreditCard>): Promise<CreditCard | undefined> {
+  async updateCreditCard(
+    id: number,
+    creditCard: Partial<InsertCreditCard>
+  ): Promise<CreditCard | undefined> {
     const updated = await prisma.creditCard.update({
       where: { id },
       data: creditCard,
@@ -1082,7 +1138,7 @@ export class DatabaseStorage implements IStorage {
 
   // Credit card transaction methods
   async createCreditCardTransaction(
-    insertTransaction: InsertCreditCardTransaction,
+    insertTransaction: InsertCreditCardTransaction
   ): Promise<CreditCardTransaction> {
     const installments =
       insertTransaction.installments && insertTransaction.installments > 0
@@ -1119,7 +1175,10 @@ export class DatabaseStorage implements IStorage {
 
       await prisma.$transaction(async (tx) => {
         for (let installment = 1; installment <= installments; installment++) {
-          const date = addMonthsPreserveDay(parseDateInput(insertTransaction.date), installment - 1);
+          const date = addMonthsPreserveDay(
+            parseDateInput(insertTransaction.date),
+            installment - 1
+          );
           const created = await tx.creditCardTransaction.create({
             data: {
               ...baseData,
@@ -1136,7 +1195,7 @@ export class DatabaseStorage implements IStorage {
       });
 
       if (!first) {
-        throw new Error("Falha ao criar transação parcelada de cartão");
+        throw new Error('Falha ao criar transação parcelada de cartão');
       }
 
       await this.updateAllInvoiceTransactions(insertTransaction.accountId);
@@ -1153,7 +1212,7 @@ export class DatabaseStorage implements IStorage {
 
   async getCreditCardTransactions(
     accountId: number,
-    creditCardId?: number,
+    creditCardId?: number
   ): Promise<CreditCardTransactionWithCategory[]> {
     const transactions = await prisma.creditCardTransaction.findMany({
       where: {
@@ -1161,16 +1220,15 @@ export class DatabaseStorage implements IStorage {
         creditCardId: creditCardId ?? undefined,
       },
       include: { category: true },
-      orderBy: [
-        { date: "desc" },
-        { createdAt: "desc" },
-      ],
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
     });
 
     return transactions.map((item) => mapCreditCardTransaction(item, item.category));
   }
 
-  async getCreditCardTransaction(id: number): Promise<CreditCardTransactionWithCategory | undefined> {
+  async getCreditCardTransaction(
+    id: number
+  ): Promise<CreditCardTransactionWithCategory | undefined> {
     const transaction = await prisma.creditCardTransaction.findUnique({
       where: { id },
       include: { category: true },
@@ -1180,7 +1238,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateCreditCardTransaction(
     id: number,
-    transaction: Partial<InsertCreditCardTransaction>,
+    transaction: Partial<InsertCreditCardTransaction>
   ): Promise<CreditCardTransaction | undefined> {
     const updated = await prisma.creditCardTransaction.update({
       where: { id },
@@ -1217,18 +1275,18 @@ export class DatabaseStorage implements IStorage {
     const invoices = await this.buildCreditCardInvoiceSummaries(accountId);
     const invoicePayments = await prisma.invoicePayment.findMany({ where: { accountId } });
     const paymentMap = new Map(
-      invoicePayments.map((payment) => [`${payment.creditCardId}:${payment.invoiceMonth}`, payment]),
+      invoicePayments.map((payment) => [`${payment.creditCardId}:${payment.invoiceMonth}`, payment])
     );
 
     const existingTransactions = await prisma.transaction.findMany({
       where: { accountId, isInvoiceTransaction: true },
       select: { id: true, creditCardInvoiceId: true },
-      orderBy: { id: "asc" },
+      orderBy: { id: 'asc' },
     });
     const existingMap = new Map<string, number>();
     const duplicatesToDelete: number[] = [];
     for (const transaction of existingTransactions) {
-      const key = transaction.creditCardInvoiceId ?? "";
+      const key = transaction.creditCardInvoiceId ?? '';
       if (!key) {
         duplicatesToDelete.push(transaction.id);
         continue;
@@ -1259,7 +1317,7 @@ export class DatabaseStorage implements IStorage {
       const description = formatInvoiceDescription(card.name, invoice.month);
       const paymentKey = `${card.id}:${invoice.month}`;
       const payment = paymentMap.get(paymentKey);
-      const paid = payment?.status === "paid";
+      const paid = payment?.status === 'paid';
       const amountStr = total.toFixed(2);
 
       if (existingMap.has(invoiceId)) {
@@ -1271,7 +1329,7 @@ export class DatabaseStorage implements IStorage {
             amount: amountStr,
             date: dueDate,
             categoryId: invoiceCategory.id,
-            type: "expense",
+            type: 'expense',
             creditCardId: card.id,
             creditCardInvoiceId: invoiceId,
             isInvoiceTransaction: true,
@@ -1289,7 +1347,7 @@ export class DatabaseStorage implements IStorage {
           data: {
             description,
             amount: amountStr,
-            type: "expense",
+            type: 'expense',
             date: dueDate,
             categoryId: invoiceCategory.id,
             accountId,
@@ -1314,7 +1372,9 @@ export class DatabaseStorage implements IStorage {
       where: {
         accountId,
         isInvoiceTransaction: true,
-        ...(usedInvoiceIds.size > 0 ? { creditCardInvoiceId: { notIn: Array.from(usedInvoiceIds) } } : {}),
+        ...(usedInvoiceIds.size > 0
+          ? { creditCardInvoiceId: { notIn: Array.from(usedInvoiceIds) } }
+          : {}),
       },
       select: { id: true },
     });
@@ -1323,15 +1383,13 @@ export class DatabaseStorage implements IStorage {
       const staleIds = staleTransactions.map((tx) => tx.id);
       await prisma.invoicePayment.updateMany({
         where: { transactionId: { in: staleIds } },
-        data: { transactionId: null, status: "pending", paidAt: null },
+        data: { transactionId: null, status: 'pending', paidAt: null },
       });
       await prisma.transaction.deleteMany({ where: { id: { in: staleIds } } });
     }
   }
 
-  private async buildCreditCardInvoiceSummaries(
-    accountId: number,
-  ): Promise<
+  private async buildCreditCardInvoiceSummaries(accountId: number): Promise<
     Array<{
       creditCardId: number;
       cardName: string;
@@ -1347,7 +1405,7 @@ export class DatabaseStorage implements IStorage {
     const transactions = await prisma.creditCardTransaction.findMany({
       where: { accountId },
       include: { category: true },
-      orderBy: [{ invoiceMonth: "asc" }, { date: "asc" }],
+      orderBy: [{ invoiceMonth: 'asc' }, { date: 'asc' }],
     });
 
     const invoices = new Map<
@@ -1366,7 +1424,8 @@ export class DatabaseStorage implements IStorage {
       const key = `${tx.creditCardId}:${tx.invoiceMonth}`;
       const mapped = mapCreditCardTransaction(tx, tx.category);
       const existing = invoices.get(key);
-      const dateStr = ensureDateString(tx.date) ?? new Date().toISOString().slice(0, DATE_ONLY_LENGTH);
+      const dateStr =
+        ensureDateString(tx.date) ?? new Date().toISOString().slice(0, DATE_ONLY_LENGTH);
       if (existing) {
         existing.total += Number.parseFloat(tx.amount.toString());
         existing.periodStart = existing.periodStart < dateStr ? existing.periodStart : dateStr;
@@ -1386,7 +1445,7 @@ export class DatabaseStorage implements IStorage {
 
     return Array.from(invoices.values()).map((invoice) => ({
       creditCardId: invoice.creditCardId,
-      cardName: cardMap.get(invoice.creditCardId)?.name ?? "",
+      cardName: cardMap.get(invoice.creditCardId)?.name ?? '',
       month: invoice.month,
       periodStart: invoice.periodStart,
       periodEnd: invoice.periodEnd,
@@ -1406,7 +1465,7 @@ export class DatabaseStorage implements IStorage {
         name: INVOICE_CATEGORY_NAME,
         color: INVOICE_CATEGORY_COLOR,
         icon: INVOICE_CATEGORY_ICON,
-        type: "expense",
+        type: 'expense',
       },
     });
   }
@@ -1422,12 +1481,9 @@ export class DatabaseStorage implements IStorage {
   async getBankAccounts(accountId: number): Promise<BankAccount[]> {
     const accounts = await prisma.bankAccount.findMany({
       where: {
-        OR: [
-          { accountId },
-          { shared: true },
-        ],
+        OR: [{ accountId }, { shared: true }],
       },
-      orderBy: { name: "asc" },
+      orderBy: { name: 'asc' },
     });
     return accounts.map(mapBankAccount);
   }
@@ -1441,7 +1497,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateBankAccount(
     id: number,
-    bankAccount: Partial<InsertBankAccount>,
+    bankAccount: Partial<InsertBankAccount>
   ): Promise<BankAccount | undefined> {
     const updated = await prisma.bankAccount.update({
       where: { id },
@@ -1463,7 +1519,7 @@ export class DatabaseStorage implements IStorage {
         type: insertDebt.type ?? null,
         balance: insertDebt.balance,
         interestRate: insertDebt.interestRate,
-        ratePeriod: insertDebt.ratePeriod ?? "monthly",
+        ratePeriod: insertDebt.ratePeriod ?? 'monthly',
         targetDate: insertDebt.targetDate ? parseDateInput(insertDebt.targetDate) : null,
       },
     });
@@ -1474,10 +1530,7 @@ export class DatabaseStorage implements IStorage {
   async getDebts(accountId: number): Promise<Debt[]> {
     const debts = await prisma.debt.findMany({
       where: { accountId },
-      orderBy: [
-        { targetDate: "asc" },
-        { createdAt: "desc" },
-      ],
+      orderBy: [{ targetDate: 'asc' }, { createdAt: 'desc' }],
     });
 
     return debts.map(mapDebt);
@@ -1494,7 +1547,7 @@ export class DatabaseStorage implements IStorage {
         where: { id },
         data: {
           name: debt.name ?? undefined,
-          type: debt.type === undefined ? undefined : debt.type ?? null,
+          type: debt.type === undefined ? undefined : (debt.type ?? null),
           balance: debt.balance ?? undefined,
           interestRate: debt.interestRate ?? undefined,
           ratePeriod: debt.ratePeriod ?? undefined,
@@ -1509,7 +1562,7 @@ export class DatabaseStorage implements IStorage {
 
       return mapDebt(updated);
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         return undefined;
       }
       throw error;
@@ -1527,7 +1580,7 @@ export class DatabaseStorage implements IStorage {
       return undefined;
     }
 
-    const [year, monthStr] = month.split("-");
+    const [year, monthStr] = month.split('-');
     const monthNumber = Number.parseInt(monthStr, 10) - 1;
     const yearNumber = Number.parseInt(year, 10);
     const startDate = new Date(Date.UTC(yearNumber, monthNumber, 1));
@@ -1539,18 +1592,18 @@ export class DatabaseStorage implements IStorage {
     const monthlyTransactions = await this.getTransactionsByDateRange(
       accountId,
       startDateStr,
-      endDateStr,
+      endDateStr
     );
 
     const paidMonthlyTransactions = monthlyTransactions.filter((transaction) => transaction.paid);
 
-    const monthlyIncome = sumTransactions(paidMonthlyTransactions, "income");
-    const monthlyExpenses = sumTransactions(paidMonthlyTransactions, "expense");
+    const monthlyIncome = sumTransactions(paidMonthlyTransactions, 'income');
+    const monthlyExpenses = sumTransactions(paidMonthlyTransactions, 'expense');
 
     // Saldo considera apenas lançamentos pagos no período solicitado
     const balance = paidMonthlyTransactions.reduce((acc, transaction) => {
       const amount = Number.parseFloat(transaction.amount);
-      return transaction.type === "income" ? acc + amount : acc - amount;
+      return transaction.type === 'income' ? acc + amount : acc - amount;
     }, 0);
 
     return {
@@ -1564,18 +1617,22 @@ export class DatabaseStorage implements IStorage {
 
   async getCategoryStats(
     accountId: number,
-    month: string,
+    month: string
   ): Promise<Array<{ categoryId: number; categoryName: string; total: string; color: string }>> {
     const categories = await this.getCategories(accountId);
     if (categories.length === 0) {
       return [];
     }
 
-    const transactions = await this.getTransactionsByDateRange(accountId, `${month}-01`, `${month}-31`);
+    const transactions = await this.getTransactionsByDateRange(
+      accountId,
+      `${month}-01`,
+      `${month}-31`
+    );
     const totals = new Map<number, number>();
 
     for (const tx of transactions) {
-      if (tx.type !== "expense") continue;
+      if (tx.type !== 'expense') continue;
       const current = totals.get(tx.categoryId) ?? 0;
       totals.set(tx.categoryId, current + Number.parseFloat(tx.amount));
     }
@@ -1594,15 +1651,9 @@ export class DatabaseStorage implements IStorage {
     const entries = await prisma.fixedCashflow.findMany({
       where: {
         accountId,
-        OR: [
-          { endMonth: null },
-          { endMonth: { gte: todayMonth } },
-        ],
+        OR: [{ endMonth: null }, { endMonth: { gte: todayMonth } }],
       },
-      orderBy: [
-        { startMonth: "asc" },
-        { createdAt: "asc" },
-      ],
+      orderBy: [{ startMonth: 'asc' }, { createdAt: 'asc' }],
     });
 
     const mapped: MonthlyFixedItem[] = entries
@@ -1616,8 +1667,8 @@ export class DatabaseStorage implements IStorage {
         endMonth: entry.endMonth ?? null,
       }));
 
-    const income = mapped.filter((item) => item.type === "income");
-    const expenses = mapped.filter((item) => item.type === "expense");
+    const income = mapped.filter((item) => item.type === 'income');
+    const expenses = mapped.filter((item) => item.type === 'expense');
     const incomeTotal = income.reduce((sum, item) => sum + Number.parseFloat(item.amount), 0);
     const expenseTotal = expenses.reduce((sum, item) => sum + Number.parseFloat(item.amount), 0);
 
@@ -1658,9 +1709,9 @@ export class DatabaseStorage implements IStorage {
 
   async updateFixedCashflow(
     id: number,
-    entry: Partial<InsertFixedCashflow>,
+    entry: Partial<InsertFixedCashflow>
   ): Promise<MonthlyFixedItem | undefined> {
-    const todayMonth = new Date().toISOString().slice(0, 7);
+    const _todayMonth = new Date().toISOString().slice(0, 7);
     const updated = await prisma.fixedCashflow.update({
       where: { id },
       data: {
@@ -1687,9 +1738,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Invoice helpers
-  async getCreditCardInvoices(
-    accountId: number,
-  ): Promise<
+  async getCreditCardInvoices(accountId: number): Promise<
     Array<{
       creditCardId: number;
       cardName: string;
@@ -1726,15 +1775,15 @@ export class DatabaseStorage implements IStorage {
   async getInvoicePayments(accountId: number): Promise<InvoicePayment[]> {
     const payments = await prisma.invoicePayment.findMany({
       where: { accountId },
-      orderBy: [{ createdAt: "desc" }],
+      orderBy: [{ createdAt: 'desc' }],
     });
     return payments.map(mapInvoicePayment);
   }
 
   async getPendingInvoicePayments(accountId: number): Promise<InvoicePayment[]> {
     const payments = await prisma.invoicePayment.findMany({
-      where: { accountId, status: "pending" },
-      orderBy: [{ dueDate: "asc" }],
+      where: { accountId, status: 'pending' },
+      orderBy: [{ dueDate: 'asc' }],
     });
     return payments.map(mapInvoicePayment);
   }
@@ -1748,7 +1797,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateInvoicePayment(
     id: number,
-    invoicePayment: Partial<InsertInvoicePayment>,
+    invoicePayment: Partial<InsertInvoicePayment>
   ): Promise<InvoicePayment | undefined> {
     const updated = await prisma.invoicePayment.update({
       where: { id },
@@ -1774,7 +1823,9 @@ export class DatabaseStorage implements IStorage {
     const existingPayments = await prisma.invoicePayment.findMany({
       where: { accountId },
     });
-    const paymentsKey = new Set(existingPayments.map((payment) => `${payment.creditCardId}:${payment.invoiceMonth}`));
+    const paymentsKey = new Set(
+      existingPayments.map((payment) => `${payment.creditCardId}:${payment.invoiceMonth}`)
+    );
 
     const creditCards = await prisma.creditCard.findMany({
       where: { accountId },
@@ -1799,7 +1850,7 @@ export class DatabaseStorage implements IStorage {
           invoiceMonth: invoice.month,
           totalAmount: invoice.total,
           dueDate,
-          status: "pending",
+          status: 'pending',
         },
       });
       created.push(mapInvoicePayment(payment));
@@ -1810,12 +1861,12 @@ export class DatabaseStorage implements IStorage {
 
   async markInvoiceAsPaid(
     invoicePaymentId: number,
-    transactionId: number,
+    transactionId: number
   ): Promise<InvoicePayment | undefined> {
     const updated = await prisma.invoicePayment.update({
       where: { id: invoicePaymentId },
       data: {
-        status: "paid",
+        status: 'paid',
         transactionId,
         paidAt: new Date(),
       },
@@ -1828,16 +1879,13 @@ export class DatabaseStorage implements IStorage {
       where: {
         accountId,
         description: {
-          contains: "fatura",
-          mode: "insensitive",
+          contains: 'fatura',
+          mode: 'insensitive',
         },
-        OR: [
-          { isInvoiceTransaction: false },
-          { isInvoiceTransaction: { equals: null } },
-        ],
+        OR: [{ isInvoiceTransaction: false }, { isInvoiceTransaction: { equals: null } }],
       },
       include: { category: true },
-      orderBy: [{ date: "asc" }],
+      orderBy: [{ date: 'asc' }],
     });
 
     return transactions.map((tx) => mapTransaction(tx, tx.category));
@@ -1887,7 +1935,7 @@ export class DatabaseStorage implements IStorage {
     const projects = await prisma.project.findMany({
       where: { accountId },
       include: { client: true },
-      orderBy: [{ createdAt: "desc" }],
+      orderBy: [{ createdAt: 'desc' }],
     });
 
     return projects.map((project) => ({
@@ -1932,7 +1980,7 @@ export class DatabaseStorage implements IStorage {
     const expenses = await prisma.transaction.findMany({
       where: {
         accountId: project.accountId,
-        type: "expense",
+        type: 'expense',
         projectName: project.name,
       },
       select: { amount: true },
@@ -1940,10 +1988,10 @@ export class DatabaseStorage implements IStorage {
 
     const totalExpenses = expenses.reduce(
       (acc, tx) => acc + Number.parseFloat(tx.amount.toString()),
-      0,
+      0
     );
     const budget = project.budget ? Number.parseFloat(project.budget) : 0;
-    const budgetUsed = budget > 0 ? ((totalExpenses / budget) * 100).toFixed(2) : "0";
+    const budgetUsed = budget > 0 ? ((totalExpenses / budget) * 100).toFixed(2) : '0';
     const remainingBudget = (budget - totalExpenses).toFixed(2);
 
     return {
@@ -1969,7 +2017,7 @@ export class DatabaseStorage implements IStorage {
   async getCostCenters(accountId: number): Promise<CostCenter[]> {
     const centers = await prisma.costCenter.findMany({
       where: { accountId },
-      orderBy: [{ name: "asc" }],
+      orderBy: [{ name: 'asc' }],
     });
     return centers.map(mapCostCenter);
   }
@@ -1983,7 +2031,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateCostCenter(
     id: number,
-    costCenter: Partial<InsertCostCenter>,
+    costCenter: Partial<InsertCostCenter>
   ): Promise<CostCenter | undefined> {
     const updated = await prisma.costCenter.update({
       where: { id },
@@ -2006,7 +2054,7 @@ export class DatabaseStorage implements IStorage {
     const expenses = await prisma.transaction.findMany({
       where: {
         accountId: costCenter.accountId,
-        type: "expense",
+        type: 'expense',
         costCenter: costCenter.code,
       },
       select: { amount: true },
@@ -2014,10 +2062,10 @@ export class DatabaseStorage implements IStorage {
 
     const totalExpenses = expenses.reduce(
       (acc, tx) => acc + Number.parseFloat(tx.amount.toString()),
-      0,
+      0
     );
     const budget = costCenter.budget ? Number.parseFloat(costCenter.budget) : 0;
-    const budgetUsed = budget > 0 ? ((totalExpenses / budget) * 100).toFixed(2) : "0";
+    const budgetUsed = budget > 0 ? ((totalExpenses / budget) * 100).toFixed(2) : '0';
     const remainingBudget = (budget - totalExpenses).toFixed(2);
 
     return {
@@ -2040,7 +2088,7 @@ export class DatabaseStorage implements IStorage {
   async getClients(accountId: number): Promise<Client[]> {
     const clients = await prisma.client.findMany({
       where: { accountId },
-      orderBy: [{ name: "asc" }],
+      orderBy: [{ name: 'asc' }],
     });
     return clients.map(mapClient);
   }
@@ -2070,13 +2118,13 @@ export class DatabaseStorage implements IStorage {
 
     const projects = await prisma.project.findMany({
       where: { clientId },
-      orderBy: [{ createdAt: "desc" }],
+      orderBy: [{ createdAt: 'desc' }],
     });
 
     const revenues = await prisma.transaction.findMany({
       where: {
         accountId: client.accountId,
-        type: "income",
+        type: 'income',
         clientName: client.name,
       },
       select: { amount: true },
@@ -2084,14 +2132,14 @@ export class DatabaseStorage implements IStorage {
 
     const totalRevenue = revenues.reduce(
       (acc, tx) => acc + Number.parseFloat(tx.amount.toString()),
-      0,
+      0
     );
 
     return {
       ...client,
       projects: projects.map(mapProject),
       totalRevenue: totalRevenue.toFixed(2),
-      activeProjects: projects.filter((project) => project.status === "active").length,
+      activeProjects: projects.filter((project) => project.status === 'active').length,
     };
   }
 
@@ -2111,7 +2159,9 @@ export class DatabaseStorage implements IStorage {
     return user ? mapUser(user) : undefined;
   }
 
-  async getUserByEmail(email: string): Promise<(AuthenticatedUser & { passwordHash: string }) | undefined> {
+  async getUserByEmail(
+    email: string
+  ): Promise<(AuthenticatedUser & { passwordHash: string }) | undefined> {
     const user = await prisma.user.findUnique({ where: { email } });
     return user ? mapUserWithPassword(user) : undefined;
   }

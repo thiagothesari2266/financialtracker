@@ -1,14 +1,14 @@
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -16,25 +16,25 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import type { Debt } from "@shared/schema";
-import { CurrencyInput } from "@/components/ui/currency-input";
+} from '@/components/ui/select';
+import type { Debt } from '@shared/schema';
+import { CurrencyInput } from '@/components/ui/currency-input';
 
 const debtSchema = z.object({
-  name: z.string().min(1, "Nome é obrigatório"),
+  name: z.string().min(1, 'Nome é obrigatório'),
   type: z.string().optional(),
-  balance: z.string().min(1, "Valor é obrigatório"),
-  interestRate: z.string().min(1, "Juros é obrigatório"),
-  ratePeriod: z.enum(["monthly", "yearly"]),
+  balance: z.string().min(1, 'Valor é obrigatório'),
+  interestRate: z.string().min(1, 'Juros é obrigatório'),
+  ratePeriod: z.enum(['monthly', 'yearly']),
   targetDate: z.string().optional(),
 });
 
@@ -48,16 +48,22 @@ interface DebtModalProps {
   editing?: Debt | null;
 }
 
-export function DebtModal({ open, onClose, onSubmit, isSaving = false, editing = null }: DebtModalProps) {
+export function DebtModal({
+  open,
+  onClose,
+  onSubmit,
+  isSaving = false,
+  editing = null,
+}: DebtModalProps) {
   const form = useForm<DebtFormValues>({
     resolver: zodResolver(debtSchema),
     defaultValues: {
-      name: "",
-      type: "",
-      balance: "",
-      interestRate: "",
-      ratePeriod: "monthly",
-      targetDate: "",
+      name: '',
+      type: '',
+      balance: '',
+      interestRate: '',
+      ratePeriod: 'monthly',
+      targetDate: '',
     },
   });
 
@@ -65,22 +71,22 @@ export function DebtModal({ open, onClose, onSubmit, isSaving = false, editing =
     if (editing) {
       form.reset({
         name: editing.name,
-        type: editing.type ?? "",
+        type: editing.type ?? '',
         balance: editing.balance,
         interestRate: editing.interestRate,
         ratePeriod: editing.ratePeriod,
-        targetDate: editing.targetDate ?? "",
+        targetDate: editing.targetDate ?? '',
       });
       return;
     }
 
     form.reset({
-      name: "",
-      type: "",
-      balance: "",
-      interestRate: "",
-      ratePeriod: "monthly",
-      targetDate: "",
+      name: '',
+      type: '',
+      balance: '',
+      interestRate: '',
+      ratePeriod: 'monthly',
+      targetDate: '',
     });
   }, [editing, form, open]);
 
@@ -92,7 +98,7 @@ export function DebtModal({ open, onClose, onSubmit, isSaving = false, editing =
     <Dialog open={open} onOpenChange={(isOpen) => (!isOpen ? onClose() : undefined)}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{editing ? "Editar dívida" : "Nova dívida"}</DialogTitle>
+          <DialogTitle>{editing ? 'Editar dívida' : 'Nova dívida'}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -152,7 +158,7 @@ export function DebtModal({ open, onClose, onSubmit, isSaving = false, editing =
                       <CurrencyInput
                         placeholder="0,00"
                         value={field.value ? Number(field.value) : null}
-                        onValueChange={(val) => field.onChange(val == null ? "" : val.toString())}
+                        onValueChange={(val) => field.onChange(val == null ? '' : val.toString())}
                       />
                     </FormControl>
                     <FormMessage />
@@ -170,7 +176,9 @@ export function DebtModal({ open, onClose, onSubmit, isSaving = false, editing =
                       <FormControl>
                         <div className="relative">
                           <Input type="number" step="0.01" min="0" placeholder="2.99" {...field} />
-                          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">%</span>
+                          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
+                            %
+                          </span>
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -207,7 +215,7 @@ export function DebtModal({ open, onClose, onSubmit, isSaving = false, editing =
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSaving}>
-                {isSaving ? "Salvando..." : editing ? "Salvar alterações" : "Adicionar"}
+                {isSaving ? 'Salvando...' : editing ? 'Salvar alterações' : 'Adicionar'}
               </Button>
             </DialogFooter>
           </form>

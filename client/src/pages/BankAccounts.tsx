@@ -1,14 +1,19 @@
-import { useState } from "react";
-import { useAccount } from "@/contexts/AccountContext";
-import { useBankAccounts, useCreateBankAccount, useUpdateBankAccount, useDeleteBankAccount } from "@/hooks/useBankAccounts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Plus, Landmark } from "lucide-react";
-import BankAccountModal from "@/components/Modals/BankAccountModal";
-import { useToast } from "@/hooks/use-toast";
-import type { BankAccount, InsertBankAccount } from "@shared/schema";
-import { AppShell } from "@/components/Layout/AppShell";
-import { EmptyState } from "@/components/ui/empty-state";
+import { useState } from 'react';
+import { useAccount } from '@/contexts/AccountContext';
+import {
+  useBankAccounts,
+  useCreateBankAccount,
+  useUpdateBankAccount,
+  useDeleteBankAccount,
+} from '@/hooks/useBankAccounts';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Plus, Landmark } from 'lucide-react';
+import BankAccountModal from '@/components/Modals/BankAccountModal';
+import { useToast } from '@/hooks/use-toast';
+import type { BankAccount, InsertBankAccount } from '@shared/schema';
+import { AppShell } from '@/components/Layout/AppShell';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export default function BankAccounts() {
   const { currentAccount } = useAccount();
@@ -22,30 +27,34 @@ export default function BankAccounts() {
 
   function handleSaveBankAccount(data: InsertBankAccount) {
     if (editingBankAccount) {
-      updateBankAccount.mutate({ id: editingBankAccount.id, data }, {
-        onSuccess: () => {
-          toast({ title: "Conta bancária atualizada" });
-          setEditingBankAccount(null);
-          setIsModalOpen(false);
-        },
-        onError: () => toast({ title: "Erro ao atualizar conta bancária", variant: "destructive" })
-      });
+      updateBankAccount.mutate(
+        { id: editingBankAccount.id, data },
+        {
+          onSuccess: () => {
+            toast({ title: 'Conta bancária atualizada' });
+            setEditingBankAccount(null);
+            setIsModalOpen(false);
+          },
+          onError: () =>
+            toast({ title: 'Erro ao atualizar conta bancária', variant: 'destructive' }),
+        }
+      );
     } else {
       createBankAccount.mutate(data, {
         onSuccess: () => {
-          toast({ title: "Conta bancária criada" });
+          toast({ title: 'Conta bancária criada' });
           setIsModalOpen(false);
         },
-        onError: () => toast({ title: "Erro ao criar conta bancária", variant: "destructive" })
+        onError: () => toast({ title: 'Erro ao criar conta bancária', variant: 'destructive' }),
       });
     }
   }
 
   function handleDeleteBankAccount(id: number) {
-    if (window.confirm("Tem certeza que deseja excluir esta conta bancária?")) {
+    if (window.confirm('Tem certeza que deseja excluir esta conta bancária?')) {
       deleteBankAccount.mutate(id, {
-        onSuccess: () => toast({ title: "Conta bancária excluída" }),
-        onError: () => toast({ title: "Erro ao excluir conta bancária", variant: "destructive" })
+        onSuccess: () => toast({ title: 'Conta bancária excluída' }),
+        onError: () => toast({ title: 'Erro ao excluir conta bancária', variant: 'destructive' }),
       });
     }
   }
@@ -75,19 +84,22 @@ export default function BankAccounts() {
       >
         <div className="space-y-6">
           {isLoading ? (
-            <EmptyState title="Carregando contas bancárias..." className="border-dashed bg-transparent" />
+            <EmptyState
+              title="Carregando contas bancárias..."
+              className="border-dashed bg-transparent"
+            />
           ) : bankAccounts.length === 0 ? (
             <EmptyState
               icon={<Landmark className="h-10 w-10 text-slate-400" />}
               title="Nenhuma conta bancária cadastrada"
               description="Cadastre uma conta para acompanhar saldos e transações."
               action={{
-                label: "Adicionar conta",
+                label: 'Adicionar conta',
                 onClick: () => {
                   setEditingBankAccount(null);
                   setIsModalOpen(true);
                 },
-                variant: "outline",
+                variant: 'outline',
               }}
             />
           ) : (
@@ -112,7 +124,7 @@ export default function BankAccounts() {
                   <CardContent>
                     <div className="mb-2 text-xs text-slate-500">Pix: {ba.pix}</div>
                     <div className="mb-2 text-xs text-slate-500">
-                      Saldo Inicial: R$ {parseFloat(ba.initialBalance || "0").toFixed(2)}
+                      Saldo Inicial: R$ {parseFloat(ba.initialBalance || '0').toFixed(2)}
                     </div>
                     {ba.accountId === currentAccount?.id && (
                       <div className="mt-4 flex gap-2">
@@ -126,7 +138,11 @@ export default function BankAccounts() {
                         >
                           Editar
                         </Button>
-                        <Button size="sm" variant="destructive" onClick={() => handleDeleteBankAccount(ba.id)}>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDeleteBankAccount(ba.id)}
+                        >
                           Excluir
                         </Button>
                       </div>

@@ -23,21 +23,23 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     if ((accounts as Account[]).length > 0 && !currentAccount) {
       // Try to load saved account ID from localStorage
       const savedAccountId = localStorage.getItem('selectedAccountId');
-      
+
       if (savedAccountId) {
         // Find the saved account in the list
         const savedAccount = (accounts as Account[]).find(
-          account => account.id === parseInt(savedAccountId)
+          (account) => account.id === parseInt(savedAccountId)
         );
-        
+
         if (savedAccount) {
           setCurrentAccount(savedAccount);
           return;
         }
       }
-      
+
       // If no saved account or saved account not found, prioritize personal account
-      const personalAccount = (accounts as Account[]).find(account => account.type === 'personal');
+      const personalAccount = (accounts as Account[]).find(
+        (account) => account.type === 'personal'
+      );
       setCurrentAccount(personalAccount || (accounts as Account[])[0]);
     }
   }, [accounts, currentAccount]);

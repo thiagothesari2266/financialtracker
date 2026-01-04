@@ -1,9 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Client, InsertClient, ClientWithProjects } from "@shared/schema";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Client, InsertClient, ClientWithProjects } from '@shared/schema';
 
 export function useClients(accountId: number) {
   return useQuery({
-    queryKey: ["/api/accounts", accountId, "clients"],
+    queryKey: ['/api/accounts', accountId, 'clients'],
     queryFn: async () => {
       const response = await fetch(`/api/accounts/${accountId}/clients`);
       if (!response.ok) throw new Error('Failed to fetch clients');
@@ -15,7 +15,7 @@ export function useClients(accountId: number) {
 
 export function useClient(id: number) {
   return useQuery({
-    queryKey: ["/api/clients", id],
+    queryKey: ['/api/clients', id],
     queryFn: async () => {
       const response = await fetch(`/api/clients/${id}`);
       if (!response.ok) throw new Error('Failed to fetch client');
@@ -27,7 +27,7 @@ export function useClient(id: number) {
 
 export function useClientWithProjects(id: number) {
   return useQuery({
-    queryKey: ["/api/clients", id, "with-projects"],
+    queryKey: ['/api/clients', id, 'with-projects'],
     queryFn: async () => {
       const response = await fetch(`/api/clients/${id}/with-projects`);
       if (!response.ok) throw new Error('Failed to fetch client with projects');
@@ -39,13 +39,13 @@ export function useClientWithProjects(id: number) {
 
 export function useCreateClient(accountId: number) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: InsertClient) => {
       const response = await fetch(`/api/accounts/${accountId}/clients`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
       });
@@ -53,20 +53,20 @@ export function useCreateClient(accountId: number) {
       return (await response.json()) as Client;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "clients"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'clients'] });
     },
   });
 }
 
 export function useUpdateClient() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertClient> }) => {
       const response = await fetch(`/api/clients/${id}`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
       });
@@ -74,9 +74,9 @@ export function useUpdateClient() {
       return (await response.json()) as Client;
     },
     onSuccess: (client: Client) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts", client.accountId, "clients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/clients", client.id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/clients", client.id, "with-projects"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', client.accountId, 'clients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/clients', client.id, 'with-projects'] });
     },
   });
 }
@@ -87,12 +87,12 @@ export function useDeleteClient(accountId: number) {
   return useMutation({
     mutationFn: async (id: number) => {
       const response = await fetch(`/api/clients/${id}`, {
-        method: "DELETE",
+        method: 'DELETE',
       });
       if (!response.ok) throw new Error('Failed to delete client');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "clients"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'clients'] });
     },
   });
 }

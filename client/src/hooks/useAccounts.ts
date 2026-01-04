@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import type { Account, InsertAccount } from "@shared/schema";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
+import type { Account, InsertAccount } from '@shared/schema';
 
 export function useAccounts() {
   return useQuery<Account[]>({
@@ -17,7 +17,7 @@ export function useAccount(id: number) {
 
 export function useCreateAccount() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: InsertAccount) => {
       const response = await apiRequest('POST', '/api/accounts', data);
@@ -31,7 +31,7 @@ export function useCreateAccount() {
 
 export function useUpdateAccount() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertAccount> }) => {
       const response = await apiRequest('PATCH', `/api/accounts/${id}`, data);
@@ -46,7 +46,7 @@ export function useUpdateAccount() {
 
 export function useDeleteAccount() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: number) => {
       await apiRequest('DELETE', `/api/accounts/${id}`);

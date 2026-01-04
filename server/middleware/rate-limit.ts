@@ -13,7 +13,7 @@ class RateLimiter {
   constructor(windowMs: number = 60000, maxRequests: number = 10) {
     this.windowMs = windowMs;
     this.maxRequests = maxRequests;
-    
+
     // Limpa registros expirados a cada minuto
     setInterval(() => {
       this.cleanup();
@@ -22,7 +22,7 @@ class RateLimiter {
 
   private cleanup() {
     const now = Date.now();
-    Object.keys(this.store).forEach(key => {
+    Object.keys(this.store).forEach((key) => {
       if (this.store[key].resetTime < now) {
         delete this.store[key];
       }
@@ -43,9 +43,9 @@ class RateLimiter {
     }
 
     if (record.count >= this.maxRequests) {
-      return { 
-        allowed: false, 
-        resetTime: record.resetTime 
+      return {
+        allowed: false,
+        resetTime: record.resetTime,
       };
     }
 
@@ -61,9 +61,9 @@ export function createRateLimitMiddleware(rateLimiter: RateLimiter) {
   return (req: any, res: any, next: any) => {
     const accountId = req.params.id;
     const identifier = `ai-chat:${accountId}`;
-    
+
     const result = rateLimiter.checkLimit(identifier);
-    
+
     if (!result.allowed) {
       const resetInSeconds = Math.ceil((result.resetTime! - Date.now()) / 1000);
       return res.status(429).json({
@@ -71,7 +71,7 @@ export function createRateLimitMiddleware(rateLimiter: RateLimiter) {
         resetTime: result.resetTime,
       });
     }
-    
+
     next();
   };
 }

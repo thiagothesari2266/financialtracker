@@ -1,7 +1,7 @@
-import { createContext, useContext, type ReactNode, useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AuthenticatedUser, InsertUser, LoginInput } from "@shared/schema";
-import { getQueryFn } from "@/lib/queryClient";
+import { createContext, useContext, type ReactNode, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { AuthenticatedUser, InsertUser, LoginInput } from '@shared/schema';
+import { getQueryFn } from '@/lib/queryClient';
 
 interface AuthContextValue {
   user: AuthenticatedUser | null;
@@ -13,11 +13,11 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const SESSION_QUERY_KEY = ["/api/auth/session"] as const;
+const SESSION_QUERY_KEY = ['/api/auth/session'] as const;
 
 async function parseResponse(res: Response) {
   if (res.ok) return;
-  let message = "Falha ao processar solicitação";
+  let message = 'Falha ao processar solicitação';
   try {
     const payload = await res.json();
     if (payload?.message) {
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const sessionQuery = useQuery<AuthenticatedUser | null>({
     queryKey: SESSION_QUERY_KEY,
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryFn: getQueryFn({ on401: 'returnNull' }),
     staleTime: Infinity,
   });
 
@@ -57,38 +57,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (credentials: LoginInput) => {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(credentials),
       });
       await parseResponse(res);
       resetAppQueries();
       await refreshSession();
     },
-    [refreshSession, resetAppQueries],
+    [refreshSession, resetAppQueries]
   );
 
   const register = useCallback(
     async (data: InsertUser) => {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(data),
       });
       await parseResponse(res);
       resetAppQueries();
       await refreshSession();
     },
-    [refreshSession, resetAppQueries],
+    [refreshSession, resetAppQueries]
   );
 
   const logout = useCallback(async () => {
-    const res = await fetch("/api/auth/logout", {
-      method: "POST",
-      credentials: "include",
+    const res = await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
     });
     if (!res.ok && res.status !== 204) {
       await parseResponse(res);
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth deve ser usado dentro de AuthProvider");
+    throw new Error('useAuth deve ser usado dentro de AuthProvider');
   }
   return context;
 }

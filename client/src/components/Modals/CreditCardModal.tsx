@@ -1,19 +1,19 @@
-import { useEffect } from "react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { CurrencyInput } from "@/components/ui/currency-input";
-import { Button } from "@/components/ui/button";
-import { z } from "zod";
-import { useDeleteCreditCard } from "@/hooks/useCreditCards";
+import { useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
+import { Button } from '@/components/ui/button';
+import { z } from 'zod';
+import { useDeleteCreditCard } from '@/hooks/useCreditCards';
 
 const creditCardSchema = z.object({
-  name: z.string().min(1, "Nome obrigatório"),
+  name: z.string().min(1, 'Nome obrigatório'),
   brand: z.string().optional(),
   creditLimit: z.string().optional(),
-  dueDate: z.string().min(1, "Vencimento obrigatório"),
-  closingDay: z.string().min(1, "Dia de fechamento obrigatório"),
+  dueDate: z.string().min(1, 'Vencimento obrigatório'),
+  closingDay: z.string().min(1, 'Dia de fechamento obrigatório'),
 });
 
 type CreditCardForm = z.infer<typeof creditCardSchema>;
@@ -26,23 +26,31 @@ interface CreditCardModalProps {
   creditCard?: any | null;
 }
 
-export default function CreditCardModal({ isOpen, onClose, onSaved, accountId, creditCard }: CreditCardModalProps) {
+export default function CreditCardModal({
+  isOpen,
+  onClose,
+  onSaved,
+  accountId,
+  creditCard,
+}: CreditCardModalProps) {
   const form = useForm<CreditCardForm>({
     resolver: zodResolver(creditCardSchema),
     defaultValues: {
-      name: "",
-      brand: "",
-      creditLimit: "",
-      dueDate: "",
-      closingDay: "",
+      name: '',
+      brand: '',
+      creditLimit: '',
+      dueDate: '',
+      closingDay: '',
     },
-    values: creditCard ? {
-      name: creditCard.name,
-      brand: creditCard.brand,
-      creditLimit: creditCard.creditLimit,
-      dueDate: String(creditCard.dueDate),
-      closingDay: creditCard.closingDay ? String(creditCard.closingDay) : "",
-    } : undefined,
+    values: creditCard
+      ? {
+          name: creditCard.name,
+          brand: creditCard.brand,
+          creditLimit: creditCard.creditLimit,
+          dueDate: String(creditCard.dueDate),
+          closingDay: creditCard.closingDay ? String(creditCard.closingDay) : '',
+        }
+      : undefined,
   });
 
   useEffect(() => {
@@ -52,15 +60,15 @@ export default function CreditCardModal({ isOpen, onClose, onSaved, accountId, c
         brand: creditCard.brand,
         creditLimit: creditCard.creditLimit,
         dueDate: String(creditCard.dueDate),
-        closingDay: creditCard.closingDay ? String(creditCard.closingDay) : "",
+        closingDay: creditCard.closingDay ? String(creditCard.closingDay) : '',
       });
     } else {
       form.reset({
-        name: "",
-        brand: "",
-        creditLimit: "",
-        dueDate: "",
-        closingDay: "",
+        name: '',
+        brand: '',
+        creditLimit: '',
+        dueDate: '',
+        closingDay: '',
       });
     }
   }, [creditCard, form]);
@@ -82,14 +90,16 @@ export default function CreditCardModal({ isOpen, onClose, onSaved, accountId, c
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{creditCard ? "Editar Cartão de Crédito" : "Novo Cartão de Crédito"}</DialogTitle>
+          <DialogTitle>
+            {creditCard ? 'Editar Cartão de Crédito' : 'Novo Cartão de Crédito'}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <Input placeholder="Nome do Cartão" {...form.register("name")} />
-          <Input placeholder="Bandeira (ex: Visa, Mastercard)" {...form.register("brand")} />
+          <Input placeholder="Nome do Cartão" {...form.register('name')} />
+          <Input placeholder="Bandeira (ex: Visa, Mastercard)" {...form.register('brand')} />
           <Controller
             control={form.control}
             name="creditLimit"
@@ -97,17 +107,36 @@ export default function CreditCardModal({ isOpen, onClose, onSaved, accountId, c
               <CurrencyInput
                 placeholder="Limite"
                 value={field.value && !isNaN(Number(field.value)) ? Number(field.value) : null}
-                onValueChange={(val) => field.onChange(val == null ? "" : val.toString())}
+                onValueChange={(val) => field.onChange(val == null ? '' : val.toString())}
               />
             )}
           />
-          <Input placeholder="Dia de vencimento" type="number" min={1} max={31} {...form.register("dueDate")} />
-          <Input placeholder="Dia de fechamento" type="number" min={1} max={31} {...form.register("closingDay")} />
+          <Input
+            placeholder="Dia de vencimento"
+            type="number"
+            min={1}
+            max={31}
+            {...form.register('dueDate')}
+          />
+          <Input
+            placeholder="Dia de fechamento"
+            type="number"
+            min={1}
+            max={31}
+            {...form.register('closingDay')}
+          />
           <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
             <Button type="submit">Salvar</Button>
             {creditCard && (
-              <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleteCreditCard.isPending}>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleteCreditCard.isPending}
+              >
                 {deleteCreditCard.isPending ? 'Excluindo...' : 'Excluir'}
               </Button>
             )}

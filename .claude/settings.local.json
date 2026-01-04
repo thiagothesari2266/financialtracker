@@ -27,7 +27,9 @@
       "Bash(mv:*)",
       "Bash(npx dotenv -e .env tsx:*)",
       "Bash(git stash:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": []
   }

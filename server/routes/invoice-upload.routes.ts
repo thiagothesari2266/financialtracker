@@ -2,9 +2,15 @@ import { Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { processInvoice, processImageFromBuffer, processMultipleImages, getInvoiceImports, getInvoiceImportDetails } from '../services/invoice-processor.service';
+import {
+  processInvoice,
+  processImageFromBuffer,
+  processMultipleImages,
+  getInvoiceImports,
+  getInvoiceImportDetails,
+} from '../services/invoice-processor.service';
 
-// Configuração do multer para upload de arquivos  
+// Configuração do multer para upload de arquivos
 const uploadDir = path.join(process.cwd(), 'server/uploads/invoices');
 
 // Criar diretório se não existir
@@ -18,20 +24,16 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     // Gerar nome único para o arquivo
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const extension = path.extname(file.originalname);
     cb(null, `invoice-${uniqueSuffix}${extension}`);
-  }
+  },
 });
 
 const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   // Aceitar apenas imagens
-  const allowedTypes = [
-    'image/jpeg',
-    'image/jpg',
-    'image/png'
-  ];
-  
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -46,7 +48,7 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10MB per file
     files: 10, // Maximum 10 files
     fieldSize: 50 * 1024 * 1024, // 50MB field size
-  }
+  },
 });
 
 /**
@@ -55,21 +57,21 @@ const upload = multer({
  */
 export function pasteInvoiceImage(req: Request, res: Response) {
   console.log('[Invoice Paste] Iniciando processamento de imagem colada...');
-  
+
   try {
     const { imageData, creditCardId, accountId } = req.body;
-    
+
     if (!imageData || !creditCardId || !accountId) {
-      return res.status(400).json({ 
-        error: 'imageData, creditCardId e accountId são obrigatórios' 
+      return res.status(400).json({
+        error: 'imageData, creditCardId e accountId são obrigatórios',
       });
     }
 
     // Parse base64 image data
     const matches = imageData.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
     if (!matches || matches.length !== 3) {
-      return res.status(400).json({ 
-        error: 'Formato de imagem inválido. Use base64 com data URL.' 
+      return res.status(400).json({
+        error: 'Formato de imagem inválido. Use base64 com data URL.',
       });
     }
 
@@ -86,32 +88,33 @@ export function pasteInvoiceImage(req: Request, res: Response) {
       fileType: `image/${imageType}`,
       creditCardId: parseInt(creditCardId),
       accountId: parseInt(accountId),
-    }).then(result => {
-      if (result.success) {
-        res.json({
-          success: true,
-          importId: result.importId,
-          transactionsCount: result.transactionsCount,
-          transactions: result.extractedData?.transactions || [],
-          message: `${result.transactionsCount} transações importadas com sucesso`
+    })
+      .then((result) => {
+        if (result.success) {
+          res.json({
+            success: true,
+            importId: result.importId,
+            transactionsCount: result.transactionsCount,
+            transactions: result.extractedData?.transactions || [],
+            message: `${result.transactionsCount} transações importadas com sucesso`,
+          });
+        } else {
+          res.status(422).json({
+            success: false,
+            error: result.error || 'Erro no processamento da imagem',
+          });
+        }
+      })
+      .catch((error) => {
+        console.error('Erro no processamento de imagem colada:', error);
+        res.status(500).json({
+          error: error instanceof Error ? error.message : 'Erro interno do servidor',
         });
-      } else {
-        res.status(422).json({
-          success: false,
-          error: result.error || 'Erro no processamento da imagem'
-        });
-      }
-    }).catch(error => {
-      console.error('Erro no processamento de imagem colada:', error);
-      res.status(500).json({
-        error: error instanceof Error ? error.message : 'Erro interno do servidor'
       });
-    });
-
   } catch (error) {
     console.error('Erro ao processar imagem colada:', error);
     res.status(500).json({
-      error: error instanceof Error ? error.message : 'Erro interno do servidor'
+      error: error instanceof Error ? error.message : 'Erro interno do servidor',
     });
   }
 }
@@ -122,13 +125,14 @@ export function pasteInvoiceImage(req: Request, res: Response) {
  */
 export function uploadMultipleInvoiceImages(req: Request, res: Response) {
   console.log('[Invoice Upload Multiple] Iniciando upload de múltiplas imagens...');
-  
+
   // Aplicar middleware de upload para múltiplos arquivos
-  upload.array('files', 10)(req, res, async (err) => { // máximo 10 arquivos
+  upload.array('files', 10)(req, res, async (err) => {
+    // máximo 10 arquivos
     if (err) {
       console.error('[Invoice Upload Multiple] Erro no upload:', err);
       return res.status(400).json({
-        error: err.message || 'Erro no upload dos arquivos'
+        error: err.message || 'Erro no upload dos arquivos',
       });
     }
 
@@ -138,16 +142,16 @@ export function uploadMultipleInvoiceImages(req: Request, res: Response) {
     }
 
     const { creditCardId, accountId } = req.body;
-    
+
     if (!creditCardId || !accountId) {
       // Limpar arquivos se dados inválidos
-      files.forEach(file => {
+      files.forEach((file) => {
         if (fs.existsSync(file.path)) {
           fs.unlinkSync(file.path);
         }
       });
-      return res.status(400).json({ 
-        error: 'creditCardId e accountId são obrigatórios' 
+      return res.status(400).json({
+        error: 'creditCardId e accountId são obrigatórios',
       });
     }
 
@@ -156,10 +160,10 @@ export function uploadMultipleInvoiceImages(req: Request, res: Response) {
     try {
       // Processar múltiplas imagens
       const result = await processMultipleImages({
-        filePaths: files.map(f => f.path),
-        filenames: files.map(f => f.originalname),
-        fileSizes: files.map(f => f.size),
-        fileTypes: files.map(f => f.mimetype),
+        filePaths: files.map((f) => f.path),
+        filenames: files.map((f) => f.originalname),
+        fileSizes: files.map((f) => f.size),
+        fileTypes: files.map((f) => f.mimetype),
         creditCardId: parseInt(creditCardId),
         accountId: parseInt(accountId),
       });
@@ -170,27 +174,26 @@ export function uploadMultipleInvoiceImages(req: Request, res: Response) {
           importId: result.importId,
           transactionsCount: result.transactionsCount,
           transactions: result.extractedData?.transactions || [],
-          message: `${result.transactionsCount} transações importadas de ${files.length} imagem(ns)`
+          message: `${result.transactionsCount} transações importadas de ${files.length} imagem(ns)`,
         });
       } else {
         res.status(422).json({
           success: false,
-          error: result.error || 'Erro no processamento das imagens'
+          error: result.error || 'Erro no processamento das imagens',
         });
       }
-
     } catch (error) {
       console.error('Erro no processamento de múltiplas imagens:', error);
-      
+
       // Limpar arquivos em caso de erro
-      files.forEach(file => {
+      files.forEach((file) => {
         if (fs.existsSync(file.path)) {
           fs.unlinkSync(file.path);
         }
       });
 
       res.status(500).json({
-        error: error instanceof Error ? error.message : 'Erro interno do servidor'
+        error: error instanceof Error ? error.message : 'Erro interno do servidor',
       });
     }
   });
@@ -202,13 +205,13 @@ export function uploadMultipleInvoiceImages(req: Request, res: Response) {
  */
 export function uploadInvoice(req: Request, res: Response) {
   console.log('[Invoice Upload] Iniciando upload...');
-  
+
   // Aplicar middleware de upload
   upload.single('file')(req, res, async (err) => {
     if (err) {
       console.error('[Invoice Upload] Erro no upload:', err);
       return res.status(400).json({
-        error: err.message || 'Erro no upload do arquivo'
+        error: err.message || 'Erro no upload do arquivo',
       });
     }
 
@@ -218,12 +221,12 @@ export function uploadInvoice(req: Request, res: Response) {
     }
 
     const { creditCardId, accountId } = req.body;
-    
+
     if (!creditCardId || !accountId) {
       // Limpar arquivo se dados inválidos
       fs.unlinkSync(file.path);
-      return res.status(400).json({ 
-        error: 'creditCardId e accountId são obrigatórios' 
+      return res.status(400).json({
+        error: 'creditCardId e accountId são obrigatórios',
       });
     }
 
@@ -246,25 +249,24 @@ export function uploadInvoice(req: Request, res: Response) {
           importId: result.importId,
           transactionsCount: result.transactionsCount,
           transactions: result.extractedData?.transactions || [],
-          message: `${result.transactionsCount} transações importadas com sucesso`
+          message: `${result.transactionsCount} transações importadas com sucesso`,
         });
       } else {
         res.status(422).json({
           success: false,
-          error: result.error || 'Erro no processamento da fatura'
+          error: result.error || 'Erro no processamento da fatura',
         });
       }
-
     } catch (error) {
       console.error('Erro no processamento:', error);
-      
+
       // Limpar arquivo em caso de erro
       if (fs.existsSync(file.path)) {
         fs.unlinkSync(file.path);
       }
 
       res.status(500).json({
-        error: error instanceof Error ? error.message : 'Erro interno do servidor'
+        error: error instanceof Error ? error.message : 'Erro interno do servidor',
       });
     }
   });
@@ -283,17 +285,13 @@ export async function getCardInvoiceImports(req: Request, res: Response) {
       return res.status(400).json({ error: 'accountId é obrigatório' });
     }
 
-    const imports = await getInvoiceImports(
-      parseInt(creditCardId),
-      parseInt(accountId as string)
-    );
+    const imports = await getInvoiceImports(parseInt(creditCardId), parseInt(accountId as string));
 
     res.json(imports);
-
   } catch (error) {
     console.error('Erro ao buscar importações:', error);
     res.status(500).json({
-      error: error instanceof Error ? error.message : 'Erro interno do servidor'
+      error: error instanceof Error ? error.message : 'Erro interno do servidor',
     });
   }
 }
@@ -317,11 +315,10 @@ export async function getInvoiceImportDetail(req: Request, res: Response) {
     );
 
     res.json(importDetails);
-
   } catch (error) {
     console.error('Erro ao buscar detalhes da importação:', error);
     res.status(500).json({
-      error: error instanceof Error ? error.message : 'Erro interno do servidor'
+      error: error instanceof Error ? error.message : 'Erro interno do servidor',
     });
   }
 }
@@ -340,21 +337,18 @@ export async function retryInvoiceImport(req: Request, res: Response) {
     }
 
     // Buscar importação
-    const importDetails = await getInvoiceImportDetails(
-      parseInt(importId),
-      parseInt(accountId)
-    );
+    const importDetails = await getInvoiceImportDetails(parseInt(importId), parseInt(accountId));
 
     if (importDetails.status !== 'failed') {
-      return res.status(400).json({ 
-        error: 'Apenas importações falhadas podem ser reprocessadas' 
+      return res.status(400).json({
+        error: 'Apenas importações falhadas podem ser reprocessadas',
       });
     }
 
     // Verificar se arquivo ainda existe
     if (!fs.existsSync(importDetails.filePath)) {
-      return res.status(400).json({ 
-        error: 'Arquivo da importação não encontrado' 
+      return res.status(400).json({
+        error: 'Arquivo da importação não encontrado',
       });
     }
 
@@ -372,19 +366,18 @@ export async function retryInvoiceImport(req: Request, res: Response) {
       res.json({
         success: true,
         transactionsCount: result.transactionsCount,
-        message: `${result.transactionsCount} transações importadas com sucesso`
+        message: `${result.transactionsCount} transações importadas com sucesso`,
       });
     } else {
       res.status(422).json({
         success: false,
-        error: result.error || 'Erro no reprocessamento da fatura'
+        error: result.error || 'Erro no reprocessamento da fatura',
       });
     }
-
   } catch (error) {
     console.error('Erro no reprocessamento:', error);
     res.status(500).json({
-      error: error instanceof Error ? error.message : 'Erro interno do servidor'
+      error: error instanceof Error ? error.message : 'Erro interno do servidor',
     });
   }
 }

@@ -1,10 +1,9 @@
-import { type MouseEvent, useEffect, useMemo, useState } from "react";
-import { addMonths, endOfMonth, format, parse, startOfMonth, subMonths } from "date-fns";
-import { useAccount } from "@/contexts/AccountContext";
-import { useTransactions } from "@/hooks/useTransactions";
-import { AppShell } from "@/components/Layout/AppShell";
-import { PageHeading } from "@/components/layout/PageHeading";
-import { Card, CardContent } from "@/components/ui/card";
+import { type MouseEvent, useEffect, useMemo, useState } from 'react';
+import { addMonths, endOfMonth, format, parse, startOfMonth, subMonths } from 'date-fns';
+import { useAccount } from '@/contexts/AccountContext';
+import { useTransactions } from '@/hooks/useTransactions';
+import { AppShell } from '@/components/Layout/AppShell';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -12,17 +11,17 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
 import {
   Calendar,
   CheckCircle,
@@ -35,17 +34,17 @@ import {
   Plus,
   Search,
   Trash2,
-} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import TransactionModal from "@/components/Modals/TransactionModal";
-import InvoiceTransactionModal from "@/components/Modals/InvoiceTransactionModal";
-import { SummaryCard } from "@/components/ui/summary-card";
-import { EmptyState } from "@/components/ui/empty-state";
-import { cn } from "@/lib/utils";
-import type { TransactionWithCategory } from "@shared/schema";
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import TransactionModal from '@/components/Modals/TransactionModal';
+import InvoiceTransactionModal from '@/components/Modals/InvoiceTransactionModal';
+import { SummaryCard } from '@/components/ui/summary-card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { cn } from '@/lib/utils';
+import type { TransactionWithCategory } from '@shared/schema';
 
-type ViewType = "month" | "week" | "day";
+type ViewType = 'month' | 'week' | 'day';
 
 export default function Transactions() {
   const { currentAccount } = useAccount();
@@ -54,17 +53,19 @@ export default function Transactions() {
 
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isInvoiceTransactionModalOpen, setIsInvoiceTransactionModalOpen] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<TransactionWithCategory | null>(null);
-  const [editScope, setEditScope] = useState<"single" | "all" | "future" | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTransaction, setSelectedTransaction] = useState<TransactionWithCategory | null>(
+    null
+  );
+  const [editScope, setEditScope] = useState<'single' | 'all' | 'future' | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [currentDate, setCurrentDate] = useState(() => new Date().toISOString().substring(0, 10));
-  const [viewType, setViewType] = useState<ViewType>("month");
+  const [viewType, setViewType] = useState<ViewType>('month');
   const storageKey = currentAccount ? `transactions-period-${currentAccount.id}` : null;
 
   useEffect(() => {
-    if (!storageKey || typeof window === "undefined") return;
+    if (!storageKey || typeof window === 'undefined') return;
     try {
       const stored = window.localStorage.getItem(storageKey);
       if (stored) {
@@ -73,38 +74,41 @@ export default function Transactions() {
         if (parsed.view) setViewType(parsed.view);
       }
     } catch (error) {
-      console.error("Failed to load persisted period", error);
+      console.error('Failed to load persisted period', error);
     }
   }, [storageKey]);
 
   useEffect(() => {
-    if (!storageKey || typeof window === "undefined") return;
+    if (!storageKey || typeof window === 'undefined') return;
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify({ date: currentDate, view: viewType }));
+      window.localStorage.setItem(
+        storageKey,
+        JSON.stringify({ date: currentDate, view: viewType })
+      );
     } catch (error) {
-      console.error("Failed to persist period", error);
+      console.error('Failed to persist period', error);
     }
   }, [storageKey, currentDate, viewType]);
 
   const handlePreviousPeriod = () => {
     setCurrentDate((prev) => {
-      const [year, month, day] = prev.split("-").map(Number);
+      const [year, month, day] = prev.split('-').map(Number);
       const baseDate = new Date(year, month - 1, day);
 
       switch (viewType) {
-        case "week": {
+        case 'week': {
           const prevWeek = new Date(baseDate);
           prevWeek.setDate(baseDate.getDate() - 7);
-          return format(prevWeek, "yyyy-MM-dd");
+          return format(prevWeek, 'yyyy-MM-dd');
         }
-        case "day": {
+        case 'day': {
           const prevDay = new Date(baseDate);
           prevDay.setDate(baseDate.getDate() - 1);
-          return format(prevDay, "yyyy-MM-dd");
+          return format(prevDay, 'yyyy-MM-dd');
         }
         default: {
           const prevMonth = subMonths(baseDate, 1);
-          return format(prevMonth, "yyyy-MM-dd");
+          return format(prevMonth, 'yyyy-MM-dd');
         }
       }
     });
@@ -112,23 +116,23 @@ export default function Transactions() {
 
   const handleNextPeriod = () => {
     setCurrentDate((prev) => {
-      const [year, month, day] = prev.split("-").map(Number);
+      const [year, month, day] = prev.split('-').map(Number);
       const baseDate = new Date(year, month - 1, day);
 
       switch (viewType) {
-        case "week": {
+        case 'week': {
           const nextWeek = new Date(baseDate);
           nextWeek.setDate(baseDate.getDate() + 7);
-          return format(nextWeek, "yyyy-MM-dd");
+          return format(nextWeek, 'yyyy-MM-dd');
         }
-        case "day": {
+        case 'day': {
           const nextDay = new Date(baseDate);
           nextDay.setDate(baseDate.getDate() + 1);
-          return format(nextDay, "yyyy-MM-dd");
+          return format(nextDay, 'yyyy-MM-dd');
         }
         default: {
           const nextMonth = addMonths(baseDate, 1);
-          return format(nextMonth, "yyyy-MM-dd");
+          return format(nextMonth, 'yyyy-MM-dd');
         }
       }
     });
@@ -139,29 +143,29 @@ export default function Transactions() {
   };
 
   const getDateRange = () => {
-    const [year, month, day] = currentDate.split("-").map(Number);
+    const [year, month, day] = currentDate.split('-').map(Number);
     const baseDate = new Date(year, month - 1, day);
 
     switch (viewType) {
-      case "day":
+      case 'day':
         return {
-          startDate: format(baseDate, "yyyy-MM-dd"),
-          endDate: format(baseDate, "yyyy-MM-dd"),
+          startDate: format(baseDate, 'yyyy-MM-dd'),
+          endDate: format(baseDate, 'yyyy-MM-dd'),
         };
-      case "week": {
+      case 'week': {
         const weekStart = new Date(baseDate);
         weekStart.setDate(baseDate.getDate() - baseDate.getDay());
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekStart.getDate() + 6);
         return {
-          startDate: format(weekStart, "yyyy-MM-dd"),
-          endDate: format(weekEnd, "yyyy-MM-dd"),
+          startDate: format(weekStart, 'yyyy-MM-dd'),
+          endDate: format(weekEnd, 'yyyy-MM-dd'),
         };
       }
       default:
         return {
-          startDate: format(startOfMonth(baseDate), "yyyy-MM-dd"),
-          endDate: format(endOfMonth(baseDate), "yyyy-MM-dd"),
+          startDate: format(startOfMonth(baseDate), 'yyyy-MM-dd'),
+          endDate: format(endOfMonth(baseDate), 'yyyy-MM-dd'),
         };
     }
   };
@@ -176,88 +180,91 @@ export default function Transactions() {
   });
 
   const { data: allTransactionsUntilPeriod = [] } = useTransactions(currentAccount?.id ?? 0, {
-    startDate: "1900-01-01",
+    startDate: '1900-01-01',
     endDate,
     enabled: !!currentAccount,
   });
 
   const totalIncomePeriodo = transactions
-    .filter((t) => t.type === "income")
+    .filter((t) => t.type === 'income')
     .reduce((sum, t) => sum + parseFloat(t.amount), 0);
   const totalExpensePeriodo = transactions
-    .filter((t) => t.type === "expense")
+    .filter((t) => t.type === 'expense')
     .reduce((sum, t) => sum + parseFloat(t.amount), 0);
   const saldoAcumuladoPeriodo = transactions
     .filter((t) => t.paid)
-    .reduce((sum, t) => sum + (t.type === "income" ? parseFloat(t.amount) : -parseFloat(t.amount)), 0);
+    .reduce(
+      (sum, t) => sum + (t.type === 'income' ? parseFloat(t.amount) : -parseFloat(t.amount)),
+      0
+    );
   const previsaoAcumulada = allTransactionsUntilPeriod.reduce(
-    (sum, t) => sum + (t.type === "income" ? parseFloat(t.amount) : -parseFloat(t.amount)),
-    0,
+    (sum, t) => sum + (t.type === 'income' ? parseFloat(t.amount) : -parseFloat(t.amount)),
+    0
   );
 
   const formatCurrency = (value: string | number) => {
-    const numeric = typeof value === "number" ? value : parseFloat(value);
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
-      Number.isFinite(numeric) ? numeric : 0,
+    const numeric = typeof value === 'number' ? value : parseFloat(value);
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+      Number.isFinite(numeric) ? numeric : 0
     );
   };
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return "";
-    const parsed = parse(dateString, "yyyy-MM-dd", new Date());
-    return format(parsed, "dd/MM/yyyy");
+    if (!dateString) return '';
+    const parsed = parse(dateString, 'yyyy-MM-dd', new Date());
+    return format(parsed, 'dd/MM/yyyy');
   };
 
   const formatCurrentPeriod = () => {
-    const [year, month, day] = currentDate.split("-").map(Number);
+    const [year, month, day] = currentDate.split('-').map(Number);
     const baseDate = new Date(year, month - 1, day);
 
     switch (viewType) {
-      case "week": {
+      case 'week': {
         const { startDate: weekStart, endDate: weekEnd } = getDateRange();
         const start = new Date(weekStart);
         const end = new Date(weekEnd);
-        return `${format(start, "dd/MM")} - ${format(end, "dd/MM/yyyy")}`;
+        return `${format(start, 'dd/MM')} - ${format(end, 'dd/MM/yyyy')}`;
       }
-      case "day":
-        return format(baseDate, "dd/MM/yyyy");
+      case 'day':
+        return format(baseDate, 'dd/MM/yyyy');
       default:
         return baseDate
-          .toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+          .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
           .replace(/^\w/, (c) => c.toUpperCase());
     }
   };
 
   const getPeriodLabel = () => {
     switch (viewType) {
-      case "week":
-        return "da semana";
-      case "day":
-        return "do dia";
+      case 'week':
+        return 'da semana';
+      case 'day':
+        return 'do dia';
       default:
-        return "do mês";
+        return 'do mês';
     }
   };
 
-  const getViewTypeLabel = (type: ViewType) => {
+  const _getViewTypeLabel = (type: ViewType) => {
     switch (type) {
-      case "week":
-        return "por semana";
-      case "day":
-        return "por dia";
+      case 'week':
+        return 'por semana';
+      case 'day':
+        return 'por dia';
       default:
-        return "por mês";
+        return 'por mês';
     }
   };
 
   const getPrevisaoLabel = () => {
     switch (viewType) {
-      case "week":
-        return "até o fim da semana";
-      case "day":
-        return "até o fim do dia";
+      case 'week':
+        return 'até o fim da semana';
+      case 'day':
+        return 'até o fim do dia';
       default:
-        return "até o fim do mês";
+        return 'até o fim do mês';
     }
   };
 
@@ -288,7 +295,7 @@ export default function Transactions() {
     transactionId: number,
     checked: boolean,
     event?: MouseEvent,
-    index?: number,
+    index?: number
   ) => {
     const newSelected = new Set(selectedTransactions);
 
@@ -311,7 +318,7 @@ export default function Transactions() {
 
   const handleSelectAll = (checked: boolean) => {
     setSelectedTransactions(
-      checked ? new Set(filteredTransactions.map((transaction) => transaction.id)) : new Set(),
+      checked ? new Set(filteredTransactions.map((transaction) => transaction.id)) : new Set()
     );
   };
 
@@ -324,24 +331,24 @@ export default function Transactions() {
     mutationFn: async (ids: number[]) => {
       await Promise.all(
         ids.map(async (id) => {
-          const response = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
+          const response = await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
           if (!response.ok) throw new Error(`Erro ao deletar transação ${id}`);
-        }),
+        })
       );
     },
     onSuccess: (_, ids) => {
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
       toast({
-        title: "Sucesso",
+        title: 'Sucesso',
         description: `${ids.length} transação(ões) excluída(s).`,
       });
       handleCancelSelection();
     },
     onError: (error: any) => {
       toast({
-        title: "Erro ao excluir",
-        description: error?.message ?? "Tente novamente mais tarde.",
-        variant: "destructive",
+        title: 'Erro ao excluir',
+        description: error?.message ?? 'Tente novamente mais tarde.',
+        variant: 'destructive',
       });
     },
   });
@@ -350,57 +357,62 @@ export default function Transactions() {
     filteredTransactions.length > 0 &&
     filteredTransactions.every((transaction) => selectedTransactions.has(transaction.id));
 
-  const headerActions = selectedTransactions.size > 0 ? (
-    <div className="flex flex-wrap items-center gap-2">
-      <Badge variant="secondary" className="text-xs">
-        {selectedTransactions.size} selecionada(s)
-      </Badge>
-      <Button variant="outline" size="sm" onClick={handleCancelSelection}>
-        Cancelar
-      </Button>
+  const headerActions =
+    selectedTransactions.size > 0 ? (
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="secondary" className="text-xs">
+          {selectedTransactions.size} selecionada(s)
+        </Badge>
+        <Button variant="outline" size="sm" onClick={handleCancelSelection}>
+          Cancelar
+        </Button>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => deleteTransactionsMutation.mutate(Array.from(selectedTransactions))}
+          disabled={deleteTransactionsMutation.isPending}
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          {deleteTransactionsMutation.isPending ? 'Excluindo...' : 'Excluir'}
+        </Button>
+      </div>
+    ) : (
       <Button
-        variant="destructive"
         size="sm"
-        onClick={() => deleteTransactionsMutation.mutate(Array.from(selectedTransactions))}
-        disabled={deleteTransactionsMutation.isPending}
+        onClick={() => {
+          setSelectedTransaction(null);
+          setIsTransactionModalOpen(true);
+        }}
       >
-        <Trash2 className="mr-2 h-4 w-4" />
-        {deleteTransactionsMutation.isPending ? "Excluindo..." : "Excluir"}
+        <Plus className="mr-2 h-4 w-4" />
+        Nova transação
       </Button>
-    </div>
-  ) : (
-    <Button
-      size="sm"
-      onClick={() => {
-        setSelectedTransaction(null);
-        setIsTransactionModalOpen(true);
-      }}
-    >
-      <Plus className="mr-2 h-4 w-4" />
-      Nova transação
-    </Button>
-  );
+    );
 
-  const summaryCards: { label: string; value: string; tone: "default" | "positive" | "negative" }[] = [
+  const summaryCards: {
+    label: string;
+    value: string;
+    tone: 'default' | 'positive' | 'negative';
+  }[] = [
     {
       label: `Entradas ${getPeriodLabel()}`,
       value: formatCurrency(totalIncomePeriodo),
-      tone: "positive",
+      tone: 'positive',
     },
     {
       label: `Saídas ${getPeriodLabel()}`,
       value: formatCurrency(totalExpensePeriodo),
-      tone: "negative",
+      tone: 'negative',
     },
     {
       label: `Saldo pago ${getPeriodLabel()}`,
       value: formatCurrency(saldoAcumuladoPeriodo),
-      tone: saldoAcumuladoPeriodo < 0 ? "negative" : "default",
+      tone: saldoAcumuladoPeriodo < 0 ? 'negative' : 'default',
     },
     {
       label: `Previsão ${getPrevisaoLabel()}`,
       value: formatCurrency(previsaoAcumulada),
-      tone: previsaoAcumulada < 0 ? "negative" : "default",
+      tone: previsaoAcumulada < 0 ? 'negative' : 'default',
     },
   ];
 
@@ -427,9 +439,9 @@ export default function Transactions() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="center">
-                <DropdownMenuItem onClick={() => setViewType("month")}>Por mês</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setViewType("week")}>Por semana</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setViewType("day")}>Por dia</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setViewType('month')}>Por mês</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setViewType('week')}>Por semana</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setViewType('day')}>Por dia</DropdownMenuItem>
                 <DropdownMenuItem disabled>Personalizado</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -460,25 +472,33 @@ export default function Transactions() {
 
           <div className="grid gap-4 pt-2 sm:grid-cols-2 xl:grid-cols-4">
             {summaryCards.map((item) => (
-              <SummaryCard key={item.label} label={item.label} value={item.value} tone={item.tone as any} />
+              <SummaryCard
+                key={item.label}
+                label={item.label}
+                value={item.value}
+                tone={item.tone as any}
+              />
             ))}
           </div>
 
           <Card className="overflow-hidden">
             <CardContent className="p-0">
               {isLoading ? (
-                <EmptyState title="Carregando transações..." className="border-none bg-transparent" />
+                <EmptyState
+                  title="Carregando transações..."
+                  className="border-none bg-transparent"
+                />
               ) : filteredTransactions.length === 0 ? (
                 <EmptyState
                   title="Nenhuma transação encontrada"
                   description="As movimentações aparecerão aqui assim que forem registradas."
                   action={{
-                    label: "Adicionar transação",
+                    label: 'Adicionar transação',
                     onClick: () => {
                       setSelectedTransaction(null);
                       setIsTransactionModalOpen(true);
                     },
-                    variant: "secondary",
+                    variant: 'secondary',
                   }}
                 />
               ) : (
@@ -489,8 +509,8 @@ export default function Transactions() {
                       <div
                         key={transaction.id}
                         className={cn(
-                          "cursor-pointer px-4 py-3 transition-colors hover:bg-muted/30",
-                          selectedTransactions.has(transaction.id) && "bg-primary/5",
+                          'cursor-pointer px-4 py-3 transition-colors hover:bg-muted/30',
+                          selectedTransactions.has(transaction.id) && 'bg-primary/5'
                         )}
                         onClick={() => handleEditTransaction(transaction)}
                       >
@@ -500,7 +520,12 @@ export default function Transactions() {
                               <Checkbox
                                 checked={selectedTransactions.has(transaction.id)}
                                 onCheckedChange={(checked) =>
-                                  handleSelectTransaction(transaction.id, Boolean(checked), undefined, index)
+                                  handleSelectTransaction(
+                                    transaction.id,
+                                    Boolean(checked),
+                                    undefined,
+                                    index
+                                  )
                                 }
                                 onClick={(e) => e.stopPropagation()}
                                 className="mt-1"
@@ -513,24 +538,26 @@ export default function Transactions() {
                                   {transaction.description}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                  {transaction.category?.name || "Sem categoria"}
+                                  {transaction.category?.name || 'Sem categoria'}
                                 </div>
                               </div>
                             </div>
                             <div className="text-right">
                               <p
                                 className={cn(
-                                  "text-sm font-semibold",
-                                  transaction.type === "income" ? "text-green-600" : "text-red-600",
+                                  'text-sm font-semibold',
+                                  transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
                                 )}
                               >
                                 {formatCurrency(transaction.amount)}
                               </p>
-                              <p className="text-xs text-muted-foreground">{formatDate(transaction.date)}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatDate(transaction.date)}
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>{transaction.paymentMethod || "Método não informado"}</span>
+                            <span>{transaction.paymentMethod || 'Método não informado'}</span>
                             {transaction.installments > 1 && (
                               <span className="rounded-full bg-muted px-2 py-0.5">
                                 {transaction.currentInstallment}/{transaction.installments}
@@ -563,7 +590,9 @@ export default function Transactions() {
                           <TableRow
                             key={transaction.id}
                             className="cursor-pointer"
-                            data-state={selectedTransactions.has(transaction.id) ? "selected" : undefined}
+                            data-state={
+                              selectedTransactions.has(transaction.id) ? 'selected' : undefined
+                            }
                             onClick={() => handleEditTransaction(transaction)}
                           >
                             <TableCell onClick={(e) => e.stopPropagation()}>
@@ -595,7 +624,7 @@ export default function Transactions() {
                             </TableCell>
                             <TableCell>
                               <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">
-                                {transaction.category?.name || "Sem categoria"}
+                                {transaction.category?.name || 'Sem categoria'}
                               </span>
                             </TableCell>
                             <TableCell>
@@ -605,20 +634,30 @@ export default function Transactions() {
                               </div>
                             </TableCell>
                             <TableCell className="text-muted-foreground">
-                              {transaction.paymentMethod || "-"}
+                              {transaction.paymentMethod || '-'}
                             </TableCell>
                             <TableCell className="text-right font-semibold">
-                              <span className={transaction.type === "income" ? "text-green-600" : "text-red-600"}>
+                              <span
+                                className={
+                                  transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                                }
+                              >
                                 {formatCurrency(transaction.amount)}
                               </span>
                             </TableCell>
                             <TableCell className="text-center">
                               {transaction.paid ? (
-                                <div className="inline-flex rounded-full bg-green-100 p-1" title="Pago">
+                                <div
+                                  className="inline-flex rounded-full bg-green-100 p-1"
+                                  title="Pago"
+                                >
                                   <CheckCircle className="h-4 w-4 text-green-600" />
                                 </div>
                               ) : (
-                                <div className="inline-flex rounded-full bg-amber-100 p-1" title="Pendente">
+                                <div
+                                  className="inline-flex rounded-full bg-amber-100 p-1"
+                                  title="Pendente"
+                                >
                                   <Clock className="h-4 w-4 text-amber-600" />
                                 </div>
                               )}

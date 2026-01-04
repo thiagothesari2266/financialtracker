@@ -1,30 +1,26 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-export const accountTypeEnum = z.enum(["personal", "business"]);
+export const accountTypeEnum = z.enum(['personal', 'business']);
 export type AccountType = z.infer<typeof accountTypeEnum>;
 
-export const categoryTypeEnum = z.enum(["income", "expense"]);
+export const categoryTypeEnum = z.enum(['income', 'expense']);
 export type CategoryType = z.infer<typeof categoryTypeEnum>;
 
-export const debtRatePeriodEnum = z.enum(["monthly", "yearly"]);
+export const debtRatePeriodEnum = z.enum(['monthly', 'yearly']);
 export type DebtRatePeriod = z.infer<typeof debtRatePeriodEnum>;
 
-export const invoicePaymentStatusEnum = z.enum(["pending", "paid", "overdue"]);
+export const invoicePaymentStatusEnum = z.enum(['pending', 'paid', 'overdue']);
 export type InvoicePaymentStatus = z.infer<typeof invoicePaymentStatusEnum>;
 
-export const invoiceImportStatusEnum = z.enum([
-  "processing",
-  "completed",
-  "failed",
-]);
+export const invoiceImportStatusEnum = z.enum(['processing', 'completed', 'failed']);
 export type InvoiceImportStatus = z.infer<typeof invoiceImportStatusEnum>;
 
 export const projectStatusEnum = z.enum([
-  "planning",
-  "active",
-  "on-hold",
-  "completed",
-  "cancelled",
+  'planning',
+  'active',
+  'on-hold',
+  'completed',
+  'cancelled',
 ]);
 export type ProjectStatus = z.infer<typeof projectStatusEnum>;
 
@@ -51,7 +47,7 @@ export const insertCategorySchema = z.object({
   color: z.string().min(1),
   icon: z.string().min(1),
   accountId: z.number(),
-  type: categoryTypeEnum.default("expense"),
+  type: categoryTypeEnum.default('expense'),
 });
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 
@@ -109,9 +105,7 @@ export const insertCreditCardTransactionSchema = z.object({
   recurrenceFrequency: z.string().optional(),
   recurrenceEndDate: z.string().optional(),
 });
-export type InsertCreditCardTransaction = z.infer<
-  typeof insertCreditCardTransactionSchema
->;
+export type InsertCreditCardTransaction = z.infer<typeof insertCreditCardTransactionSchema>;
 
 export const insertBankAccountSchema = z.object({
   name: z.string().min(1),
@@ -128,7 +122,7 @@ export const insertDebtSchema = z.object({
   type: z.string().optional().nullable(),
   balance: z.string().min(1),
   interestRate: z.string().min(1),
-  ratePeriod: debtRatePeriodEnum.default("monthly"),
+  ratePeriod: debtRatePeriodEnum.default('monthly'),
   targetDate: z.string().optional().nullable(),
 });
 export type InsertDebt = z.infer<typeof insertDebtSchema>;
@@ -140,7 +134,7 @@ export const insertInvoicePaymentSchema = z.object({
   totalAmount: z.string().min(1),
   dueDate: z.string().min(1),
   transactionId: z.number().optional().nullable(),
-  status: invoicePaymentStatusEnum.default("pending"),
+  status: invoicePaymentStatusEnum.default('pending'),
 });
 export type InsertInvoicePayment = z.infer<typeof insertInvoicePaymentSchema>;
 
@@ -151,7 +145,7 @@ export const insertInvoiceImportSchema = z.object({
   fileSize: z.number(),
   fileType: z.string().min(1),
   filePath: z.string().min(1),
-  status: invoiceImportStatusEnum.default("processing"),
+  status: invoiceImportStatusEnum.default('processing'),
   extractedData: z.any().optional().nullable(),
   transactionsImported: z.number().optional(),
   errorMessage: z.string().optional().nullable(),
@@ -165,7 +159,7 @@ export const insertProjectSchema = z.object({
   budget: z.string().optional().nullable(),
   startDate: z.string().optional().nullable(),
   endDate: z.string().optional().nullable(),
-  status: projectStatusEnum.default("planning"),
+  status: projectStatusEnum.default('planning'),
   accountId: z.number(),
 });
 export type InsertProject = z.infer<typeof insertProjectSchema>;
@@ -427,8 +421,15 @@ export const insertFixedCashflowSchema = z.object({
   description: z.string().min(1),
   amount: z.string().min(1),
   type: categoryTypeEnum,
-  startMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(), // yyyy-mm
-  endMonth: z.string().regex(/^\d{4}-\d{2}$/).optional().nullable(),
+  startMonth: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/)
+    .optional(), // yyyy-mm
+  endMonth: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/)
+    .optional()
+    .nullable(),
   accountId: z.number(),
 });
 export type InsertFixedCashflow = z.infer<typeof insertFixedCashflowSchema>;

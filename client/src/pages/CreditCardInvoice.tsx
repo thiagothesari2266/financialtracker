@@ -1,8 +1,8 @@
-import { useState, useMemo } from "react";
-import { useAccount } from "@/contexts/AccountContext";
-import { useCreditCards, useCreditCardInvoices } from "@/hooks/useCreditCards";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useMemo } from 'react';
+import { useAccount } from '@/contexts/AccountContext';
+import { useCreditCards, useCreditCardInvoices } from '@/hooks/useCreditCards';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Plus,
   Search,
@@ -14,23 +14,22 @@ import {
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
-} from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { 
+} from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import TransactionModal from "@/components/Modals/TransactionModal";
-import { useLocation } from "wouter";
-import type { CreditCard } from "@shared/schema";
-import { AppShell } from "@/components/Layout/AppShell";
-import { EmptyState } from "@/components/ui/empty-state";
+} from '@/components/ui/dropdown-menu';
+import { useToast } from '@/hooks/use-toast';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import TransactionModal from '@/components/Modals/TransactionModal';
+import { useLocation } from 'wouter';
+import { AppShell } from '@/components/Layout/AppShell';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export default function CreditCardInvoice() {
   const { currentAccount } = useAccount();
@@ -38,9 +37,9 @@ export default function CreditCardInvoice() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
-  
+
   // Estados para seleção em massa
   const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -51,36 +50,42 @@ export default function CreditCardInvoice() {
   const creditCardId = urlParams.get('creditCardId');
   const month = urlParams.get('month');
 
-  const { data: creditCards = [], isLoading: loadingCreditCards } = useCreditCards(currentAccount?.id || 0);
-  const { data: invoices = [], isLoading: loadingInvoices } = useCreditCardInvoices(currentAccount?.id || 0);
+  const { data: creditCards = [], isLoading: loadingCreditCards } = useCreditCards(
+    currentAccount?.id || 0
+  );
+  const { data: invoices = [], isLoading: loadingInvoices } = useCreditCardInvoices(
+    currentAccount?.id || 0
+  );
 
   // Buscar o cartão de crédito específico
   const creditCard = useMemo(() => {
     if (!creditCardId || !creditCards.length) return null;
-    return creditCards.find(card => card.id === Number(creditCardId));
+    return creditCards.find((card) => card.id === Number(creditCardId));
   }, [creditCardId, creditCards]);
   // Buscar a fatura específica
   const invoice = useMemo(() => {
     if (!creditCardId || !month || !invoices.length) return null;
-    return invoices.find((inv: any) => 
-      inv.creditCardId === Number(creditCardId) && inv.month === month
+    return invoices.find(
+      (inv: any) => inv.creditCardId === Number(creditCardId) && inv.month === month
     );
   }, [creditCardId, month, invoices]);
   // Funções auxiliares de formatação
   const formatCurrency = (amount: string) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
     }).format(Math.abs(parseFloat(amount))); // Math.abs para mostrar valores sempre positivos
   };
 
   const formatMonth = (monthStr: string) => {
     const [year, month] = monthStr.split('-');
     const date = new Date(parseInt(year), parseInt(month) - 1);
-    return date.toLocaleDateString('pt-BR', { 
-      month: 'long', 
-      year: 'numeric' 
-    }).replace(/^\w/, c => c.toUpperCase());
+    return date
+      .toLocaleDateString('pt-BR', {
+        month: 'long',
+        year: 'numeric',
+      })
+      .replace(/^\w/, (c) => c.toUpperCase());
   };
 
   const formatDate = (dateStr: string) => {
@@ -93,12 +98,12 @@ export default function CreditCardInvoice() {
     const [year, monthNum] = month.split('-');
     let newMonth = parseInt(monthNum) - 1;
     let newYear = parseInt(year);
-    
+
     if (newMonth < 1) {
       newMonth = 12;
       newYear -= 1;
     }
-    
+
     const newMonthStr = `${newYear}-${String(newMonth).padStart(2, '0')}`;
     navigate(`/credit-card-invoice?creditCardId=${creditCardId}&month=${newMonthStr}`);
   };
@@ -108,12 +113,12 @@ export default function CreditCardInvoice() {
     const [year, monthNum] = month.split('-');
     let newMonth = parseInt(monthNum) + 1;
     let newYear = parseInt(year);
-    
+
     if (newMonth > 12) {
       newMonth = 1;
       newYear += 1;
     }
-    
+
     const newMonthStr = `${newYear}-${String(newMonth).padStart(2, '0')}`;
     navigate(`/credit-card-invoice?creditCardId=${creditCardId}&month=${newMonthStr}`);
   };
@@ -126,21 +131,26 @@ export default function CreditCardInvoice() {
 
   const handleEditTransaction = (transaction: any) => {
     if (isSelectionMode) return; // Não abre modal no modo de seleção
-    
+
     console.log('[CreditCardInvoice] Editando transação:', transaction);
     setSelectedTransaction(transaction);
     setIsTransactionModalOpen(true);
   };
 
   // Funções para seleção em massa
-  const handleSelectTransaction = (transactionId: number, checked: boolean, event?: React.MouseEvent, index?: number) => {
+  const handleSelectTransaction = (
+    transactionId: number,
+    checked: boolean,
+    event?: React.MouseEvent,
+    index?: number
+  ) => {
     const newSelected = new Set(selectedTransactions);
-    
+
     // Verificar se é uma seleção de intervalo (Shift + click)
     if (event?.shiftKey && lastSelectedIndex !== null && index !== undefined) {
       const startIndex = Math.min(lastSelectedIndex, index);
       const endIndex = Math.max(lastSelectedIndex, index);
-      
+
       // Selecionar todas as transações no intervalo (incluindo a última clicada)
       for (let i = startIndex; i <= endIndex; i++) {
         if (filteredTransactions[i]) {
@@ -157,9 +167,9 @@ export default function CreditCardInvoice() {
         newSelected.delete(transactionId);
       }
     }
-    
+
     setSelectedTransactions(newSelected);
-    
+
     // Atualizar o último índice selecionado
     if (index !== undefined) {
       setLastSelectedIndex(index);
@@ -168,7 +178,7 @@ export default function CreditCardInvoice() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      const allIds = new Set(filteredTransactions.map(t => t.id));
+      const allIds = new Set(filteredTransactions.map((t) => t.id));
       setSelectedTransactions(allIds);
     } else {
       setSelectedTransactions(new Set());
@@ -210,8 +220,12 @@ export default function CreditCardInvoice() {
     },
     onSuccess: (_, transactionIds) => {
       if (currentAccount?.id) {
-        queryClient.invalidateQueries({ queryKey: ['/api/accounts', currentAccount.id, 'credit-card-invoices'] });
-        queryClient.refetchQueries({ queryKey: ['/api/accounts', currentAccount.id, 'credit-card-invoices'] });
+        queryClient.invalidateQueries({
+          queryKey: ['/api/accounts', currentAccount.id, 'credit-card-invoices'],
+        });
+        queryClient.refetchQueries({
+          queryKey: ['/api/accounts', currentAccount.id, 'credit-card-invoices'],
+        });
       }
       toast({
         title: 'Sucesso',
@@ -230,27 +244,29 @@ export default function CreditCardInvoice() {
 
   const handleDeleteSelected = () => {
     if (selectedTransactions.size === 0) return;
-    
+
     const confirmDelete = window.confirm(
       `Tem certeza que deseja excluir ${selectedTransactions.size} transação(ões) selecionada(s)?`
     );
-    
+
     if (confirmDelete) {
       deleteTransactionsMutation.mutate(Array.from(selectedTransactions));
     }
   };
 
   // Filtrar transações baseado no termo de busca e creditCardId
-  const filteredTransactions = invoice?.transactions?.filter((transaction: any) =>
-    transaction.creditCardId === Number(creditCardId) && (
-      transaction?.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction?.category?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  ) || [];
+  const filteredTransactions =
+    invoice?.transactions?.filter(
+      (transaction: any) =>
+        transaction.creditCardId === Number(creditCardId) &&
+        (transaction?.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          transaction?.category?.name?.toLowerCase().includes(searchTerm.toLowerCase()))
+    ) || [];
 
-  const isAllSelected = filteredTransactions.length > 0 && 
-    filteredTransactions.every(t => selectedTransactions.has(t.id));
-  const isSomeSelected = selectedTransactions.size > 0;
+  const isAllSelected =
+    filteredTransactions.length > 0 &&
+    filteredTransactions.every((t) => selectedTransactions.has(t.id));
+  const _isSomeSelected = selectedTransactions.size > 0;
 
   const handleCloseTransactionModal = () => {
     setIsTransactionModalOpen(false);
@@ -261,7 +277,7 @@ export default function CreditCardInvoice() {
     const newTransaction = {
       creditCardId: Number(creditCardId),
       type: 'expense',
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
     };
     setSelectedTransaction(newTransaction);
     setIsTransactionModalOpen(true);
@@ -272,38 +288,37 @@ export default function CreditCardInvoice() {
 
   const hasInvalidParams = !creditCardId || !month;
   const isLoadingData = loadingInvoices || loadingCreditCards;
-  const pageTitle = creditCard ? `Fatura - ${creditCard.name}` : "Faturas";
+  const pageTitle = creditCard ? `Fatura - ${creditCard.name}` : 'Faturas';
   const pageDescription =
     creditCard && invoice
       ? `${formatMonth(invoice.month)} • ${formatCurrency(invoice.total)}`
-      : "Selecione um cartão e mês para visualizar a fatura.";
+      : 'Selecione um cartão e mês para visualizar a fatura.';
 
-  const pageActions = creditCard && month
-    ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleGoBack}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
+  const pageActions =
+    creditCard && month ? (
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" onClick={handleGoBack}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Voltar
+        </Button>
+        <div className="flex items-center gap-1 rounded-full border bg-card px-2 py-1 text-sm font-medium">
+          <Button variant="ghost" size="icon" onClick={handlePreviousMonth}>
+            <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="flex items-center gap-1 rounded-full border bg-card px-2 py-1 text-sm font-medium">
-            <Button variant="ghost" size="icon" onClick={handlePreviousMonth}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="px-2">{formatMonth(month)}</span>
-            <Button variant="ghost" size="icon" onClick={handleNextMonth}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleCurrentMonth}>
-            Hoje
-          </Button>
-          <Button onClick={handleAddTransaction}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Transação
+          <span className="px-2">{formatMonth(month)}</span>
+          <Button variant="ghost" size="icon" onClick={handleNextMonth}>
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-      )
-    : undefined;
+        <Button variant="outline" size="sm" onClick={handleCurrentMonth}>
+          Hoje
+        </Button>
+        <Button onClick={handleAddTransaction}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nova Transação
+        </Button>
+      </div>
+    ) : undefined;
 
   const renderContent = () => {
     if (hasInvalidParams) {
@@ -313,7 +328,7 @@ export default function CreditCardInvoice() {
           title="Parâmetros inválidos"
           description="Os parâmetros creditCardId e month são obrigatórios."
           action={{
-            label: "Voltar aos cartões",
+            label: 'Voltar aos cartões',
             onClick: () => navigate('/credit-cards'),
             variant: 'outline',
           }}
@@ -332,7 +347,7 @@ export default function CreditCardInvoice() {
           title="Fatura não encontrada"
           description="A fatura solicitada não existe ou não pôde ser carregada."
           action={{
-            label: "Voltar aos cartões",
+            label: 'Voltar aos cartões',
             onClick: handleGoBack,
             variant: 'outline',
           }}
@@ -377,7 +392,9 @@ export default function CreditCardInvoice() {
               </div>
               <div>
                 <p className="text-sm text-slate-600">Total da Fatura</p>
-                <p className="text-lg font-semibold text-red-600">{formatCurrency(invoice.total)}</p>
+                <p className="text-lg font-semibold text-red-600">
+                  {formatCurrency(invoice.total)}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-slate-600">Transações</p>
@@ -416,7 +433,9 @@ export default function CreditCardInvoice() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  <DropdownMenuItem onClick={handleToggleSelectionMode}>Selecionar múltiplas</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleToggleSelectionMode}>
+                    Selecionar múltiplas
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -428,7 +447,11 @@ export default function CreditCardInvoice() {
             <CardTitle>Transações da Fatura</CardTitle>
             {isSelectionMode && filteredTransactions.length > 0 && (
               <div className="flex items-center gap-2">
-                <Checkbox checked={isAllSelected} onCheckedChange={handleSelectAll} className="border-slate-400" />
+                <Checkbox
+                  checked={isAllSelected}
+                  onCheckedChange={handleSelectAll}
+                  className="border-slate-400"
+                />
                 <span className="text-sm text-slate-600">Selecionar todas</span>
               </div>
             )}
@@ -447,7 +470,12 @@ export default function CreditCardInvoice() {
                         <Checkbox
                           checked={selectedTransactions.has(transaction.id)}
                           onCheckedChange={(checked) =>
-                            handleSelectTransaction(transaction.id, Boolean(checked), undefined, index)
+                            handleSelectTransaction(
+                              transaction.id,
+                              Boolean(checked),
+                              undefined,
+                              index
+                            )
                           }
                           onClick={(e) => {
                             e.stopPropagation();
@@ -462,7 +490,9 @@ export default function CreditCardInvoice() {
                         />
                       )}
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
-                        <i className={`${transaction.category?.icon || 'fas fa-exchange-alt'} text-red-600`}></i>
+                        <i
+                          className={`${transaction.category?.icon || 'fas fa-exchange-alt'} text-red-600`}
+                        ></i>
                       </div>
                       <div>
                         <h3 className="font-medium text-slate-900">
@@ -475,13 +505,16 @@ export default function CreditCardInvoice() {
                           )}
                         </h3>
                         <p className="text-sm text-slate-600">
-                          {transaction.category?.name || 'Sem categoria'} • {formatDate(transaction.date)}
+                          {transaction.category?.name || 'Sem categoria'} •{' '}
+                          {formatDate(transaction.date)}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="font-semibold text-red-600">{formatCurrency(transaction.amount)}</p>
+                        <p className="font-semibold text-red-600">
+                          {formatCurrency(transaction.amount)}
+                        </p>
                         {transaction.installments > 1 && (
                           <Badge variant="outline" className="mt-1 text-xs">
                             Parcelado
@@ -510,7 +543,9 @@ export default function CreditCardInvoice() {
                   {searchTerm ? 'Nenhuma transação encontrada' : 'Nenhuma transação nesta fatura'}
                 </p>
                 <p className="mb-4 text-sm text-slate-500">
-                  {searchTerm ? 'Tente ajustar o termo de busca' : 'Adicione transações para começar'}
+                  {searchTerm
+                    ? 'Tente ajustar o termo de busca'
+                    : 'Adicione transações para começar'}
                 </p>
                 <Button onClick={handleAddTransaction} variant="outline">
                   <Plus className="mr-2 h-4 w-4" />

@@ -1,6 +1,6 @@
-import React from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import React from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface EditInstallmentScopeModalProps {
   open: boolean;
@@ -8,7 +8,11 @@ interface EditInstallmentScopeModalProps {
   onSelect: (scope: 'single' | 'all' | 'future') => void;
 }
 
-export default function EditInstallmentScopeModal({ open, onClose, onSelect }: EditInstallmentScopeModalProps) {
+export default function EditInstallmentScopeModal({
+  open,
+  onClose,
+  onSelect,
+}: EditInstallmentScopeModalProps) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-sm">

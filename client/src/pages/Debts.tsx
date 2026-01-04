@@ -1,19 +1,26 @@
-import { useMemo, useState } from "react";
-import { AppShell } from "@/components/Layout/AppShell";
-import { useAccount } from "@/contexts/AccountContext";
-import { SummaryCard } from "@/components/ui/summary-card";
-import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { BadgePercent, CalendarDays, Clock3, PiggyBank, Plus, Pencil, Trash2 } from "lucide-react";
-import type { Debt, DebtRatePeriod, InsertDebt } from "@shared/schema";
-import { DebtModal, type DebtFormValues } from "@/components/Modals/DebtModal";
-import { useToast } from "@/hooks/use-toast";
-import { useCreateDebt, useDebts, useDeleteDebt, useUpdateDebt } from "@/hooks/useDebts";
-import { EmptyState } from "@/components/ui/empty-state";
+import { useMemo, useState } from 'react';
+import { AppShell } from '@/components/Layout/AppShell';
+import { useAccount } from '@/contexts/AccountContext';
+import { SummaryCard } from '@/components/ui/summary-card';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { BadgePercent, CalendarDays, Clock3, PiggyBank, Plus, Pencil, Trash2 } from 'lucide-react';
+import type { Debt, DebtRatePeriod, InsertDebt } from '@shared/schema';
+import { DebtModal, type DebtFormValues } from '@/components/Modals/DebtModal';
+import { useToast } from '@/hooks/use-toast';
+import { useCreateDebt, useDebts, useDeleteDebt, useUpdateDebt } from '@/hooks/useDebts';
+import { EmptyState } from '@/components/ui/empty-state';
 
 const toNumber = (value: string): number => {
-  const normalized = value.replace(/,/g, ".");
+  const normalized = value.replace(/,/g, '.');
   const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 };
@@ -21,23 +28,23 @@ const toNumber = (value: string): number => {
 const getMonthlyRate = (debt: Debt): number => {
   const baseRate = toNumber(debt.interestRate) / 100;
   if (baseRate <= 0) return 0;
-  return debt.ratePeriod === "yearly" ? baseRate / 12 : baseRate;
+  return debt.ratePeriod === 'yearly' ? baseRate / 12 : baseRate;
 };
 
 const formatCurrency = (value: number | string): string => {
-  const numeric = typeof value === "number" ? value : toNumber(value);
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(numeric);
+  const numeric = typeof value === 'number' ? value : toNumber(value);
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(numeric);
 };
 
 const formatPercent = (value: string, period: DebtRatePeriod): string => {
   const numeric = toNumber(value);
-  return `${numeric.toFixed(2)}% ${period === "yearly" ? "a.a." : "a.m."}`;
+  return `${numeric.toFixed(2)}% ${period === 'yearly' ? 'a.a.' : 'a.m.'}`;
 };
 
 const formatDate = (value: string | null) => {
-  if (!value) return "-";
+  if (!value) return '-';
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? "-" : parsed.toLocaleDateString("pt-BR");
+  return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleDateString('pt-BR');
 };
 
 export default function Debts() {
@@ -90,18 +97,18 @@ export default function Debts() {
     try {
       if (editingDebt) {
         await updateMutation.mutateAsync({ id: editingDebt.id, data: payload });
-        toast({ title: "Dívida atualizada" });
+        toast({ title: 'Dívida atualizada' });
       } else {
         await createMutation.mutateAsync(payload);
-        toast({ title: "Dívida adicionada" });
+        toast({ title: 'Dívida adicionada' });
       }
       setIsModalOpen(false);
       setEditingDebt(null);
-    } catch (error) {
+    } catch (_error) {
       toast({
-        title: "Falha ao salvar",
-        description: "Verifique os dados e tente novamente.",
-        variant: "destructive",
+        title: 'Falha ao salvar',
+        description: 'Verifique os dados e tente novamente.',
+        variant: 'destructive',
       });
     }
   };
@@ -112,9 +119,9 @@ export default function Debts() {
 
     try {
       await deleteMutation.mutateAsync(debt.id);
-      toast({ title: "Dívida removida" });
+      toast({ title: 'Dívida removida' });
     } catch (error) {
-      toast({ title: "Erro ao remover", variant: "destructive" });
+      toast({ title: 'Erro ao remover', variant: 'destructive' });
     }
   };
 
@@ -138,7 +145,7 @@ export default function Debts() {
               title="Nenhuma dívida cadastrada"
               description="Registre cartões, financiamentos ou outros débitos para acompanhar juros e prazos."
               action={{
-                label: "Adicionar dívida",
+                label: 'Adicionar dívida',
                 onClick: () => {
                   setEditingDebt(null);
                   setIsModalOpen(true);
@@ -161,11 +168,13 @@ export default function Debts() {
             {debt.type && <div className="text-xs text-muted-foreground">{debt.type}</div>}
           </TableCell>
           <TableCell className="text-sm">{formatCurrency(debt.balance)}</TableCell>
-          <TableCell className="text-sm">{formatPercent(debt.interestRate, debt.ratePeriod)}</TableCell>
+          <TableCell className="text-sm">
+            {formatPercent(debt.interestRate, debt.ratePeriod)}
+          </TableCell>
           <TableCell className="text-sm text-amber-600">{formatCurrency(monthlyCost)}</TableCell>
           <TableCell className="text-sm">
             <Badge variant="outline" className="bg-amber-50 text-amber-700">
-              {debt.ratePeriod === "yearly" ? "a.a." : "a.m."}
+              {debt.ratePeriod === 'yearly' ? 'a.a.' : 'a.m.'}
             </Badge>
           </TableCell>
           <TableCell className="text-sm">{formatDate(debt.targetDate)}</TableCell>
@@ -223,8 +232,10 @@ export default function Debts() {
           />
           <SummaryCard
             label="Próxima data alvo"
-            value={totals.nextTarget ? formatDate(totals.nextTarget) : "Sem data"}
-            helperText={totals.nextTarget ? "Priorize este vencimento" : "Defina uma data de quitação"}
+            value={totals.nextTarget ? formatDate(totals.nextTarget) : 'Sem data'}
+            helperText={
+              totals.nextTarget ? 'Priorize este vencimento' : 'Defina uma data de quitação'
+            }
             icon={<CalendarDays className="h-10 w-10 text-sky-600" />}
           />
         </div>
@@ -233,7 +244,9 @@ export default function Debts() {
           <div className="flex items-center justify-between border-b px-4 py-3">
             <div>
               <p className="text-sm font-medium">Dívidas monitoradas</p>
-              <p className="text-xs text-muted-foreground">Valores não movimentam transações, servem apenas para análise.</p>
+              <p className="text-xs text-muted-foreground">
+                Valores não movimentam transações, servem apenas para análise.
+              </p>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Clock3 className="h-4 w-4" />

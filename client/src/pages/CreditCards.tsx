@@ -1,19 +1,24 @@
-import { useState } from "react";
-import { useAccount } from "@/contexts/AccountContext";
-import { AppShell } from "@/components/Layout/AppShell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Plus, CreditCard, Calendar, DollarSign, RefreshCw, Upload } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import CreditCardModal from "@/components/Modals/CreditCardModal";
-import CreditCardInvoicesModal from "@/components/Modals/CreditCardInvoicesModal";
-import InvoiceUploadModal from "@/components/Modals/InvoiceUploadModal";
-import { useCreditCards, useCreateCreditCard, useUpdateCreditCard, useDeleteCreditCard } from "@/hooks/useCreditCards";
-import { useProcessOverdueInvoices } from "@/hooks/useProcessInvoices";
-import { useToast } from "@/hooks/use-toast";
-import { SummaryCard } from "@/components/ui/summary-card";
-import { EmptyState } from "@/components/ui/empty-state";
-import { cn } from "@/lib/utils";
+import { useState } from 'react';
+import { useAccount } from '@/contexts/AccountContext';
+import { AppShell } from '@/components/Layout/AppShell';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Plus, CreditCard, Calendar, DollarSign, RefreshCw, Upload } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import CreditCardModal from '@/components/Modals/CreditCardModal';
+import CreditCardInvoicesModal from '@/components/Modals/CreditCardInvoicesModal';
+import InvoiceUploadModal from '@/components/Modals/InvoiceUploadModal';
+import {
+  useCreditCards,
+  useCreateCreditCard,
+  useUpdateCreditCard,
+  useDeleteCreditCard,
+} from '@/hooks/useCreditCards';
+import { useProcessOverdueInvoices } from '@/hooks/useProcessInvoices';
+import { useToast } from '@/hooks/use-toast';
+import { SummaryCard } from '@/components/ui/summary-card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { cn } from '@/lib/utils';
 
 export default function CreditCards() {
   const { currentAccount } = useAccount();
@@ -44,10 +49,10 @@ export default function CreditCards() {
     );
   }
   const formatCurrency = (amount: string | number) => {
-    const value = typeof amount === "number" ? amount : parseFloat(amount);
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
+    const value = typeof amount === 'number' ? amount : parseFloat(amount);
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
     }).format(Number.isFinite(value) ? value : 0);
   };
 
@@ -56,7 +61,7 @@ export default function CreditCards() {
     const today = new Date();
     let invoiceMonth = today.getMonth() + 1; // 1-12
     let invoiceYear = today.getFullYear();
-    
+
     // Para cartões que fecham no final do mês (>=25), as compras vão sempre para o próximo mês
     if (closingDay >= 25) {
       if (today.getDate() <= closingDay) {
@@ -86,7 +91,7 @@ export default function CreditCards() {
       }
       // Antes/no fechamento -> mesmo mês (não altera)
     }
-    
+
     return `${invoiceYear}-${String(invoiceMonth).padStart(2, '0')}`;
   };
 
@@ -95,8 +100,18 @@ export default function CreditCards() {
     const yearMonth = getCurrentInvoiceMonth(closingDay);
     const [year, month] = yearMonth.split('-');
     const monthNames = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
     ];
     return `${monthNames[parseInt(month) - 1]} de ${year}`;
   };
@@ -124,22 +139,20 @@ export default function CreditCards() {
         }
       );
     } else {
-      createCreditCard.mutate(
-        payload,
-        {
-          onSuccess: () => {
-            setIsCreditCardModalOpen(false);
-          },
-        }
-      );
+      createCreditCard.mutate(payload, {
+        onSuccess: () => {
+          setIsCreditCardModalOpen(false);
+        },
+      });
     }
   }
 
   function handleEditCreditCard(card: any) {
     setEditingCard(card);
-    setIsCreditCardModalOpen(true);  }
+    setIsCreditCardModalOpen(true);
+  }
 
-  function handleDeleteCreditCard(card: any) {
+  function _handleDeleteCreditCard(card: any) {
     if (window.confirm(`Tem certeza que deseja excluir o cartão "${card.name}"?`)) {
       deleteCreditCard.mutate(card.id);
     }
@@ -156,19 +169,19 @@ export default function CreditCards() {
 
   function handleProcessInvoices() {
     if (!currentAccount) return;
-    
+
     processInvoices.mutate(currentAccount.id, {
       onSuccess: (processedInvoices) => {
         toast({
-          title: "Faturas processadas!",
+          title: 'Faturas processadas!',
           description: `${processedInvoices.length} faturas foram processadas e adicionadas como transações.`,
         });
       },
-      onError: (error) => {
+      onError: (_error) => {
         toast({
-          title: "Erro ao processar faturas",
-          description: "Ocorreu um erro ao processar as faturas. Tente novamente.",
-          variant: "destructive",
+          title: 'Erro ao processar faturas',
+          description: 'Ocorreu um erro ao processar as faturas. Tente novamente.',
+          variant: 'destructive',
         });
       },
     });
@@ -186,7 +199,9 @@ export default function CreditCards() {
               onClick={handleProcessInvoices}
               disabled={processInvoices.isPending}
             >
-              <RefreshCw className={cn("h-4 w-4 mr-2", processInvoices.isPending && "animate-spin")} />
+              <RefreshCw
+                className={cn('h-4 w-4 mr-2', processInvoices.isPending && 'animate-spin')}
+              />
               Processar faturas
             </Button>
             <Button onClick={() => setIsCreditCardModalOpen(true)}>
@@ -199,7 +214,10 @@ export default function CreditCards() {
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
             {isLoading ? (
-              <EmptyState title="Carregando cartões..." className="col-span-full border-none bg-transparent" />
+              <EmptyState
+                title="Carregando cartões..."
+                className="col-span-full border-none bg-transparent"
+              />
             ) : creditCards.length === 0 ? (
               <EmptyState
                 className="col-span-full"
@@ -207,14 +225,17 @@ export default function CreditCards() {
                 title="Nenhum cartão cadastrado"
                 description="Cadastre seu primeiro cartão para acompanhar limites, faturas e importações."
                 action={{
-                  label: "Adicionar cartão",
+                  label: 'Adicionar cartão',
                   onClick: () => setIsCreditCardModalOpen(true),
                 }}
               />
             ) : (
               creditCards.map((card) => {
-                const usagePercentage = card.creditLimit && card.currentBalance ? (parseFloat(card.currentBalance) / parseFloat(card.creditLimit)) * 100 : 0;
-                
+                const usagePercentage =
+                  card.creditLimit && card.currentBalance
+                    ? (parseFloat(card.currentBalance) / parseFloat(card.creditLimit)) * 100
+                    : 0;
+
                 return (
                   <Card key={card.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader className="pb-4">
@@ -228,11 +249,13 @@ export default function CreditCards() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                          {/* Balance and Limit */}
+                        {/* Balance and Limit */}
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-slate-600">Fatura Atual</span>
-                            <span className="font-semibold text-red-600">{formatCurrency(card.currentBalance || "0.00")}</span>
+                            <span className="font-semibold text-red-600">
+                              {formatCurrency(card.currentBalance || '0.00')}
+                            </span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-slate-600">Mês da Fatura</span>
@@ -242,15 +265,20 @@ export default function CreditCards() {
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-slate-600">Limite</span>
-                            <span className="font-semibold text-slate-900">{formatCurrency(card.creditLimit || "0.00")}</span>
+                            <span className="font-semibold text-slate-900">
+                              {formatCurrency(card.creditLimit || '0.00')}
+                            </span>
                           </div>
-                          
+
                           {/* Usage Bar */}
                           <div className="w-full bg-slate-200 rounded-full h-2">
-                            <div 
+                            <div
                               className={`h-2 rounded-full transition-all ${
-                                usagePercentage > 80 ? 'bg-red-500' : 
-                                usagePercentage > 60 ? 'bg-yellow-500' : 'bg-green-500'
+                                usagePercentage > 80
+                                  ? 'bg-red-500'
+                                  : usagePercentage > 60
+                                    ? 'bg-yellow-500'
+                                    : 'bg-green-500'
                               }`}
                               style={{ width: `${Math.min(usagePercentage, 100)}%` }}
                             ></div>
@@ -259,39 +287,52 @@ export default function CreditCards() {
                             {usagePercentage.toFixed(1)}% utilizado
                           </div>
                         </div>
-                        
+
                         {/* Due Date e Closing Day */}
                         <div className="flex items-start justify-between gap-6 pt-2 border-t">
-  {/* Fechamento */}
-  <div className="flex items-center justify-between w-full">
-    <div className="flex items-center space-x-2">
-      <Calendar className="h-4 w-4 text-slate-400" />
-      <span className="text-sm text-slate-600">Fechamento</span>
-    </div>
-    <span className="text-sm font-medium">Dia {card.closingDay || "-"}</span>
-  </div>
+                          {/* Fechamento */}
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center space-x-2">
+                              <Calendar className="h-4 w-4 text-slate-400" />
+                              <span className="text-sm text-slate-600">Fechamento</span>
+                            </div>
+                            <span className="text-sm font-medium">
+                              Dia {card.closingDay || '-'}
+                            </span>
+                          </div>
 
-  {/* Vencimento */}
-  <div className="flex items-center justify-between w-full">
-    <div className="flex items-center space-x-2">
-      <Calendar className="h-4 w-4 text-slate-400" />
-      <span className="text-sm text-slate-600">Vencimento</span>
-    </div>
-    <span className="text-sm font-medium">Dia {card.dueDate}</span>
-  </div>
-</div>
+                          {/* Vencimento */}
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center space-x-2">
+                              <Calendar className="h-4 w-4 text-slate-400" />
+                              <span className="text-sm text-slate-600">Vencimento</span>
+                            </div>
+                            <span className="text-sm font-medium">Dia {card.dueDate}</span>
+                          </div>
+                        </div>
 
-
-                          {/* Actions */}
+                        {/* Actions */}
                         <div className="grid grid-cols-3 gap-2 pt-2">
-                          <Button variant="outline" size="sm" onClick={() => handleViewInvoices(card)}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewInvoices(card)}
+                          >
                             Ver Fatura
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleUploadInvoice(card)}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUploadInvoice(card)}
+                          >
                             <Upload className="h-3 w-3 mr-1" />
                             Importar
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleEditCreditCard(card)}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditCreditCard(card)}
+                          >
                             Editar
                           </Button>
                         </div>
@@ -307,7 +348,10 @@ export default function CreditCards() {
             <SummaryCard
               label="Total das faturas"
               value={formatCurrency(
-                creditCards.reduce((sum, card) => sum + parseFloat(card.currentBalance || "0.00"), 0),
+                creditCards.reduce(
+                  (sum, card) => sum + parseFloat(card.currentBalance || '0.00'),
+                  0
+                )
               )}
               tone="negative"
               icon={<DollarSign className="h-6 w-6 text-red-600" />}
@@ -315,15 +359,18 @@ export default function CreditCards() {
             <SummaryCard
               label="Limite total"
               value={formatCurrency(
-                creditCards.reduce((sum, card) => sum + parseFloat(card.creditLimit || "0.00"), 0),
+                creditCards.reduce((sum, card) => sum + parseFloat(card.creditLimit || '0.00'), 0)
               )}
               icon={<CreditCard className="h-6 w-6 text-blue-600" />}
             />
             <SummaryCard
               label="Limite disponível"
               value={formatCurrency(
-                creditCards.reduce((sum, card) => sum + parseFloat(card.creditLimit || "0.00"), 0) -
-                  creditCards.reduce((sum, card) => sum + parseFloat(card.currentBalance || "0.00"), 0),
+                creditCards.reduce((sum, card) => sum + parseFloat(card.creditLimit || '0.00'), 0) -
+                  creditCards.reduce(
+                    (sum, card) => sum + parseFloat(card.currentBalance || '0.00'),
+                    0
+                  )
               )}
               tone="positive"
             />

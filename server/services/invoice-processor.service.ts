@@ -1,14 +1,10 @@
-import { prisma } from "../db";
+import { prisma } from '../db';
 import {
   analyzeInvoiceImage,
   analyzeMultipleInvoiceImages,
   type InvoiceAnalysisResult,
-} from "./openai.service";
-import {
-  processFile,
-  processImageBuffer,
-  cleanupTempFile,
-} from "./image-parser.service";
+} from './openai.service';
+import { processFile, processImageBuffer, cleanupTempFile } from './image-parser.service';
 
 export interface ProcessInvoiceRequest {
   filePath: string;
@@ -71,19 +67,19 @@ async function createImportRecord({
       fileSize,
       fileType,
       filePath,
-      status: "processing",
+      status: 'processing',
     },
   });
 }
 
 async function finalizeImport(
   importId: number,
-  status: "completed" | "failed",
+  status: 'completed' | 'failed',
   extras: Partial<{
     extractedData: InvoiceAnalysisResult;
     transactionsImported: number;
     errorMessage: string;
-  }> = {},
+  }> = {}
 ) {
   await prisma.invoiceImport.update({
     where: { id: importId },
@@ -103,7 +99,7 @@ async function buildCategoryMap(accountId: number) {
   });
 
   if (categories.length === 0) {
-    throw new Error("Nenhuma categoria cadastrada para esta conta");
+    throw new Error('Nenhuma categoria cadastrada para esta conta');
   }
 
   const map = new Map(categories.map((category) => [category.name.toLowerCase(), category.id]));
@@ -114,11 +110,11 @@ function buildTransactionPayload(
   extracted: InvoiceAnalysisResult,
   request: { creditCardId: number; accountId: number },
   categoryMap: Map<string, number>,
-  fallbackCategoryId: number,
+  fallbackCategoryId: number
 ) {
   return extracted.transactions.map((transaction) => {
     const categoryId =
-      findMatchingCategory(transaction.category ?? "", categoryMap, transaction.description) ??
+      findMatchingCategory(transaction.category ?? '', categoryMap, transaction.description) ??
       fallbackCategoryId;
 
     const installments = transaction.installments ?? 1;
@@ -135,13 +131,13 @@ function buildTransactionPayload(
       installments,
       currentInstallment: transaction.currentInstallment ?? 1,
       invoiceMonth,
-      launchType: installments > 1 ? "recorrente" : "unico",
+      launchType: installments > 1 ? 'recorrente' : 'unico',
     };
   });
 }
 
 async function persistTransactions(
-  transactions: Array<ReturnType<typeof buildTransactionPayload>[number]>,
+  transactions: Array<ReturnType<typeof buildTransactionPayload>[number]>
 ) {
   if (transactions.length === 0) {
     return 0;
@@ -198,7 +194,7 @@ async function runInvoiceImport({
     const payload = buildTransactionPayload(analysisResult, request, map, fallbackCategoryId);
     const insertedCount = await persistTransactions(payload);
 
-    await finalizeImport(importRecord.id, "completed", {
+    await finalizeImport(importRecord.id, 'completed', {
       extractedData: analysisResult,
       transactionsImported: insertedCount,
     });
@@ -210,22 +206,24 @@ async function runInvoiceImport({
       extractedData: analysisResult,
     };
   } catch (error) {
-    await finalizeImport(importRecord.id, "failed", {
-      errorMessage: error instanceof Error ? error.message : "Erro desconhecido",
+    await finalizeImport(importRecord.id, 'failed', {
+      errorMessage: error instanceof Error ? error.message : 'Erro desconhecido',
     });
 
     return {
       importId: importRecord.id,
       success: false,
       transactionsCount: 0,
-      error: error instanceof Error ? error.message : "Erro desconhecido",
+      error: error instanceof Error ? error.message : 'Erro desconhecido',
     };
   } finally {
     await cleanup?.();
   }
 }
 
-export async function processInvoice(request: ProcessInvoiceRequest): Promise<ProcessInvoiceResult> {
+export async function processInvoice(
+  request: ProcessInvoiceRequest
+): Promise<ProcessInvoiceResult> {
   return runInvoiceImport({
     request,
     importMeta: {
@@ -235,13 +233,13 @@ export async function processInvoice(request: ProcessInvoiceRequest): Promise<Pr
       filePath: request.filePath,
     },
     messages: {
-      emptyBase64: "Não foi possível processar a imagem enviada",
-      noTransactions: "Nenhuma transação foi identificada na fatura",
+      emptyBase64: 'Não foi possível processar a imagem enviada',
+      noTransactions: 'Nenhuma transação foi identificada na fatura',
     },
     getBase64Images: async () => {
       const { imageBase64 } = await processFile(request.filePath, request.fileType);
       if (!imageBase64) {
-        throw new Error("Não foi possível processar a imagem enviada");
+        throw new Error('Não foi possível processar a imagem enviada');
       }
       return [imageBase64];
     },
@@ -250,7 +248,7 @@ export async function processInvoice(request: ProcessInvoiceRequest): Promise<Pr
 }
 
 export async function processImageFromBuffer(
-  request: ProcessImageBufferRequest,
+  request: ProcessImageBufferRequest
 ): Promise<ProcessInvoiceResult> {
   return runInvoiceImport({
     request,
@@ -258,16 +256,16 @@ export async function processImageFromBuffer(
       filename: request.filename,
       fileSize: request.imageBuffer.length,
       fileType: request.fileType,
-      filePath: "clipboard-image",
+      filePath: 'clipboard-image',
     },
     messages: {
-      emptyBase64: "Não foi possível processar a imagem colada",
-      noTransactions: "Nenhuma transação foi identificada na fatura",
+      emptyBase64: 'Não foi possível processar a imagem colada',
+      noTransactions: 'Nenhuma transação foi identificada na fatura',
     },
     getBase64Images: async () => {
       const { imageBase64 } = await processImageBuffer(request.imageBuffer, request.fileType);
       if (!imageBase64) {
-        throw new Error("Não foi possível processar a imagem colada");
+        throw new Error('Não foi possível processar a imagem colada');
       }
       return [imageBase64];
     },
@@ -275,21 +273,21 @@ export async function processImageFromBuffer(
 }
 
 export async function processMultipleImages(
-  request: ProcessMultipleImagesRequest,
+  request: ProcessMultipleImagesRequest
 ): Promise<ProcessInvoiceResult> {
   const totalSize = request.fileSizes.reduce((sum, size) => sum + size, 0);
 
   return runInvoiceImport({
     request,
     importMeta: {
-      filename: `${request.filenames.length} imagens: ${request.filenames.join(", ")}`,
+      filename: `${request.filenames.length} imagens: ${request.filenames.join(', ')}`,
       fileSize: totalSize,
-      fileType: "multiple-images",
-      filePath: request.filePaths.join(";"),
+      fileType: 'multiple-images',
+      filePath: request.filePaths.join(';'),
     },
     messages: {
-      emptyBase64: "Não foi possível processar nenhuma das imagens enviadas",
-      noTransactions: "Nenhuma transação foi identificada nas imagens",
+      emptyBase64: 'Não foi possível processar nenhuma das imagens enviadas',
+      noTransactions: 'Nenhuma transação foi identificada nas imagens',
     },
     getBase64Images: async () => {
       const base64Images: string[] = [];
@@ -314,12 +312,12 @@ export async function processMultipleImages(
 function findMatchingCategory(
   categoryName: string,
   categoryMap: Map<string, number>,
-  transactionDescription?: string,
+  transactionDescription?: string
 ): number | null {
   if (!categoryName && !transactionDescription) return null;
 
   const normalizedCategory = categoryName.toLowerCase().trim();
-  const normalizedDescription = (transactionDescription ?? "").toLowerCase().trim();
+  const normalizedDescription = (transactionDescription ?? '').toLowerCase().trim();
   const combinedText = `${normalizedCategory} ${normalizedDescription}`;
 
   if (normalizedCategory && categoryMap.has(normalizedCategory)) {
@@ -357,124 +355,131 @@ function findMatchingCategory(
 
 const smartCategoryDictionary: Record<string, string[]> = {
   alimentação: [
-    "extra",
-    "carrefour",
-    "walmart",
-    "atacadao",
-    "assai",
-    "supermercado",
-    "mercado",
-    "ifood",
-    "uber eats",
-    "ubereats",
-    "rappi",
-    "delivery",
-    "restaurant",
-    "lanchonete",
-    "pizzaria",
-    "mcdonald",
-    "burger king",
-    "padaria",
-    "padaria",
-    "cafe",
-    "starbucks",
-    "hortifruti",
-    "acougue",
-    "alimento",
+    'extra',
+    'carrefour',
+    'walmart',
+    'atacadao',
+    'assai',
+    'supermercado',
+    'mercado',
+    'ifood',
+    'uber eats',
+    'ubereats',
+    'rappi',
+    'delivery',
+    'restaurant',
+    'lanchonete',
+    'pizzaria',
+    'mcdonald',
+    'burger king',
+    'padaria',
+    'padaria',
+    'cafe',
+    'starbucks',
+    'hortifruti',
+    'acougue',
+    'alimento',
   ],
   transporte: [
-    "shell",
-    "petrobras",
-    "br",
-    "ipiranga",
-    "posto",
-    "combustivel",
-    "gasolina",
-    "uber",
-    "taxi",
-    "99",
-    "metrô",
-    "metro",
-    "onibus",
-    "estacionamento",
-    "pedagio",
-    "sem parar",
-    "mecanica",
-    "oficina",
+    'shell',
+    'petrobras',
+    'br',
+    'ipiranga',
+    'posto',
+    'combustivel',
+    'gasolina',
+    'uber',
+    'taxi',
+    '99',
+    'metrô',
+    'metro',
+    'onibus',
+    'estacionamento',
+    'pedagio',
+    'sem parar',
+    'mecanica',
+    'oficina',
   ],
   saúde: [
-    "droga",
-    "farmacia",
-    "drogaria",
-    "hospital",
-    "clinica",
-    "laboratorio",
-    "exame",
-    "consulta",
-    "medic",
-    "plano de saude",
-    "odontologia",
+    'droga',
+    'farmacia',
+    'drogaria',
+    'hospital',
+    'clinica',
+    'laboratorio',
+    'exame',
+    'consulta',
+    'medic',
+    'plano de saude',
+    'odontologia',
   ],
   lazer: [
-    "netflix",
-    "spotify",
-    "disney",
-    "globoplay",
-    "cinema",
-    "ingresso",
-    "teatro",
-    "show",
-    "hotel",
-    "viagem",
-    "resort",
-    "parque",
+    'netflix',
+    'spotify',
+    'disney',
+    'globoplay',
+    'cinema',
+    'ingresso',
+    'teatro',
+    'show',
+    'hotel',
+    'viagem',
+    'resort',
+    'parque',
   ],
   educação: [
-    "escola",
-    "colegio",
-    "universidade",
-    "faculdade",
-    "curso",
-    "livro",
-    "papelaria",
-    "kalunga",
-    "apostila",
+    'escola',
+    'colegio',
+    'universidade',
+    'faculdade',
+    'curso',
+    'livro',
+    'papelaria',
+    'kalunga',
+    'apostila',
   ],
   casa: [
-    "leroy",
-    "telhanorte",
-    "tok stok",
-    "casas bahia",
-    "magazine luiza",
-    "mobly",
-    "madeira",
-    "moveis",
-    "decoracao",
-    "reforma",
-    "limpeza",
+    'leroy',
+    'telhanorte',
+    'tok stok',
+    'casas bahia',
+    'magazine luiza',
+    'mobly',
+    'madeira',
+    'moveis',
+    'decoracao',
+    'reforma',
+    'limpeza',
   ],
   tecnologia: [
-    "apple",
-    "samsung",
-    "lg",
-    "google",
-    "amazon",
-    "kabum",
-    "pichau",
-    "notebook",
-    "computador",
-    "celular",
-    "software",
-    "internet",
-    "banda larga",
+    'apple',
+    'samsung',
+    'lg',
+    'google',
+    'amazon',
+    'kabum',
+    'pichau',
+    'notebook',
+    'computador',
+    'celular',
+    'software',
+    'internet',
+    'banda larga',
   ],
-  escritório: ["papelaria", "office", "material escritorio", "mesa", "cadeira", "toner"],
-  marketing: ["facebook ads", "google ads", "instagram", "design", "grafica", "banner"],
-  fornecedores: ["fornecedor", "distribuidor", "atacado", "materia prima", "insumo", "terceirizado"],
+  escritório: ['papelaria', 'office', 'material escritorio', 'mesa', 'cadeira', 'toner'],
+  marketing: ['facebook ads', 'google ads', 'instagram', 'design', 'grafica', 'banner'],
+  fornecedores: [
+    'fornecedor',
+    'distribuidor',
+    'atacado',
+    'materia prima',
+    'insumo',
+    'terceirizado',
+  ],
 };
 
 function removeAccents(text: string): string {
-  return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
 export async function getInvoiceImports(creditCardId: number, accountId: number) {
@@ -483,7 +488,7 @@ export async function getInvoiceImports(creditCardId: number, accountId: number)
       creditCardId,
       accountId,
     },
-    orderBy: [{ createdAt: "desc" }],
+    orderBy: [{ createdAt: 'desc' }],
   });
 }
 
@@ -496,7 +501,7 @@ export async function getInvoiceImportDetails(importId: number, accountId: numbe
   });
 
   if (!record) {
-    throw new Error("Importação não encontrada");
+    throw new Error('Importação não encontrada');
   }
 
   return record;

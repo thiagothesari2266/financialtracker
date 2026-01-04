@@ -1,5 +1,5 @@
-import { type ReactNode } from "react";
-import { Link, useLocation } from "wouter";
+import { type ReactNode } from 'react';
+import { Link, useLocation } from 'wouter';
 import {
   Sidebar,
   SidebarContent,
@@ -15,10 +15,10 @@ import {
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
-} from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
+} from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,8 +26,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Bell,
   Building2,
@@ -45,11 +45,11 @@ import {
   CircleDollarSign,
   Repeat,
   BadgePercent,
-} from "lucide-react";
-import { AccountSwitcher } from "./AccountSwitcher";
-import { useAccount } from "@/contexts/AccountContext";
-import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
+} from 'lucide-react';
+import { AccountSwitcher } from './AccountSwitcher';
+import { useAccount } from '@/contexts/AccountContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 interface AppShellProps {
   title: string;
@@ -65,24 +65,24 @@ interface NavigationItem {
 }
 
 const primaryNavigation: NavigationItem[] = [
-  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Transações", href: "/transactions", icon: Receipt },
-  { title: "Categorias", href: "/categories", icon: Tags },
-  { title: "Cartões", href: "/credit-cards", icon: CreditCard },
-  { title: "Faturas", href: "/credit-card-invoice", icon: FileSpreadsheet },
-  { title: "Relatórios", href: "/reports", icon: LineChart },
-  { title: "Painel de Dívidas", href: "/debts", icon: BadgePercent },
-  { title: "Fixos mensais", href: "/monthly-fixed", icon: Repeat },
-  { title: "Contas Bancárias", href: "/bank-accounts", icon: Wallet },
+  { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { title: 'Transações', href: '/transactions', icon: Receipt },
+  { title: 'Categorias', href: '/categories', icon: Tags },
+  { title: 'Cartões', href: '/credit-cards', icon: CreditCard },
+  { title: 'Faturas', href: '/credit-card-invoice', icon: FileSpreadsheet },
+  { title: 'Relatórios', href: '/reports', icon: LineChart },
+  { title: 'Painel de Dívidas', href: '/debts', icon: BadgePercent },
+  { title: 'Fixos mensais', href: '/monthly-fixed', icon: Repeat },
+  { title: 'Contas Bancárias', href: '/bank-accounts', icon: Wallet },
 ];
 
 const businessNavigation: NavigationItem[] = [
-  { title: "Projetos", href: "/projects", icon: Layers3 },
-  { title: "Centro de Custo", href: "/cost-centers", icon: Building2 },
+  { title: 'Projetos', href: '/projects', icon: Layers3 },
+  { title: 'Centro de Custo', href: '/cost-centers', icon: Building2 },
 ];
 
 const secondaryNavigation: NavigationItem[] = [
-  { title: "Configurações", href: "/settings", icon: Settings2 },
+  { title: 'Configurações', href: '/settings', icon: Settings2 },
 ];
 
 export function AppShell({ title, description, actions, children }: AppShellProps) {
@@ -94,7 +94,7 @@ export function AppShell({ title, description, actions, children }: AppShellProp
         <div className="text-center">
           <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">
-            {isLoading ? "Carregando contas..." : "Selecione uma conta para continuar"}
+            {isLoading ? 'Carregando contas...' : 'Selecione uma conta para continuar'}
           </p>
         </div>
       </div>
@@ -118,7 +118,7 @@ export function AppShell({ title, description, actions, children }: AppShellProp
   );
 }
 
-function AppSidebar({ accountType }: { accountType: "personal" | "business" }) {
+function AppSidebar({ accountType }: { accountType: 'personal' | 'business' }) {
   const [location] = useLocation();
 
   const renderNavItems = (items: NavigationItem[]) =>
@@ -156,7 +156,7 @@ function AppSidebar({ accountType }: { accountType: "personal" | "business" }) {
             </SidebarGroupContent>
           </SidebarGroup>
 
-          {accountType === "business" && (
+          {accountType === 'business' && (
             <SidebarGroup>
               <SidebarGroupLabel>Operações</SidebarGroupLabel>
               <SidebarGroupContent>
@@ -227,22 +227,22 @@ function UserMenu() {
 
   const initials = user?.name
     ? user.name
-        .split(" ")
+        .split(' ')
         .map((part) => part[0])
-        .join("")
+        .join('')
         .slice(0, 2)
         .toUpperCase()
-    : user?.email?.[0]?.toUpperCase() ?? "?";
+    : (user?.email?.[0]?.toUpperCase() ?? '?');
 
   const handleLogout = async () => {
     try {
       await logout();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Falha ao encerrar sessão";
+      const message = error instanceof Error ? error.message : 'Falha ao encerrar sessão';
       toast({
-        title: "Erro ao sair",
+        title: 'Erro ao sair',
         description: message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -258,7 +258,7 @@ function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>
-          <div className="text-sm font-semibold">{user?.name || "Usuário"}</div>
+          <div className="text-sm font-semibold">{user?.name || 'Usuário'}</div>
           <div className="text-xs text-muted-foreground">{user?.email}</div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

@@ -1,24 +1,24 @@
-import { forwardRef, useMemo } from "react";
-import { Input, type InputProps } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { forwardRef, useMemo } from 'react';
+import { Input, type InputProps } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("pt-BR", {
+  new Intl.NumberFormat('pt-BR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
 
-type CurrencyInputProps = Omit<InputProps, "value" | "onChange" | "type"> & {
+type CurrencyInputProps = Omit<InputProps, 'value' | 'onChange' | 'type'> & {
   value?: number | null;
   onValueChange?: (value: number | null) => void;
 };
 
 export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
   ({ value = null, onValueChange, className, ...props }, ref) => {
-    const displayValue = useMemo(() => (value == null ? "" : formatCurrency(value)), [value]);
+    const displayValue = useMemo(() => (value == null ? '' : formatCurrency(value)), [value]);
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const digits = event.target.value.replace(/\D/g, "");
+      const digits = event.target.value.replace(/\D/g, '');
       if (!digits) {
         onValueChange?.(null);
         return;
@@ -40,11 +40,11 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
           value={displayValue}
           onChange={handleChange}
           inputMode="decimal"
-          className={cn("pl-10", className)}
+          className={cn('pl-10', className)}
           {...props}
         />
       </div>
     );
-  },
+  }
 );
-CurrencyInput.displayName = "CurrencyInput";
+CurrencyInput.displayName = 'CurrencyInput';

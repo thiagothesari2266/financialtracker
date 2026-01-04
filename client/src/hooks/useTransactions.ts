@@ -1,13 +1,16 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import type { Transaction, InsertTransaction, TransactionWithCategory } from "@shared/schema";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
+import type { InsertTransaction, TransactionWithCategory } from '@shared/schema';
 
-export function useTransactions(accountId: number, options?: { limit?: number; startDate?: string; endDate?: string; enabled?: boolean }) {
+export function useTransactions(
+  accountId: number,
+  options?: { limit?: number; startDate?: string; endDate?: string; enabled?: boolean }
+) {
   const params = new URLSearchParams();
   if (options?.limit) params.append('limit', options.limit.toString());
   if (options?.startDate) params.append('startDate', options.startDate);
   if (options?.endDate) params.append('endDate', options.endDate);
-  
+
   const queryString = params.toString();
   const url = `/api/accounts/${accountId}/transactions${queryString ? `?${queryString}` : ''}`;
 
@@ -32,7 +35,7 @@ export function useTransaction(id: number) {
 
 export function useCreateTransaction(accountId: number) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: InsertTransaction) => {
       const response = await apiRequest('POST', `/api/accounts/${accountId}/transactions`, data);
@@ -46,7 +49,7 @@ export function useCreateTransaction(accountId: number) {
 
 export function useUpdateTransaction(accountId: number) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertTransaction> }) => {
       const response = await apiRequest('PATCH', `/api/transactions/${id}`, data);
@@ -64,7 +67,9 @@ export function useUpdateTransaction(accountId: number) {
       if (data) {
         queryClient.invalidateQueries({ queryKey: ['/api/accounts', data.accountId] });
         queryClient.invalidateQueries({ queryKey: ['/api/transactions', data.id] });
-        queryClient.invalidateQueries({ queryKey: ['/api/accounts', data.accountId, 'transactions'] });
+        queryClient.invalidateQueries({
+          queryKey: ['/api/accounts', data.accountId, 'transactions'],
+        });
       }
     },
   });

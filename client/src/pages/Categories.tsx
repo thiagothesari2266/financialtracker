@@ -1,15 +1,15 @@
-import { useState } from "react";
-import { useAccount } from "@/contexts/AccountContext";
-import { useCategories, useDeleteCategory } from "@/hooks/useCategories";
-import { AppShell } from "@/components/Layout/AppShell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Folder, Plus, Edit, Trash2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import CategoryModal from "@/components/Modals/CategoryModal";
-import type { Category } from "@shared/schema";
-import { getCategoryIcon, categoryColors } from "@/lib/categoryIcons";
-import { EmptyState } from "@/components/ui/empty-state";
+import { useState } from 'react';
+import { useAccount } from '@/contexts/AccountContext';
+import { useCategories, useDeleteCategory } from '@/hooks/useCategories';
+import { AppShell } from '@/components/Layout/AppShell';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Folder, Plus, Edit, Trash2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import CategoryModal from '@/components/Modals/CategoryModal';
+import type { Category } from '@shared/schema';
+import { getCategoryIcon, categoryColors } from '@/lib/categoryIcons';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export default function Categories() {
   const { currentAccount } = useAccount();
@@ -34,33 +34,37 @@ export default function Categories() {
   };
 
   const handleDelete = async (categoryId: number) => {
-    if (!confirm("Tem certeza que deseja excluir esta categoria?")) return;
+    if (!confirm('Tem certeza que deseja excluir esta categoria?')) return;
     try {
       await deleteMutation.mutateAsync(categoryId);
       toast({
-        title: "Categoria excluída",
-        description: "A lista foi atualizada.",
+        title: 'Categoria excluída',
+        description: 'A lista foi atualizada.',
       });
-    } catch (error) {
+    } catch (_error) {
       toast({
-        title: "Erro ao excluir",
-        description: "Não foi possível excluir a categoria.",
-        variant: "destructive",
+        title: 'Erro ao excluir',
+        description: 'Não foi possível excluir a categoria.',
+        variant: 'destructive',
       });
     }
   };
 
-  const incomeCategories = categories.filter((cat) => cat.type === "income");
-  const expenseCategories = categories.filter((cat) => cat.type === "expense");
+  const incomeCategories = categories.filter((cat) => cat.type === 'income');
+  const expenseCategories = categories.filter((cat) => cat.type === 'expense');
 
-  const renderGroup = (title: string, items: Category[], tone: "income" | "expense") => (
+  const renderGroup = (title: string, items: Category[], tone: 'income' | 'expense') => (
     <Card className="border-muted">
       <CardHeader className="pb-4">
-        <CardTitle className={tone === "income" ? "text-green-600" : "text-red-600"}>{title}</CardTitle>
+        <CardTitle className={tone === 'income' ? 'text-green-600' : 'text-red-600'}>
+          {title}
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {items.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">Nenhuma categoria cadastrada</p>
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            Nenhuma categoria cadastrada
+          </p>
         ) : (
           items.map((category) => (
             <div
@@ -72,12 +76,17 @@ export default function Categories() {
                   className="flex h-7 w-7 items-center justify-center rounded-full text-white"
                   style={{ backgroundColor: categoryColors[tone] }}
                 >
-                  {getCategoryIcon(category.icon, "h-3.5 w-3.5", "white")}
+                  {getCategoryIcon(category.icon, 'h-3.5 w-3.5', 'white')}
                 </div>
                 <span className="text-sm font-medium text-foreground">{category.name}</span>
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(category)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => handleEdit(category)}
+                >
                   <Edit className="h-3.5 w-3.5" />
                 </Button>
                 <Button
@@ -123,7 +132,7 @@ export default function Categories() {
               title="Nenhuma categoria criada"
               description="Comece cadastrando sua primeira categoria para organizar melhor suas finanças."
               action={{
-                label: "Criar categoria",
+                label: 'Criar categoria',
                 onClick: () => {
                   setEditingCategory(null);
                   setIsCategoryModalOpen(true);
@@ -132,8 +141,8 @@ export default function Categories() {
             />
           ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {renderGroup("Categorias de Receita", incomeCategories, "income")}
-              {renderGroup("Categorias de Despesa", expenseCategories, "expense")}
+              {renderGroup('Categorias de Receita', incomeCategories, 'income')}
+              {renderGroup('Categorias de Despesa', expenseCategories, 'expense')}
             </div>
           )}
         </div>

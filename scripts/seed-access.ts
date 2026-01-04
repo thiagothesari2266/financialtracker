@@ -1,21 +1,21 @@
-import "dotenv/config";
-import bcrypt from "bcryptjs";
-import { prisma } from "../server/db";
+import 'dotenv/config';
+import bcrypt from 'bcryptjs';
+import { prisma } from '../server/db';
 
 const PASSWORD_SALT_ROUNDS = 10;
 
 const DEFAULT_USERS = [
   {
-    label: "Usuario pessoal",
-    email: "thiagothesari@gmail.com",
-    password: "tmttx22ID",
+    label: 'Usuario pessoal',
+    email: 'thiagothesari@gmail.com',
+    password: 'tmttx22ID',
   },
 ];
 
-const PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%!";
+const PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%!';
 
 function generatePassword(length = 12) {
-  let result = "";
+  let result = '';
   for (let i = 0; i < length; i++) {
     const index = Math.floor(Math.random() * PASSWORD_CHARS.length);
     result += PASSWORD_CHARS[index];
@@ -26,7 +26,7 @@ function generatePassword(length = 12) {
 interface SeedResult {
   email: string;
   password: string;
-  status: "created" | "skipped";
+  status: 'created' | 'skipped';
   note?: string;
 }
 
@@ -37,9 +37,9 @@ async function upsertUser(email: string, password: string): Promise<SeedResult> 
   if (existing) {
     return {
       email: normalizedEmail,
-      password: "********",
-      status: "skipped",
-      note: "Usuário já existe",
+      password: '********',
+      status: 'skipped',
+      note: 'Usuário já existe',
     };
   }
 
@@ -54,23 +54,24 @@ async function upsertUser(email: string, password: string): Promise<SeedResult> 
   return {
     email: normalizedEmail,
     password,
-    status: "created",
+    status: 'created',
   };
 }
 
 async function main() {
-  console.log("🚀 Iniciando seed de acessos padrão...");
+  console.log('🚀 Iniciando seed de acessos padrão...');
   const results: SeedResult[] = [];
 
   for (const user of DEFAULT_USERS) {
-    const password = user.password && user.password.length >= 8 ? user.password : generatePassword();
+    const password =
+      user.password && user.password.length >= 8 ? user.password : generatePassword();
     const result = await upsertUser(user.email, password);
     results.push(result);
   }
 
-  console.log("\nResumo dos acessos:");
+  console.log('\nResumo dos acessos:');
   results.forEach((result) => {
-    if (result.status === "created") {
+    if (result.status === 'created') {
       console.log(`✅ ${result.email} | senha: ${result.password}`);
     } else {
       console.log(`ℹ️  ${result.email} | ${result.note}`);
@@ -80,7 +81,7 @@ async function main() {
 
 main()
   .catch((error) => {
-    console.error("❌ Erro ao executar seed de acessos:", error);
+    console.error('❌ Erro ao executar seed de acessos:', error);
     process.exitCode = 1;
   })
   .finally(async () => {

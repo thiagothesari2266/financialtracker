@@ -1,6 +1,11 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import type { CreditCard, InsertCreditCard, CreditCardTransaction, InsertCreditCardTransaction } from "@shared/schema";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
+import type {
+  CreditCard,
+  InsertCreditCard,
+  CreditCardTransaction,
+  InsertCreditCardTransaction,
+} from '@shared/schema';
 
 export function useCreditCards(accountId: number) {
   return useQuery<CreditCard[]>({
@@ -23,7 +28,7 @@ export function useCreditCard(id: number) {
 
 export function useCreateCreditCard(accountId: number) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: InsertCreditCard) => {
       const response = await apiRequest('POST', `/api/accounts/${accountId}/credit-cards`, data);
@@ -37,14 +42,16 @@ export function useCreateCreditCard(accountId: number) {
 
 export function useUpdateCreditCard() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertCreditCard> }) => {
       const response = await apiRequest('PATCH', `/api/credit-cards/${id}`, data);
       return response.json();
     },
     onSuccess: (creditCard: CreditCard) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', creditCard.accountId, 'credit-cards'] });
+      queryClient.invalidateQueries({
+        queryKey: ['/api/accounts', creditCard.accountId, 'credit-cards'],
+      });
       queryClient.invalidateQueries({ queryKey: ['/api/credit-cards', creditCard.id] });
     },
   });
@@ -52,7 +59,7 @@ export function useUpdateCreditCard() {
 
 export function useDeleteCreditCard() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: number) => {
       const creditCard = await queryClient.getQueryData<CreditCard>(['/api/credit-cards', id]);
@@ -61,7 +68,9 @@ export function useDeleteCreditCard() {
     },
     onSuccess: (creditCard) => {
       if (creditCard) {
-        queryClient.invalidateQueries({ queryKey: ['/api/accounts', creditCard.accountId, 'credit-cards'] });
+        queryClient.invalidateQueries({
+          queryKey: ['/api/accounts', creditCard.accountId, 'credit-cards'],
+        });
       }
     },
   });
@@ -69,15 +78,25 @@ export function useDeleteCreditCard() {
 
 export function useUpdateCreditCardTransaction() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertCreditCardTransaction> }) => {
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: number;
+      data: Partial<InsertCreditCardTransaction>;
+    }) => {
       const response = await apiRequest('PUT', `/api/credit-card-transactions/${id}`, data);
       return response.json();
     },
     onSuccess: (transaction: CreditCardTransaction) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', transaction.accountId, 'credit-card-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', transaction.accountId, 'credit-card-invoices'] });
+      queryClient.invalidateQueries({
+        queryKey: ['/api/accounts', transaction.accountId, 'credit-card-transactions'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['/api/accounts', transaction.accountId, 'credit-card-invoices'],
+      });
     },
   });
 }
@@ -104,7 +123,10 @@ export function useDeleteCreditCardTransaction() {
 
       // Se não encontrou no cache, tenta buscar via queries de invoices
       if (!accountId) {
-        const invoiceQueries = queryClient.getQueriesData({ queryKey: ['/api/accounts'], type: 'active' });
+        const invoiceQueries = queryClient.getQueriesData({
+          queryKey: ['/api/accounts'],
+          type: 'active',
+        });
         for (const [, data] of invoiceQueries) {
           if (Array.isArray(data)) {
             for (const invoice of data) {
@@ -126,8 +148,12 @@ export function useDeleteCreditCardTransaction() {
     },
     onSuccess: ({ accountId }) => {
       if (accountId) {
-        queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'credit-card-transactions'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'credit-card-invoices'] });
+        queryClient.invalidateQueries({
+          queryKey: ['/api/accounts', accountId, 'credit-card-transactions'],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ['/api/accounts', accountId, 'credit-card-invoices'],
+        });
       }
     },
   });

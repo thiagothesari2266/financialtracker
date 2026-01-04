@@ -1,21 +1,21 @@
-import { useState } from "react";
-import { useAccount } from "@/contexts/AccountContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Plus, Building, DollarSign, User, MoreHorizontal, Edit, Trash2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { useCostCenters, useDeleteCostCenter } from "@/hooks/useCostCenters";
-import { useToast } from "@/hooks/use-toast";
-import CostCenterModal from "@/components/Modals/CostCenterModal";
+import { useState } from 'react';
+import { useAccount } from '@/contexts/AccountContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Plus, Building, DollarSign, User, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { useCostCenters, useDeleteCostCenter } from '@/hooks/useCostCenters';
+import { useToast } from '@/hooks/use-toast';
+import CostCenterModal from '@/components/Modals/CostCenterModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import type { CostCenter } from "@shared/schema";
-import { AppShell } from "@/components/Layout/AppShell";
-import { EmptyState } from "@/components/ui/empty-state";
+} from '@/components/ui/dropdown-menu';
+import type { CostCenter } from '@shared/schema';
+import { AppShell } from '@/components/Layout/AppShell';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export default function CostCenters() {
   const { currentAccount } = useAccount();
@@ -37,7 +37,7 @@ export default function CostCenters() {
     );
   }
 
-  if (currentAccount.type !== "business") {
+  if (currentAccount.type !== 'business') {
     return (
       <AppShell title="Centros de Custo" description="Gerencie e monitore seus centros de custo">
         <EmptyState
@@ -59,24 +59,24 @@ export default function CostCenters() {
       try {
         await deleteMutation.mutateAsync(costCenter.id);
         toast({
-          title: "Centro de custo excluído!",
+          title: 'Centro de custo excluído!',
           description: `O centro de custo "${costCenter.name}" foi excluído com sucesso.`,
         });
-      } catch (error) {
+      } catch (_error) {
         toast({
-          title: "Erro",
-          description: "Não foi possível excluir o centro de custo.",
-          variant: "destructive",
+          title: 'Erro',
+          description: 'Não foi possível excluir o centro de custo.',
+          variant: 'destructive',
         });
       }
     }
   };
 
   const formatCurrency = (amount?: string) => {
-    if (!amount) return "R$ 0,00";
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
+    if (!amount) return 'R$ 0,00';
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
     }).format(parseFloat(amount));
   };
 
@@ -103,14 +103,17 @@ export default function CostCenters() {
         }
       >
         {isLoading ? (
-          <EmptyState title="Carregando centros de custo..." className="border-dashed bg-transparent" />
+          <EmptyState
+            title="Carregando centros de custo..."
+            className="border-dashed bg-transparent"
+          />
         ) : costCenters.length === 0 ? (
           <EmptyState
             icon={<Building className="h-16 w-16 text-slate-400" />}
             title="Nenhum centro de custo encontrado"
             description="Comece criando seu primeiro centro de custo para organizar suas despesas."
             action={{
-              label: "Criar centro",
+              label: 'Criar centro',
               onClick: handleOpenCreateModal,
             }}
           />
@@ -121,7 +124,9 @@ export default function CostCenters() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="mb-2 text-lg font-semibold text-slate-900">{costCenter.name}</CardTitle>
+                      <CardTitle className="mb-2 text-lg font-semibold text-slate-900">
+                        {costCenter.name}
+                      </CardTitle>
                       <Badge variant="outline" className="text-xs">
                         {costCenter.code}
                       </Badge>
@@ -137,7 +142,10 @@ export default function CostCenters() {
                           <Edit className="mr-2 h-4 w-4" />
                           Editar
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteCostCenter(costCenter)} className="text-red-600">
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteCostCenter(costCenter)}
+                          className="text-red-600"
+                        >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Excluir
                         </DropdownMenuItem>
@@ -146,7 +154,9 @@ export default function CostCenters() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {costCenter.description && <p className="text-sm text-slate-600 line-clamp-2">{costCenter.description}</p>}
+                  {costCenter.description && (
+                    <p className="text-sm text-slate-600 line-clamp-2">{costCenter.description}</p>
+                  )}
 
                   {costCenter.department && (
                     <div className="flex items-center gap-2 text-sm text-slate-600">

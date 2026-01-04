@@ -1,27 +1,27 @@
-import { useMemo, useState } from "react";
-import { format, parse } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { AppShell } from "@/components/Layout/AppShell";
-import MetricsCards from "@/components/Dashboard/MetricsCards";
-import ExpenseChart from "@/components/Dashboard/ExpenseChart";
-import RecentTransactions from "@/components/Dashboard/RecentTransactions";
-import CreditCards from "@/components/Dashboard/CreditCards";
-import TopCategories from "@/components/Dashboard/TopCategories";
-import TransactionModal from "@/components/Modals/TransactionModal";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useAccount } from "@/contexts/AccountContext";
+import { useMemo, useState } from 'react';
+import { format, parse } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { AppShell } from '@/components/Layout/AppShell';
+import MetricsCards from '@/components/Dashboard/MetricsCards';
+import ExpenseChart from '@/components/Dashboard/ExpenseChart';
+import RecentTransactions from '@/components/Dashboard/RecentTransactions';
+import CreditCards from '@/components/Dashboard/CreditCards';
+import TopCategories from '@/components/Dashboard/TopCategories';
+import TransactionModal from '@/components/Modals/TransactionModal';
+import { Button } from '@/components/ui/button';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useAccount } from '@/contexts/AccountContext';
 
 export default function Dashboard() {
   const { currentAccount } = useAccount();
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(() => format(new Date(), "yyyy-MM"));
+  const [currentMonth, setCurrentMonth] = useState(() => format(new Date(), 'yyyy-MM'));
 
   const formattedMonth = useMemo(() => {
     try {
-      const date = parse(currentMonth, "yyyy-MM", new Date());
-      return format(date, "MMMM yyyy", { locale: ptBR });
-    } catch (_) {
+      const date = parse(currentMonth, 'yyyy-MM', new Date());
+      return format(date, 'MMMM yyyy', { locale: ptBR });
+    } catch {
       return currentMonth;
     }
   }, [currentMonth]);
@@ -38,15 +38,15 @@ export default function Dashboard() {
   }
 
   const handlePreviousMonth = () => {
-    const date = parse(currentMonth, "yyyy-MM", new Date());
+    const date = parse(currentMonth, 'yyyy-MM', new Date());
     date.setMonth(date.getMonth() - 1);
-    setCurrentMonth(format(date, "yyyy-MM"));
+    setCurrentMonth(format(date, 'yyyy-MM'));
   };
 
   const handleNextMonth = () => {
-    const date = parse(currentMonth, "yyyy-MM", new Date());
+    const date = parse(currentMonth, 'yyyy-MM', new Date());
     date.setMonth(date.getMonth() + 1);
-    setCurrentMonth(format(date, "yyyy-MM"));
+    setCurrentMonth(format(date, 'yyyy-MM'));
   };
 
   return (

@@ -1,7 +1,7 @@
-import { Link, useLocation } from "wouter";
-import { useAccount } from "@/contexts/AccountContext";
-import { AccountSwitcher } from "./AccountSwitcher";
-import { cn } from "@/lib/utils";
+import { Link, useLocation } from 'wouter';
+import { useAccount } from '@/contexts/AccountContext';
+import { AccountSwitcher } from './AccountSwitcher';
+import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   Receipt,
@@ -13,7 +13,7 @@ import {
   Building2,
   Settings2,
   Repeat,
-} from "lucide-react";
+} from 'lucide-react';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -21,17 +21,17 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Transações", href: "/transactions", icon: Receipt },
-  { label: "Categorias", href: "/categories", icon: Tags },
-  { label: "Cartões", href: "/credit-cards", icon: CreditCard },
-  { label: "Faturas", href: "/credit-card-invoice", icon: FileSpreadsheet },
-  { label: "Fixos mensais", href: "/monthly-fixed", icon: Repeat },
-  { label: "Relatórios", href: "/reports", icon: FileSpreadsheet },
-  { label: "Contas Bancárias", href: "/bank-accounts", icon: Landmark },
-  { label: "Projetos", href: "/projects", icon: Layers3 },
-  { label: "Centro de Custo", href: "/cost-centers", icon: Building2 },
-  { label: "Configurações", href: "/settings", icon: Settings2 },
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Transações', href: '/transactions', icon: Receipt },
+  { label: 'Categorias', href: '/categories', icon: Tags },
+  { label: 'Cartões', href: '/credit-cards', icon: CreditCard },
+  { label: 'Faturas', href: '/credit-card-invoice', icon: FileSpreadsheet },
+  { label: 'Fixos mensais', href: '/monthly-fixed', icon: Repeat },
+  { label: 'Relatórios', href: '/reports', icon: FileSpreadsheet },
+  { label: 'Contas Bancárias', href: '/bank-accounts', icon: Landmark },
+  { label: 'Projetos', href: '/projects', icon: Layers3 },
+  { label: 'Centro de Custo', href: '/cost-centers', icon: Building2 },
+  { label: 'Configurações', href: '/settings', icon: Settings2 },
 ];
 
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
@@ -51,8 +51,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       )}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 border-r border-sidebar-border bg-sidebar transition-transform duration-200 ease-out",
-          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          'fixed inset-y-0 left-0 z-50 w-64 border-r border-sidebar-border bg-sidebar transition-transform duration-200 ease-out',
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
         <div className="flex h-full flex-col p-4">
@@ -73,10 +73,10 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center rounded-lg px-3 py-2 text-sm transition-colors",
+                    'flex items-center rounded-lg px-3 py-2 text-sm transition-colors',
                     isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                   )}
                   onClick={onClose}
                 >

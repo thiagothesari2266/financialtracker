@@ -1,18 +1,15 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Bot } from "lucide-react";
-import FinancialChat from "./FinancialChat";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Bot } from 'lucide-react';
+import FinancialChat from './FinancialChat';
 
 export default function FloatingChatButton() {
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   return (
     <>
-      <FinancialChat 
-        isOpen={isChatOpen} 
-        onClose={() => setIsChatOpen(false)} 
-      />
-      
+      <FinancialChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+
       {/* Botão flutuante fixo */}
       <Button
         onClick={() => setIsChatOpen(true)}

@@ -1,11 +1,17 @@
-import { useState } from "react";
-import { useAccount } from "@/contexts/AccountContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Download, Calendar, TrendingUp, DollarSign } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useQuery } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
+import { useState } from 'react';
+import { useAccount } from '@/contexts/AccountContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Download, Calendar, TrendingUp, DollarSign } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useQuery } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
 import {
   BarChart,
   Bar,
@@ -20,13 +26,13 @@ import {
   Legend,
   LineChart,
   Line,
-} from "recharts";
-import { AppShell } from "@/components/Layout/AppShell";
-import { SummaryCard } from "@/components/ui/summary-card";
+} from 'recharts';
+import { AppShell } from '@/components/Layout/AppShell';
+import { SummaryCard } from '@/components/ui/summary-card';
 
 export default function Reports() {
   const { currentAccount } = useAccount();
-  const [selectedPeriod, setSelectedPeriod] = useState("2025-01");
+  const [selectedPeriod, setSelectedPeriod] = useState('2025-01');
   const { toast } = useToast();
 
   // Fetch real data for reports
@@ -36,7 +42,13 @@ export default function Reports() {
   });
 
   const { data: categoryStats = [] } = useQuery({
-    queryKey: ['/api/accounts', currentAccount?.id, 'categories', 'stats', { month: selectedPeriod }],
+    queryKey: [
+      '/api/accounts',
+      currentAccount?.id,
+      'categories',
+      'stats',
+      { month: selectedPeriod },
+    ],
     enabled: !!currentAccount,
   });
 
@@ -59,7 +71,7 @@ export default function Reports() {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -76,23 +88,23 @@ export default function Reports() {
   const generateMonthlySummary = () => {
     const months = [];
     const today = new Date();
-    
+
     for (let i = 5; i >= 0; i--) {
       const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      
-      const monthTransactions = transactions.filter((t: any) => 
-        typeof t.date === "string" && t.date.startsWith(monthKey)
+
+      const monthTransactions = transactions.filter(
+        (t: any) => typeof t.date === 'string' && t.date.startsWith(monthKey)
       );
-      
+
       const income = monthTransactions
         .filter((t: any) => t.type === 'income')
         .reduce((sum: number, t: any) => sum + parseFloat(t.amount), 0);
-      
+
       const expenses = monthTransactions
         .filter((t: any) => t.type === 'expense')
         .reduce((sum: number, t: any) => sum + parseFloat(t.amount), 0);
-      
+
       months.push({
         month: date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
         receitas: income,
@@ -100,7 +112,7 @@ export default function Reports() {
         saldo: income - expenses,
       });
     }
-    
+
     return months;
   };
 
@@ -109,7 +121,7 @@ export default function Reports() {
   const handleExportReport = (type: string) => {
     let data: any[] = [];
     let filename = '';
-    
+
     switch (type) {
       case 'transactions':
         data = transactions;
@@ -126,21 +138,21 @@ export default function Reports() {
       default:
         return;
     }
-    
+
     if (data.length === 0) {
       toast({
-        title: "Nenhum dado para exportar",
-        description: "Não há dados disponíveis para o período selecionado.",
-        variant: "destructive",
+        title: 'Nenhum dado para exportar',
+        description: 'Não há dados disponíveis para o período selecionado.',
+        variant: 'destructive',
       });
       return;
     }
-    
+
     // Convert to CSV
     const headers = Object.keys(data[0]).join(',');
-    const rows = data.map(row => Object.values(row).join(',')).join('\n');
+    const rows = data.map((row) => Object.values(row).join(',')).join('\n');
     const csv = headers + '\n' + rows;
-    
+
     // Download file
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -149,9 +161,9 @@ export default function Reports() {
     a.download = filename;
     a.click();
     window.URL.revokeObjectURL(url);
-    
+
     toast({
-      title: "Relatório exportado!",
+      title: 'Relatório exportado!',
       description: `Arquivo ${filename} foi baixado com sucesso.`,
     });
   };
@@ -240,8 +252,8 @@ export default function Reports() {
                   Nenhum dado disponível para o período
                 </div>
               )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -259,8 +271,20 @@ export default function Reports() {
                   <YAxis tickFormatter={(value) => formatCurrency(value)} />
                   <Tooltip formatter={(value) => formatCurrency(value as number)} />
                   <Legend />
-                  <Line type="monotone" dataKey="receitas" stroke="#22c55e" strokeWidth={2} name="Receitas" />
-                  <Line type="monotone" dataKey="despesas" stroke="#ef4444" strokeWidth={2} name="Despesas" />
+                  <Line
+                    type="monotone"
+                    dataKey="receitas"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    name="Receitas"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="despesas"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    name="Despesas"
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>

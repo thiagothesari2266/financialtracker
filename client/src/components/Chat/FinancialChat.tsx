@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from "react";
-import { useAccount } from "@/contexts/AccountContext";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Send, Bot, User, X, MessageCircle, Lightbulb } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useRef, useEffect } from 'react';
+import { useAccount } from '@/contexts/AccountContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Send, Bot, User, X, Lightbulb } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface ChatMessage {
   id: string;
@@ -19,24 +19,24 @@ interface FinancialChatProps {
 }
 
 const SUGGESTED_QUESTIONS = [
-  "📊 Analise meus gastos deste mês",
-  "🏷️ Qual categoria consome mais dinheiro?",
-  "💰 Como está meu saldo atual?",
-  "📈 Posso economizar R$ 500 este mês?",
-  "🔍 Compare com o mês passado",
-  "💡 Dê dicas para economizar",
+  '📊 Analise meus gastos deste mês',
+  '🏷️ Qual categoria consome mais dinheiro?',
+  '💰 Como está meu saldo atual?',
+  '📈 Posso economizar R$ 500 este mês?',
+  '🔍 Compare com o mês passado',
+  '💡 Dê dicas para economizar',
 ];
 
 export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
   const { currentAccount } = useAccount();
   const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputMessage, setInputMessage] = useState("");
+  const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
@@ -46,18 +46,20 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       // Mensagem de boas-vindas simples
-      setMessages([{
-        id: Date.now().toString(),
-        type: 'assistant',
-        content: `👋 Olá! Sou seu assistente financeiro da conta **${currentAccount?.name}**. Como posso te ajudar?`,
-        timestamp: new Date(),
-      }]);
+      setMessages([
+        {
+          id: Date.now().toString(),
+          type: 'assistant',
+          content: `👋 Olá! Sou seu assistente financeiro da conta **${currentAccount?.name}**. Como posso te ajudar?`,
+          timestamp: new Date(),
+        },
+      ]);
     }
   }, [isOpen, currentAccount?.name, messages.length]);
 
   const sendMessage = async (message: string) => {
     if (!message.trim() || !currentAccount) return;
-    
+
     if (message.length > 500) {
       toast({
         title: 'Mensagem muito longa',
@@ -74,15 +76,15 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
-    setInputMessage("");
+    setMessages((prev) => [...prev, userMessage]);
+    setInputMessage('');
     setIsLoading(true);
 
     try {
       // Preparar histórico da conversa para enviar à IA
-      const conversationHistory = messages.map(msg => ({
+      const conversationHistory = messages.map((msg) => ({
         role: msg.type === 'user' ? 'user' : 'assistant',
-        content: msg.content
+        content: msg.content,
       }));
 
       const response = await fetch(`/api/accounts/${currentAccount.id}/ai-chat`, {
@@ -90,9 +92,9 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           message,
-          conversationHistory 
+          conversationHistory,
         }),
       });
 
@@ -105,7 +107,7 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
       }
 
       const data = await response.json();
-      
+
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
@@ -113,7 +115,7 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
         timestamp: new Date(),
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -153,7 +155,7 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
             <X className="w-4 h-4" />
           </Button>
         </CardHeader>
-        
+
         <CardContent className="flex-1 flex flex-col overflow-hidden">
           {/* Área de mensagens */}
           <div className="flex-1 overflow-y-auto space-y-4 mb-4">
@@ -169,8 +171,8 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
                 >
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      message.type === 'user' 
-                        ? 'bg-primary text-white' 
+                      message.type === 'user'
+                        ? 'bg-primary text-white'
                         : 'bg-slate-100 text-slate-600'
                     }`}
                   >
@@ -202,7 +204,7 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
                 </div>
               </div>
             ))}
-            
+
             {isLoading && (
               <div className="flex justify-start">
                 <div className="flex gap-2">
@@ -212,14 +214,20 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
                   <div className="bg-slate-100 rounded-lg px-4 py-2">
                     <div className="flex space-x-1">
                       <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" />
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                      <div
+                        className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                        style={{ animationDelay: '0.1s' }}
+                      />
+                      <div
+                        className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                        style={{ animationDelay: '0.2s' }}
+                      />
                     </div>
                   </div>
                 </div>
               </div>
             )}
-            
+
             <div ref={messagesEndRef} />
           </div>
 

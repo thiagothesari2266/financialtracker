@@ -1,19 +1,31 @@
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { CurrencyInput } from "@/components/ui/currency-input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { insertProjectSchema, type InsertProject, type ProjectWithClient } from "@shared/schema";
-import { useCreateProject, useUpdateProject } from "@/hooks/useProjects";
-import { useClients } from "@/hooks/useClients";
-import { DatePicker } from "@/components/ui/date-picker";
-import { format, parse } from "date-fns";
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { insertProjectSchema, type InsertProject, type ProjectWithClient } from '@shared/schema';
+import { useCreateProject, useUpdateProject } from '@/hooks/useProjects';
+import { useClients } from '@/hooks/useClients';
+import { DatePicker } from '@/components/ui/date-picker';
+import { format, parse } from 'date-fns';
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -32,13 +44,13 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
   const form = useForm<InsertProject>({
     resolver: zodResolver(insertProjectSchema),
     defaultValues: {
-      name: project?.name || "",
-      description: project?.description || "",
+      name: project?.name || '',
+      description: project?.description || '',
       clientId: project?.clientId || undefined,
-      budget: project?.budget || "",
-      startDate: project?.startDate || "",
-      endDate: project?.endDate || "",
-      status: project?.status || "planning",
+      budget: project?.budget || '',
+      startDate: project?.startDate || '',
+      endDate: project?.endDate || '',
+      status: project?.status || 'planning',
       accountId: accountId,
     },
   });
@@ -47,23 +59,23 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
     if (project) {
       form.reset({
         name: project.name,
-        description: project.description || "",
+        description: project.description || '',
         clientId: project.clientId || undefined,
-        budget: project.budget || "",
-        startDate: project.startDate || "",
-        endDate: project.endDate || "",
+        budget: project.budget || '',
+        startDate: project.startDate || '',
+        endDate: project.endDate || '',
         status: project.status,
         accountId: accountId,
       });
     } else {
       form.reset({
-        name: "",
-        description: "",
+        name: '',
+        description: '',
         clientId: undefined,
-        budget: "",
-        startDate: "",
-        endDate: "",
-        status: "planning",
+        budget: '',
+        startDate: '',
+        endDate: '',
+        status: 'planning',
         accountId: accountId,
       });
     }
@@ -74,23 +86,25 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
       if (project) {
         await updateMutation.mutateAsync({ id: project.id, data });
         toast({
-          title: "Projeto atualizado!",
+          title: 'Projeto atualizado!',
           description: `O projeto "${data.name}" foi atualizado com sucesso.`,
         });
       } else {
         await createMutation.mutateAsync(data);
         toast({
-          title: "Projeto criado!",
+          title: 'Projeto criado!',
           description: `O projeto "${data.name}" foi criado com sucesso.`,
         });
       }
       form.reset();
       onClose();
-    } catch (error) {
+    } catch (_error) {
       toast({
-        title: "Erro",
-        description: project ? "Não foi possível atualizar o projeto." : "Não foi possível criar o projeto.",
-        variant: "destructive",
+        title: 'Erro',
+        description: project
+          ? 'Não foi possível atualizar o projeto.'
+          : 'Não foi possível criar o projeto.',
+        variant: 'destructive',
       });
     }
   };
@@ -101,11 +115,11 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>
-            {project ? "Editar Projeto" : "Novo Projeto"}
-          </DialogTitle>
+          <DialogTitle>{project ? 'Editar Projeto' : 'Novo Projeto'}</DialogTitle>
           <DialogDescription>
-            {project ? "Atualize as informações do projeto." : "Crie um novo projeto para organizar suas atividades."}
+            {project
+              ? 'Atualize as informações do projeto.'
+              : 'Crie um novo projeto para organizar suas atividades.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -157,7 +171,7 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
                 <FormItem>
                   <FormLabel>Descrição</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Descrição detalhada do projeto..."
                       className="resize-none"
                       {...field}
@@ -174,8 +188,8 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cliente</FormLabel>
-                    <Select 
-                      value={field.value?.toString() || ""} 
+                    <Select
+                      value={field.value?.toString() || ''}
                       onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
                     >
                       <FormControl>
@@ -200,7 +214,8 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
                 control={form.control}
                 name="budget"
                 render={({ field }) => {
-                  const numericValue = field.value && !isNaN(Number(field.value)) ? Number(field.value) : null;
+                  const numericValue =
+                    field.value && !isNaN(Number(field.value)) ? Number(field.value) : null;
                   return (
                     <FormItem>
                       <FormLabel>Orçamento</FormLabel>
@@ -208,7 +223,7 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
                         <CurrencyInput
                           placeholder="0,00"
                           value={numericValue}
-                          onValueChange={(val) => field.onChange(val == null ? "" : val.toString())}
+                          onValueChange={(val) => field.onChange(val == null ? '' : val.toString())}
                         />
                       </FormControl>
                     </FormItem>
@@ -226,8 +241,10 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
                     <FormLabel>Data de Início</FormLabel>
                     <FormControl>
                       <DatePicker
-                        date={field.value ? parse(field.value, "yyyy-MM-dd", new Date()) : undefined}
-                        onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                        date={
+                          field.value ? parse(field.value, 'yyyy-MM-dd', new Date()) : undefined
+                        }
+                        onSelect={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
                       />
                     </FormControl>
                   </FormItem>
@@ -242,8 +259,10 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
                     <FormLabel>Data de Término</FormLabel>
                     <FormControl>
                       <DatePicker
-                        date={field.value ? parse(field.value, "yyyy-MM-dd", new Date()) : undefined}
-                        onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                        date={
+                          field.value ? parse(field.value, 'yyyy-MM-dd', new Date()) : undefined
+                        }
+                        onSelect={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
                       />
                     </FormControl>
                   </FormItem>
@@ -256,7 +275,7 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
                 Cancelar
               </Button>
               <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Salvando..." : project ? "Atualizar" : "Criar"}
+                {isLoading ? 'Salvando...' : project ? 'Atualizar' : 'Criar'}
               </Button>
             </div>
           </form>

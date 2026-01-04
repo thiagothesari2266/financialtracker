@@ -1,14 +1,14 @@
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -16,23 +16,23 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { CurrencyInput } from "@/components/ui/currency-input";
-import { Button } from "@/components/ui/button";
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import type { InsertFixedCashflow, MonthlyFixedItem } from "@shared/schema";
+} from '@/components/ui/select';
+import type { MonthlyFixedItem } from '@shared/schema';
 
 const fixedCashflowSchema = z.object({
-  description: z.string().min(1, "Descrição é obrigatória"),
-  amount: z.string().min(1, "Valor é obrigatório"),
-  type: z.enum(["income", "expense"]),
+  description: z.string().min(1, 'Descrição é obrigatória'),
+  amount: z.string().min(1, 'Valor é obrigatório'),
+  type: z.enum(['income', 'expense']),
 });
 
 type FixedCashflowForm = z.infer<typeof fixedCashflowSchema>;
@@ -55,9 +55,9 @@ export function FixedCashflowModal({
   const form = useForm<FixedCashflowForm>({
     resolver: zodResolver(fixedCashflowSchema),
     defaultValues: {
-      description: "",
-      amount: "",
-      type: "expense",
+      description: '',
+      amount: '',
+      type: 'expense',
     },
   });
 
@@ -70,9 +70,9 @@ export function FixedCashflowModal({
       });
     } else {
       form.reset({
-        description: "",
-        amount: "",
-        type: "expense",
+        description: '',
+        amount: '',
+        type: 'expense',
       });
     }
   }, [editing, form, open]);
@@ -85,7 +85,7 @@ export function FixedCashflowModal({
     <Dialog open={open} onOpenChange={(isOpen) => (!isOpen ? onClose() : undefined)}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{editing ? "Editar fixo mensal" : "Novo fixo mensal"}</DialogTitle>
+          <DialogTitle>{editing ? 'Editar fixo mensal' : 'Novo fixo mensal'}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -114,7 +114,7 @@ export function FixedCashflowModal({
                       <CurrencyInput
                         placeholder="0,00"
                         value={field.value ? Number(field.value) : null}
-                        onValueChange={(val) => field.onChange(val == null ? "" : val.toString())}
+                        onValueChange={(val) => field.onChange(val == null ? '' : val.toString())}
                       />
                     </FormControl>
                     <FormMessage />
@@ -150,7 +150,7 @@ export function FixedCashflowModal({
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSaving}>
-                {isSaving ? "Salvando..." : editing ? "Salvar alterações" : "Adicionar"}
+                {isSaving ? 'Salvando...' : editing ? 'Salvar alterações' : 'Adicionar'}
               </Button>
             </DialogFooter>
           </form>

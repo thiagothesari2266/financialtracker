@@ -1,12 +1,12 @@
-import { useEffect } from "react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { CurrencyInput } from "@/components/ui/currency-input";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { insertBankAccountSchema, type InsertBankAccount, type BankAccount } from "@shared/schema";
+import { useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { insertBankAccountSchema, type InsertBankAccount, type BankAccount } from '@shared/schema';
 
 interface BankAccountModalProps {
   isOpen: boolean;
@@ -16,39 +16,47 @@ interface BankAccountModalProps {
   bankAccount?: BankAccount | null;
 }
 
-export default function BankAccountModal({ isOpen, onClose, onSaved, accountId, bankAccount }: BankAccountModalProps) {
+export default function BankAccountModal({
+  isOpen,
+  onClose,
+  onSaved,
+  accountId,
+  bankAccount,
+}: BankAccountModalProps) {
   const form = useForm<InsertBankAccount>({
     resolver: zodResolver(insertBankAccountSchema),
     defaultValues: {
-      name: "",
-      initialBalance: "0.00",
-      pix: "",
+      name: '',
+      initialBalance: '0.00',
+      pix: '',
       shared: false,
       accountId,
     },
-    values: bankAccount ? {
-      name: bankAccount.name,
-      initialBalance: bankAccount.initialBalance || "0.00",
-      pix: bankAccount.pix,
-      shared: bankAccount.shared ?? false,
-      accountId: bankAccount.accountId,
-    } : undefined,
+    values: bankAccount
+      ? {
+          name: bankAccount.name,
+          initialBalance: bankAccount.initialBalance || '0.00',
+          pix: bankAccount.pix,
+          shared: bankAccount.shared ?? false,
+          accountId: bankAccount.accountId,
+        }
+      : undefined,
   });
 
   useEffect(() => {
     if (bankAccount) {
       form.reset({
         name: bankAccount.name,
-        initialBalance: bankAccount.initialBalance || "0.00",
+        initialBalance: bankAccount.initialBalance || '0.00',
         pix: bankAccount.pix,
         shared: bankAccount.shared ?? false,
         accountId: bankAccount.accountId,
       });
     } else {
       form.reset({
-        name: "",
-        initialBalance: "0.00",
-        pix: "",
+        name: '',
+        initialBalance: '0.00',
+        pix: '',
         shared: false,
         accountId,
       });
@@ -57,23 +65,24 @@ export default function BankAccountModal({ isOpen, onClose, onSaved, accountId, 
 
   const onSubmit = (data: InsertBankAccount) => {
     // O hook de create/update deve ser chamado pelo componente pai
-    if (onSaved) onSaved({
-      name: data.name,
-      initialBalance: data.initialBalance || "0.00",
-      pix: data.pix,
-      shared: data.shared ?? false,
-      accountId: data.accountId
-    } as any);
+    if (onSaved)
+      onSaved({
+        name: data.name,
+        initialBalance: data.initialBalance || '0.00',
+        pix: data.pix,
+        shared: data.shared ?? false,
+        accountId: data.accountId,
+      } as any);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{bankAccount ? "Editar Conta Bancária" : "Nova Conta Bancária"}</DialogTitle>
+          <DialogTitle>{bankAccount ? 'Editar Conta Bancária' : 'Nova Conta Bancária'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <Input placeholder="Nome da Conta (ex: Itaú, Nubank)" {...form.register("name")} />
+          <Input placeholder="Nome da Conta (ex: Itaú, Nubank)" {...form.register('name')} />
           <Controller
             control={form.control}
             name="initialBalance"
@@ -81,21 +90,17 @@ export default function BankAccountModal({ isOpen, onClose, onSaved, accountId, 
               <CurrencyInput
                 placeholder="Saldo Inicial"
                 value={field.value && !isNaN(Number(field.value)) ? Number(field.value) : null}
-                onValueChange={(val) => field.onChange(val == null ? "" : val.toString())}
+                onValueChange={(val) => field.onChange(val == null ? '' : val.toString())}
               />
             )}
           />
-          <Input placeholder="Pix (chave obrigatória)" {...form.register("pix")} />
+          <Input placeholder="Pix (chave obrigatória)" {...form.register('pix')} />
           <Controller
             control={form.control}
             name="shared"
             render={({ field }) => (
               <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="shared"
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                />
+                <Checkbox id="shared" checked={field.value} onCheckedChange={field.onChange} />
                 <label htmlFor="shared" className="text-sm cursor-pointer">
                   Compartilhada (visível em todas as contas)
                 </label>
@@ -103,7 +108,9 @@ export default function BankAccountModal({ isOpen, onClose, onSaved, accountId, 
             )}
           />
           <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
             <Button type="submit">Salvar</Button>
           </div>
         </form>

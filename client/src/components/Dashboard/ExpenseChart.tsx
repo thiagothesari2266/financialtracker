@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { useAccount } from "@/contexts/AccountContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { useQuery } from '@tanstack/react-query';
+import { useAccount } from '@/contexts/AccountContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 interface ExpenseChartProps {
   currentMonth: string;
@@ -34,12 +34,12 @@ export default function ExpenseChart({ currentMonth }: ExpenseChartProps) {
     if (isNaN(numValue) || numValue === null || numValue === undefined) {
       return new Intl.NumberFormat('pt-BR', {
         style: 'currency',
-        currency: 'BRL'
+        currency: 'BRL',
       }).format(0);
     }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(numValue);
   };
 
@@ -90,10 +90,18 @@ export default function ExpenseChart({ currentMonth }: ExpenseChartProps) {
             Distribuição por Categoria
           </CardTitle>
           <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm" className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1 rounded-lg hover:bg-slate-100">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1 rounded-lg hover:bg-slate-100"
+            >
               Despesas
             </Button>
-            <Button variant="ghost" size="sm" className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1 rounded-lg hover:bg-slate-100">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1 rounded-lg hover:bg-slate-100"
+            >
               Receitas
             </Button>
           </div>

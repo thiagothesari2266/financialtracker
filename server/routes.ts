@@ -1,23 +1,30 @@
-import type { Express } from "express";
-import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { uploadInvoice, uploadMultipleInvoiceImages, pasteInvoiceImage, getCardInvoiceImports, getInvoiceImportDetail, retryInvoiceImport } from "./routes/invoice-upload.routes";
-import { AIFinancialAdvisor } from "./services/ai-financial-advisor";
-import { aiChatRateLimit, createRateLimitMiddleware } from "./middleware/rate-limit";
-import { 
-  insertAccountSchema, 
-  insertCategorySchema, 
-  insertTransactionSchema, 
+import type { Express } from 'express';
+import { createServer, type Server } from 'http';
+import { storage } from './storage';
+import {
+  uploadInvoice,
+  uploadMultipleInvoiceImages,
+  pasteInvoiceImage,
+  getCardInvoiceImports,
+  getInvoiceImportDetail,
+  retryInvoiceImport,
+} from './routes/invoice-upload.routes';
+import { AIFinancialAdvisor } from './services/ai-financial-advisor';
+import { aiChatRateLimit, createRateLimitMiddleware } from './middleware/rate-limit';
+import {
+  insertAccountSchema,
+  insertCategorySchema,
+  insertTransactionSchema,
   insertCreditCardSchema,
   insertCreditCardTransactionSchema,
   insertBankAccountSchema,
   insertInvoicePaymentSchema,
   insertProjectSchema,
   insertCostCenterSchema,
-  insertClientSchema
-} from "@shared/schema";
-import { z } from "zod";
-import { insertFixedCashflowSchema, insertDebtSchema } from "@shared/schema";
+  insertClientSchema,
+} from '@shared/schema';
+import { z } from 'zod';
+import { insertFixedCashflowSchema, insertDebtSchema } from '@shared/schema';
 
 const normalizeAmount = (value: unknown, decimals = 2): string | undefined => {
   if (value === null || value === undefined) return undefined;
@@ -25,80 +32,80 @@ const normalizeAmount = (value: unknown, decimals = 2): string | undefined => {
   const raw = String(value).trim();
   if (!raw) return undefined;
 
-  const hasComma = raw.includes(",");
-  const hasDot = raw.includes(".");
+  const hasComma = raw.includes(',');
+  const hasDot = raw.includes('.');
 
   // Vírgula como decimal: remove pontos de milhar e troca vírgula por ponto
-  if (hasComma && (!hasDot || raw.lastIndexOf(",") > raw.lastIndexOf("."))) {
-    const withoutThousands = raw.replace(/\./g, "");
-    const normalized = withoutThousands.replace(",", ".");
+  if (hasComma && (!hasDot || raw.lastIndexOf(',') > raw.lastIndexOf('.'))) {
+    const withoutThousands = raw.replace(/\./g, '');
+    const normalized = withoutThousands.replace(',', '.');
     const parsed = Number.parseFloat(normalized);
     if (Number.isFinite(parsed)) return parsed.toFixed(decimals);
   }
 
   // Ponto como decimal: remover vírgulas usadas como milhar
   if (hasDot) {
-    const normalized = raw.replace(/,/g, "");
+    const normalized = raw.replace(/,/g, '');
     const parsed = Number.parseFloat(normalized);
     if (Number.isFinite(parsed)) return parsed.toFixed(decimals);
   }
 
   // Sem separadores explícitos: interpretar como número inteiro ou decimal já no formato do usuário
-  const parsed = Number.parseFloat(raw.replace(/\s+/g, ""));
+  const parsed = Number.parseFloat(raw.replace(/\s+/g, ''));
   return Number.isFinite(parsed) ? parsed.toFixed(decimals) : undefined;
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Account routes
-  app.get("/api/accounts", async (req, res) => {
+  app.get('/api/accounts', async (req, res) => {
     try {
       const accounts = await storage.getAccounts();
       res.json(accounts);
     } catch (error) {
-      console.error("[GET /api/accounts]", error);
-      res.status(500).json({ message: "Failed to fetch accounts" });
+      console.error('[GET /api/accounts]', error);
+      res.status(500).json({ message: 'Failed to fetch accounts' });
     }
   });
 
-  app.get("/api/accounts/:id", async (req, res) => {
+  app.get('/api/accounts/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const account = await storage.getAccount(id);
       if (!account) {
-        return res.status(404).json({ message: "Account not found" });
+        return res.status(404).json({ message: 'Account not found' });
       }
       res.json(account);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch account" });
+      res.status(500).json({ message: 'Failed to fetch account' });
     }
   });
 
-  app.get("/api/accounts/:id/stats", async (req, res) => {
+  app.get('/api/accounts/:id/stats', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const month = req.query.month as string || new Date().toISOString().substring(0, 7);
+      const month = (req.query.month as string) || new Date().toISOString().substring(0, 7);
       const stats = await storage.getAccountStats(id, month);
       if (!stats) {
-        return res.status(404).json({ message: "Account not found" });
+        return res.status(404).json({ message: 'Account not found' });
       }
       res.json(stats);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch account stats" });
+      res.status(500).json({ message: 'Failed to fetch account stats' });
     }
   });
 
-  app.get("/api/accounts/:id/monthly-fixed", async (req, res) => {
+  app.get('/api/accounts/:id/monthly-fixed', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const summary = await storage.getFixedCashflow(id);
       res.json(summary);
     } catch (error) {
-      console.error("[GET /api/accounts/:id/monthly-fixed]", error);
-      res.status(500).json({ message: "Failed to fetch monthly fixed cashflow" });
+      console.error('[GET /api/accounts/:id/monthly-fixed]', error);
+      res.status(500).json({ message: 'Failed to fetch monthly fixed cashflow' });
     }
   });
 
-  app.post("/api/accounts/:id/monthly-fixed", async (req, res) => {
+  app.post('/api/accounts/:id/monthly-fixed', async (req, res) => {
     try {
       const accountId = parseInt(req.params.id);
       const validated = insertFixedCashflowSchema.parse({
@@ -109,15 +116,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const created = await storage.createFixedCashflow(validated);
       res.status(201).json(created);
     } catch (error) {
-      console.error("[POST /api/accounts/:id/monthly-fixed]", error);
+      console.error('[POST /api/accounts/:id/monthly-fixed]', error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create monthly fixed entry" });
+      res.status(500).json({ message: 'Failed to create monthly fixed entry' });
     }
   });
 
-  app.patch("/api/monthly-fixed/:id", async (req, res) => {
+  app.patch('/api/monthly-fixed/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validated = insertFixedCashflowSchema.partial().parse({
@@ -125,52 +132,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amount: req.body.amount !== undefined ? normalizeAmount(req.body.amount) : undefined,
       });
       const updated = await storage.updateFixedCashflow(id, validated);
-      if (!updated) return res.status(404).json({ message: "Item not found" });
+      if (!updated) return res.status(404).json({ message: 'Item not found' });
       res.json(updated);
     } catch (error) {
-      console.error("[PATCH /api/monthly-fixed/:id]", error);
+      console.error('[PATCH /api/monthly-fixed/:id]', error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update monthly fixed entry" });
+      res.status(500).json({ message: 'Failed to update monthly fixed entry' });
     }
   });
 
-  app.delete("/api/monthly-fixed/:id", async (req, res) => {
+  app.delete('/api/monthly-fixed/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteFixedCashflow(id);
       res.status(204).send();
     } catch (error) {
-      console.error("[DELETE /api/monthly-fixed/:id]", error);
-      res.status(500).json({ message: "Failed to delete monthly fixed entry" });
+      console.error('[DELETE /api/monthly-fixed/:id]', error);
+      res.status(500).json({ message: 'Failed to delete monthly fixed entry' });
     }
   });
 
-  app.get("/api/accounts/:accountId/debts", async (req, res) => {
+  app.get('/api/accounts/:accountId/debts', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const debts = await storage.getDebts(accountId);
       res.json(debts);
     } catch (error) {
-      console.error("[GET /api/accounts/:accountId/debts]", error);
-      res.status(500).json({ message: "Failed to fetch debts" });
+      console.error('[GET /api/accounts/:accountId/debts]', error);
+      res.status(500).json({ message: 'Failed to fetch debts' });
     }
   });
 
-  app.get("/api/debts/:id", async (req, res) => {
+  app.get('/api/debts/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const debt = await storage.getDebt(id);
-      if (!debt) return res.status(404).json({ message: "Debt not found" });
+      if (!debt) return res.status(404).json({ message: 'Debt not found' });
       res.json(debt);
     } catch (error) {
-      console.error("[GET /api/debts/:id]", error);
-      res.status(500).json({ message: "Failed to fetch debt" });
+      console.error('[GET /api/debts/:id]', error);
+      res.status(500).json({ message: 'Failed to fetch debt' });
     }
   });
 
-  app.post("/api/accounts/:accountId/debts", async (req, res) => {
+  app.post('/api/accounts/:accountId/debts', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const validated = insertDebtSchema.parse({
@@ -183,160 +190,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const created = await storage.createDebt(validated);
       res.status(201).json(created);
     } catch (error) {
-      console.error("[POST /api/accounts/:accountId/debts]", error);
+      console.error('[POST /api/accounts/:accountId/debts]', error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create debt" });
+      res.status(500).json({ message: 'Failed to create debt' });
     }
   });
 
-  app.patch("/api/debts/:id", async (req, res) => {
+  app.patch('/api/debts/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validated = insertDebtSchema.partial().parse({
         ...req.body,
         balance: req.body.balance !== undefined ? normalizeAmount(req.body.balance) : undefined,
         interestRate:
-          req.body.interestRate !== undefined ? normalizeAmount(req.body.interestRate, 3) : undefined,
+          req.body.interestRate !== undefined
+            ? normalizeAmount(req.body.interestRate, 3)
+            : undefined,
       });
 
       const updated = await storage.updateDebt(id, validated);
-      if (!updated) return res.status(404).json({ message: "Debt not found" });
+      if (!updated) return res.status(404).json({ message: 'Debt not found' });
       res.json(updated);
     } catch (error) {
-      console.error("[PATCH /api/debts/:id]", error);
+      console.error('[PATCH /api/debts/:id]', error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update debt" });
+      res.status(500).json({ message: 'Failed to update debt' });
     }
   });
 
-  app.delete("/api/debts/:id", async (req, res) => {
+  app.delete('/api/debts/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteDebt(id);
       res.status(204).send();
     } catch (error) {
-      console.error("[DELETE /api/debts/:id]", error);
-      res.status(500).json({ message: "Failed to delete debt" });
+      console.error('[DELETE /api/debts/:id]', error);
+      res.status(500).json({ message: 'Failed to delete debt' });
     }
   });
 
-  app.post("/api/accounts", async (req, res) => {
+  app.post('/api/accounts', async (req, res) => {
     try {
       const validatedData = insertAccountSchema.parse(req.body);
       const account = await storage.createAccount(validatedData);
       res.status(201).json(account);
     } catch (error) {
-      console.error("[POST /api/accounts]", error);
+      console.error('[POST /api/accounts]', error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create account" });
+      res.status(500).json({ message: 'Failed to create account' });
     }
   });
 
-  app.patch("/api/accounts/:id", async (req, res) => {
+  app.patch('/api/accounts/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertAccountSchema.partial().parse(req.body);
       const account = await storage.updateAccount(id, validatedData);
       if (!account) {
-        return res.status(404).json({ message: "Account not found" });
+        return res.status(404).json({ message: 'Account not found' });
       }
       res.json(account);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update account" });
+      res.status(500).json({ message: 'Failed to update account' });
     }
   });
 
-  app.delete("/api/accounts/:id", async (req, res) => {
+  app.delete('/api/accounts/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteAccount(id);
       res.status(204).send();
     } catch (error) {
-      console.error("[DELETE /api/accounts/:id]", error);
-      res.status(500).json({ message: "Failed to delete account", error: error.message });
+      console.error('[DELETE /api/accounts/:id]', error);
+      res.status(500).json({ message: 'Failed to delete account', error: error.message });
     }
   });
 
   // AI Financial Advisor routes
-  app.get("/api/accounts/:id/financial-summary", async (req, res) => {
+  app.get('/api/accounts/:id/financial-summary', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const context = await AIFinancialAdvisor.getFinancialContext(id);
       res.json(context);
     } catch (error) {
-      console.error("[GET /api/accounts/:id/financial-summary]", error);
-      res.status(500).json({ message: "Failed to fetch financial summary" });
+      console.error('[GET /api/accounts/:id/financial-summary]', error);
+      res.status(500).json({ message: 'Failed to fetch financial summary' });
     }
   });
 
-  app.post("/api/accounts/:id/ai-chat", createRateLimitMiddleware(aiChatRateLimit), async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { message, conversationHistory = [] } = req.body;
-      
-      // Validação de entrada
-      if (!message || typeof message !== 'string') {
-        return res.status(400).json({ message: "Message is required" });
-      }
+  app.post(
+    '/api/accounts/:id/ai-chat',
+    createRateLimitMiddleware(aiChatRateLimit),
+    async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const { message, conversationHistory = [] } = req.body;
 
-      // Sanitização e validação de tamanho
-      const sanitizedMessage = message.trim();
-      if (sanitizedMessage.length === 0) {
-        return res.status(400).json({ message: "Message cannot be empty" });
-      }
-      
-      if (sanitizedMessage.length > 500) {
-        return res.status(400).json({ message: "Message too long (max 500 characters)" });
-      }
+        // Validação de entrada
+        if (!message || typeof message !== 'string') {
+          return res.status(400).json({ message: 'Message is required' });
+        }
 
-      // Verificar se a conta existe
-      const account = await storage.getAccount(id);
-      if (!account) {
-        return res.status(404).json({ message: "Account not found" });
+        // Sanitização e validação de tamanho
+        const sanitizedMessage = message.trim();
+        if (sanitizedMessage.length === 0) {
+          return res.status(400).json({ message: 'Message cannot be empty' });
+        }
+
+        if (sanitizedMessage.length > 500) {
+          return res.status(400).json({ message: 'Message too long (max 500 characters)' });
+        }
+
+        // Verificar se a conta existe
+        const account = await storage.getAccount(id);
+        if (!account) {
+          return res.status(404).json({ message: 'Account not found' });
+        }
+
+        console.log(
+          `[AI Chat] Account ${id}: "${sanitizedMessage.substring(0, 50)}${sanitizedMessage.length > 50 ? '...' : ''}"`
+        );
+
+        const response = await AIFinancialAdvisor.analyzeFinances(
+          id,
+          sanitizedMessage,
+          conversationHistory
+        );
+        res.json({ response });
+      } catch (error) {
+        console.error('[POST /api/accounts/:id/ai-chat]', error);
+        res.status(500).json({ message: 'Failed to process AI request' });
       }
-
-      console.log(`[AI Chat] Account ${id}: "${sanitizedMessage.substring(0, 50)}${sanitizedMessage.length > 50 ? '...' : ''}"`);
-
-      const response = await AIFinancialAdvisor.analyzeFinances(id, sanitizedMessage, conversationHistory);
-      res.json({ response });
-    } catch (error) {
-      console.error("[POST /api/accounts/:id/ai-chat]", error);
-      res.status(500).json({ message: "Failed to process AI request" });
     }
-  });
+  );
 
   // Category routes
-  app.get("/api/accounts/:accountId/categories", async (req, res) => {
+  app.get('/api/accounts/:accountId/categories', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const categories = await storage.getCategories(accountId);
       res.json(categories);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch categories" });
+      res.status(500).json({ message: 'Failed to fetch categories' });
     }
   });
 
-  app.get("/api/accounts/:accountId/categories/stats", async (req, res) => {
+  app.get('/api/accounts/:accountId/categories/stats', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
-      const month = req.query.month as string || new Date().toISOString().substring(0, 7);
+      const month = (req.query.month as string) || new Date().toISOString().substring(0, 7);
       const stats = await storage.getCategoryStats(accountId, month);
       res.json(stats);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch category stats" });
+      res.status(500).json({ message: 'Failed to fetch category stats' });
     }
   });
 
-  app.post("/api/accounts/:accountId/categories", async (req, res) => {
+  app.post('/api/accounts/:accountId/categories', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const validatedData = insertCategorySchema.parse({
@@ -347,49 +366,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(category);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create category" });
+      res.status(500).json({ message: 'Failed to create category' });
     }
   });
 
-  app.patch("/api/categories/:id", async (req, res) => {
+  app.patch('/api/categories/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      console.log("[PATCH /api/categories/:id] id:", id, "body:", req.body);
+      console.log('[PATCH /api/categories/:id] id:', id, 'body:', req.body);
       const validatedData = insertCategorySchema.partial().parse(req.body);
       if (!validatedData || Object.keys(validatedData).length === 0) {
-        return res.status(400).json({ message: "Nenhum campo para atualizar" });
+        return res.status(400).json({ message: 'Nenhum campo para atualizar' });
       }
       const category = await storage.updateCategory(id, validatedData);
       if (!category) {
-        console.log("[PATCH /api/categories/:id] Category not found");
-        return res.status(404).json({ message: "Category not found" });
+        console.log('[PATCH /api/categories/:id] Category not found');
+        return res.status(404).json({ message: 'Category not found' });
       }
       res.json(category);
     } catch (error) {
-      console.error("[PATCH /api/categories/:id] error:", error);
+      console.error('[PATCH /api/categories/:id] error:', error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update category" });
+      res.status(500).json({ message: 'Failed to update category' });
     }
   });
 
-  app.delete("/api/categories/:id", async (req, res) => {
+  app.delete('/api/categories/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      console.log("[DELETE /api/categories/:id] id:", id);
+      console.log('[DELETE /api/categories/:id] id:', id);
       await storage.deleteCategory(id);
       res.status(204).send();
     } catch (error) {
-      console.error("[DELETE /api/categories/:id] error:", error);
-      res.status(500).json({ message: "Failed to delete category" });
+      console.error('[DELETE /api/categories/:id] error:', error);
+      res.status(500).json({ message: 'Failed to delete category' });
     }
   });
 
   // Transaction routes
-  app.get("/api/accounts/:accountId/transactions", async (req, res) => {
+  app.get('/api/accounts/:accountId/transactions', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
@@ -406,34 +425,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(transactions);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch transactions" });
+      res.status(500).json({ message: 'Failed to fetch transactions' });
     }
   });
 
-  app.get("/api/transactions/:id", async (req, res) => {
+  app.get('/api/transactions/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const transaction = await storage.getTransaction(id);
       if (!transaction) {
-        return res.status(404).json({ message: "Transaction not found" });
+        return res.status(404).json({ message: 'Transaction not found' });
       }
       res.json(transaction);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch transaction" });
+      res.status(500).json({ message: 'Failed to fetch transaction' });
     }
   });
 
-  app.post("/api/accounts/:accountId/transactions", async (req, res) => {
+  app.post('/api/accounts/:accountId/transactions', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       // Converte campos string para número antes da validação
       const raw = { ...req.body };
       // Limpa todos os campos opcionais que vierem como string vazia
       const optionalFields = [
-        "bankAccountId", "installments", "currentInstallment", "installmentsGroupId", "recurrenceFrequency", "recurrenceEndDate", "launchType", "recurrenceGroupId", "paymentMethod", "clientName", "projectName", "costCenter"
+        'bankAccountId',
+        'installments',
+        'currentInstallment',
+        'installmentsGroupId',
+        'recurrenceFrequency',
+        'recurrenceEndDate',
+        'launchType',
+        'recurrenceGroupId',
+        'paymentMethod',
+        'clientName',
+        'projectName',
+        'costCenter',
       ];
       for (const key of optionalFields) {
-        if (raw[key] === "" || raw[key] === null) {
+        if (raw[key] === '' || raw[key] === null) {
           raw[key] = undefined;
         }
       }
@@ -452,9 +482,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (isNaN(raw.currentInstallment)) raw.currentInstallment = 1;
       }
       // --- Validação extra para parcelada ---
-      if (raw.launchType === "parcelada") {
+      if (raw.launchType === 'parcelada') {
         if (!raw.installments || isNaN(raw.installments) || raw.installments < 2) {
-          return res.status(400).json({ message: "Número de parcelas inválido. Informe um número de parcelas maior ou igual a 2." });
+          return res.status(400).json({
+            message:
+              'Número de parcelas inválido. Informe um número de parcelas maior ou igual a 2.',
+          });
         }
       }
       const validatedData = insertTransactionSchema.parse({
@@ -464,15 +497,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transaction = await storage.createTransaction(validatedData);
       res.status(201).json(transaction);
     } catch (error) {
-      console.error("[POST /api/accounts/:accountId/transactions] Erro:", error);
+      console.error('[POST /api/accounts/:accountId/transactions] Erro:', error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create transaction", error: typeof error === 'object' && error && 'message' in error ? (error as any).message : String(error) });
+      res.status(500).json({
+        message: 'Failed to create transaction',
+        error:
+          typeof error === 'object' && error && 'message' in error
+            ? (error as any).message
+            : String(error),
+      });
     }
   });
 
-  app.patch("/api/transactions/:id", async (req, res) => {
+  app.patch('/api/transactions/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       // Permite campos extras para edição em lote
@@ -502,19 +541,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transaction = await storage.updateTransaction(id, validatedData);
       }
       if (!transaction) {
-        return res.status(404).json({ message: "Transação não encontrada" });
+        return res.status(404).json({ message: 'Transação não encontrada' });
       }
       res.json(transaction);
     } catch (error) {
-      console.error("[PATCH /api/transactions/:id] Erro:", error);
+      console.error('[PATCH /api/transactions/:id] Erro:', error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update transaction", error: typeof error === 'object' && error && 'message' in error ? (error as any).message : String(error) });
+      res.status(500).json({
+        message: 'Failed to update transaction',
+        error:
+          typeof error === 'object' && error && 'message' in error
+            ? (error as any).message
+            : String(error),
+      });
     }
   });
 
-  app.delete("/api/transactions/:id", async (req, res) => {
+  app.delete('/api/transactions/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       // Suporte a exclusão em lote via body
@@ -526,38 +571,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete transaction" });
+      res.status(500).json({ message: 'Failed to delete transaction' });
     }
   });
 
   // Credit card routes
-  app.get("/api/accounts/:accountId/credit-cards", async (req, res) => {
+  app.get('/api/accounts/:accountId/credit-cards', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
-      console.log(`[GET /api/accounts/${accountId}/credit-cards] Buscando cartões para accountId:`, accountId);
+      console.log(
+        `[GET /api/accounts/${accountId}/credit-cards] Buscando cartões para accountId:`,
+        accountId
+      );
       const creditCards = await storage.getCreditCards(accountId);
-      console.log(`[GET /api/accounts/${accountId}/credit-cards] Encontrados ${creditCards.length} cartões:`, creditCards);
+      console.log(
+        `[GET /api/accounts/${accountId}/credit-cards] Encontrados ${creditCards.length} cartões:`,
+        creditCards
+      );
       res.json(creditCards);
     } catch (error) {
       console.error(`[GET /api/accounts/:accountId/credit-cards] Erro:`, error);
-      res.status(500).json({ message: "Failed to fetch credit cards" });
+      res.status(500).json({ message: 'Failed to fetch credit cards' });
     }
   });
 
-  app.get("/api/credit-cards/:id", async (req, res) => {
+  app.get('/api/credit-cards/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const card = await storage.getCreditCard(id);
       if (!card) {
-        return res.status(404).json({ message: "Credit card not found" });
+        return res.status(404).json({ message: 'Credit card not found' });
       }
       res.json(card);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch credit card" });
+      res.status(500).json({ message: 'Failed to fetch credit card' });
     }
   });
 
-  app.post("/api/accounts/:accountId/credit-cards", async (req, res) => {
+  app.post('/api/accounts/:accountId/credit-cards', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       console.log('[POST /api/accounts/:accountId/credit-cards] Body recebido:', req.body);
@@ -573,11 +624,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertCreditCardSchema.parse(sanitizedInput);
       const normalizedData = {
         ...validatedData,
-        brand: (validatedData.brand ?? "").trim(),
+        brand: (validatedData.brand ?? '').trim(),
         creditLimit:
-          validatedData.creditLimit && validatedData.creditLimit.trim() !== ""
+          validatedData.creditLimit && validatedData.creditLimit.trim() !== ''
             ? validatedData.creditLimit
-            : "0",
+            : '0',
       };
       console.log('[POST /api/accounts/:accountId/credit-cards] Dados validados:', validatedData);
       const card = await storage.createCreditCard(normalizedData);
@@ -585,13 +636,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('[POST /api/accounts/:accountId/credit-cards] Erro:', error);
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create credit card", error: typeof error === 'object' && error && 'message' in error ? (error as any).message : String(error) });
+      res.status(500).json({
+        message: 'Failed to create credit card',
+        error:
+          typeof error === 'object' && error && 'message' in error
+            ? (error as any).message
+            : String(error),
+      });
     }
   });
 
-  app.patch("/api/credit-cards/:id", async (req, res) => {
+  app.patch('/api/credit-cards/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const sanitizedInput = {
@@ -605,55 +662,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const normalizedData = {
         ...validatedData,
         ...(validatedData.brand !== undefined && {
-          brand: validatedData.brand?.trim() ?? "",
+          brand: validatedData.brand?.trim() ?? '',
         }),
         ...(validatedData.creditLimit !== undefined && {
           creditLimit:
-            validatedData.creditLimit && validatedData.creditLimit.trim() !== ""
+            validatedData.creditLimit && validatedData.creditLimit.trim() !== ''
               ? validatedData.creditLimit
-              : "0",
+              : '0',
         }),
       };
       const creditCard = await storage.updateCreditCard(id, normalizedData);
       if (!creditCard) {
-        return res.status(404).json({ message: "Credit card not found" });
+        return res.status(404).json({ message: 'Credit card not found' });
       }
       res.json(creditCard);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update credit card" });
+      res.status(500).json({ message: 'Failed to update credit card' });
     }
   });
-  app.delete("/api/credit-cards/:id", async (req, res) => {
+  app.delete('/api/credit-cards/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      console.log("[DELETE /api/credit-cards/:id] Tentando excluir cartão ID:", id);
+      console.log('[DELETE /api/credit-cards/:id] Tentando excluir cartão ID:', id);
       await storage.deleteCreditCard(id);
-      console.log("[DELETE /api/credit-cards/:id] Cartão excluído com sucesso");
+      console.log('[DELETE /api/credit-cards/:id] Cartão excluído com sucesso');
       res.status(204).send();
     } catch (error) {
-      console.error("[DELETE /api/credit-cards/:id] Erro:", error);
-      res.status(500).json({ 
-        message: "Failed to delete credit card", 
-        error: typeof error === 'object' && error && 'message' in error ? (error as any).message : String(error) 
+      console.error('[DELETE /api/credit-cards/:id] Erro:', error);
+      res.status(500).json({
+        message: 'Failed to delete credit card',
+        error:
+          typeof error === 'object' && error && 'message' in error
+            ? (error as any).message
+            : String(error),
       });
     }
   });
 
   // Credit card transaction routes
-  app.get("/api/accounts/:accountId/credit-card-transactions", async (req, res) => {
+  app.get('/api/accounts/:accountId/credit-card-transactions', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
-      const creditCardId = req.query.creditCardId ? parseInt(req.query.creditCardId as string) : undefined;
+      const creditCardId = req.query.creditCardId
+        ? parseInt(req.query.creditCardId as string)
+        : undefined;
       const transactions = await storage.getCreditCardTransactions(accountId, creditCardId);
       res.json(transactions);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch credit card transactions" });
+      res.status(500).json({ message: 'Failed to fetch credit card transactions' });
     }
   });
-  app.post("/api/accounts/:accountId/credit-card-transactions", async (req, res) => {
+  app.post('/api/accounts/:accountId/credit-card-transactions', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const validatedData = insertCreditCardTransactionSchema.parse({
@@ -664,66 +726,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(transaction);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create credit card transaction" });
+      res.status(500).json({ message: 'Failed to create credit card transaction' });
     }
   });
 
-  app.put("/api/credit-card-transactions/:id", async (req, res) => {
+  app.put('/api/credit-card-transactions/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertCreditCardTransactionSchema.partial().parse(req.body);
       const transaction = await storage.updateCreditCardTransaction(id, validatedData);
       if (!transaction) {
-        return res.status(404).json({ message: "Credit card transaction not found" });
+        return res.status(404).json({ message: 'Credit card transaction not found' });
       }
       res.json(transaction);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update credit card transaction" });
+      res.status(500).json({ message: 'Failed to update credit card transaction' });
     }
   });
-  app.delete("/api/credit-card-transactions/:id", async (req, res) => {
+  app.delete('/api/credit-card-transactions/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      console.log("[DELETE /api/credit-card-transactions/:id] id:", id);
+      console.log('[DELETE /api/credit-card-transactions/:id] id:', id);
       await storage.deleteCreditCardTransaction(id);
-      console.log("[DELETE /api/credit-card-transactions/:id] Transação excluída com sucesso");
+      console.log('[DELETE /api/credit-card-transactions/:id] Transação excluída com sucesso');
       res.status(204).send();
     } catch (error) {
-      console.error("[DELETE /api/credit-card-transactions/:id] error:", error);
-      res.status(500).json({ message: "Failed to delete credit card transaction" });
+      console.error('[DELETE /api/credit-card-transactions/:id] error:', error);
+      res.status(500).json({ message: 'Failed to delete credit card transaction' });
     }
   });
 
   // Bank account routes
-  app.get("/api/accounts/:accountId/bank-accounts", async (req, res) => {
+  app.get('/api/accounts/:accountId/bank-accounts', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const bankAccounts = await storage.getBankAccounts(accountId);
       res.json(bankAccounts);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch bank accounts" });
+      res.status(500).json({ message: 'Failed to fetch bank accounts' });
     }
   });
 
-  app.get("/api/bank-accounts/:id", async (req, res) => {
+  app.get('/api/bank-accounts/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const bankAccount = await storage.getBankAccount(id);
       if (!bankAccount) {
-        return res.status(404).json({ message: "Bank account not found" });
+        return res.status(404).json({ message: 'Bank account not found' });
       }
       res.json(bankAccount);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch bank account" });
+      res.status(500).json({ message: 'Failed to fetch bank account' });
     }
   });
 
-  app.post("/api/accounts/:accountId/bank-accounts", async (req, res) => {
+  app.post('/api/accounts/:accountId/bank-accounts', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const validatedData = insertBankAccountSchema.parse({
@@ -734,36 +796,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(bankAccount);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create bank account" });
+      res.status(500).json({ message: 'Failed to create bank account' });
     }
   });
 
-  app.patch("/api/bank-accounts/:id", async (req, res) => {
+  app.patch('/api/bank-accounts/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertBankAccountSchema.partial().parse(req.body);
       const bankAccount = await storage.updateBankAccount(id, validatedData);
       if (!bankAccount) {
-        return res.status(404).json({ message: "Bank account not found" });
+        return res.status(404).json({ message: 'Bank account not found' });
       }
       res.json(bankAccount);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to update bank account" });
+      res.status(500).json({ message: 'Failed to update bank account' });
     }
   });
 
-  app.delete("/api/bank-accounts/:id", async (req, res) => {
+  app.delete('/api/bank-accounts/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteBankAccount(id);
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete bank account" });
+      res.status(500).json({ message: 'Failed to delete bank account' });
     }
   });
   // Listar faturas de cartão de crédito
@@ -781,172 +843,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Invoice payment routes
-  app.get("/api/accounts/:accountId/invoice-payments", async (req, res) => {
+  app.get('/api/accounts/:accountId/invoice-payments', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const invoicePayments = await storage.getInvoicePayments(accountId);
       res.json(invoicePayments);
     } catch (error) {
-      console.error("[GET /api/accounts/:accountId/invoice-payments]", error);
-      res.status(500).json({ message: "Failed to fetch invoice payments" });
+      console.error('[GET /api/accounts/:accountId/invoice-payments]', error);
+      res.status(500).json({ message: 'Failed to fetch invoice payments' });
     }
   });
 
-  app.get("/api/accounts/:accountId/invoice-payments/pending", async (req, res) => {
+  app.get('/api/accounts/:accountId/invoice-payments/pending', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const pendingInvoices = await storage.getPendingInvoicePayments(accountId);
       res.json(pendingInvoices);
     } catch (error) {
-      console.error("[GET /api/accounts/:accountId/invoice-payments/pending]", error);
-      res.status(500).json({ message: "Failed to fetch pending invoice payments" });
+      console.error('[GET /api/accounts/:accountId/invoice-payments/pending]', error);
+      res.status(500).json({ message: 'Failed to fetch pending invoice payments' });
     }
   });
 
-  app.post("/api/accounts/:accountId/invoice-payments", async (req, res) => {
+  app.post('/api/accounts/:accountId/invoice-payments', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const invoicePaymentData = insertInvoicePaymentSchema.parse({
         ...req.body,
-        accountId
+        accountId,
       });
       const invoicePayment = await storage.createInvoicePayment(invoicePaymentData);
       res.status(201).json(invoicePayment);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid invoice payment data", errors: error.errors });
+        return res
+          .status(400)
+          .json({ message: 'Invalid invoice payment data', errors: error.errors });
       }
-      console.error("[POST /api/accounts/:accountId/invoice-payments]", error);
-      res.status(500).json({ message: "Failed to create invoice payment" });
+      console.error('[POST /api/accounts/:accountId/invoice-payments]', error);
+      res.status(500).json({ message: 'Failed to create invoice payment' });
     }
   });
 
-  app.post("/api/accounts/:accountId/invoice-payments/process-overdue", async (req, res) => {
+  app.post('/api/accounts/:accountId/invoice-payments/process-overdue', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const processedInvoices = await storage.processOverdueInvoices(accountId);
       res.json(processedInvoices);
     } catch (error) {
-      console.error("[POST /api/accounts/:accountId/invoice-payments/process-overdue]", error);
-      res.status(500).json({ message: "Failed to process overdue invoices" });
+      console.error('[POST /api/accounts/:accountId/invoice-payments/process-overdue]', error);
+      res.status(500).json({ message: 'Failed to process overdue invoices' });
     }
   });
 
-  app.put("/api/invoice-payments/:id", async (req, res) => {
+  app.put('/api/invoice-payments/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const invoicePaymentData = insertInvoicePaymentSchema.partial().parse(req.body);
       const invoicePayment = await storage.updateInvoicePayment(id, invoicePaymentData);
       if (!invoicePayment) {
-        return res.status(404).json({ message: "Invoice payment not found" });
+        return res.status(404).json({ message: 'Invoice payment not found' });
       }
       res.json(invoicePayment);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid invoice payment data", errors: error.errors });
+        return res
+          .status(400)
+          .json({ message: 'Invalid invoice payment data', errors: error.errors });
       }
-      console.error("[PUT /api/invoice-payments/:id]", error);
-      res.status(500).json({ message: "Failed to update invoice payment" });
+      console.error('[PUT /api/invoice-payments/:id]', error);
+      res.status(500).json({ message: 'Failed to update invoice payment' });
     }
   });
 
-  app.put("/api/invoice-payments/:id/mark-paid", async (req, res) => {
+  app.put('/api/invoice-payments/:id/mark-paid', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { transactionId } = req.body;
-      
+
       if (!transactionId) {
-        return res.status(400).json({ message: "Transaction ID is required" });
+        return res.status(400).json({ message: 'Transaction ID is required' });
       }
-      
+
       const invoicePayment = await storage.markInvoiceAsPaid(id, transactionId);
       if (!invoicePayment) {
-        return res.status(404).json({ message: "Invoice payment not found" });
+        return res.status(404).json({ message: 'Invoice payment not found' });
       }
       res.json(invoicePayment);
     } catch (error) {
-      console.error("[PUT /api/invoice-payments/:id/mark-paid]", error);
-      res.status(500).json({ message: "Failed to mark invoice as paid" });
+      console.error('[PUT /api/invoice-payments/:id/mark-paid]', error);
+      res.status(500).json({ message: 'Failed to mark invoice as paid' });
     }
   });
 
-  app.delete("/api/invoice-payments/:id", async (req, res) => {
+  app.delete('/api/invoice-payments/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteInvoicePayment(id);
       res.status(204).send();
     } catch (error) {
-      console.error("[DELETE /api/invoice-payments/:id]", error);
-      res.status(500).json({ message: "Failed to delete invoice payment" });
+      console.error('[DELETE /api/invoice-payments/:id]', error);
+      res.status(500).json({ message: 'Failed to delete invoice payment' });
     }
   });
 
   // Endpoint para buscar transações antigas com "Fatura" na descrição
-  app.get("/api/accounts/:id/legacy-invoice-transactions", async (req, res) => {
+  app.get('/api/accounts/:id/legacy-invoice-transactions', async (req, res) => {
     try {
       const accountId = parseInt(req.params.id);
       const legacyTransactions = await storage.getLegacyInvoiceTransactions(accountId);
       res.json(legacyTransactions);
     } catch (error) {
-      console.error("[GET /api/accounts/:id/legacy-invoice-transactions]", error);
-      res.status(500).json({ message: "Failed to fetch legacy invoice transactions" });
+      console.error('[GET /api/accounts/:id/legacy-invoice-transactions]', error);
+      res.status(500).json({ message: 'Failed to fetch legacy invoice transactions' });
     }
   });
 
   // Endpoint para deletar transações antigas de fatura em lote
-  app.delete("/api/accounts/:id/legacy-invoice-transactions", async (req, res) => {
+  app.delete('/api/accounts/:id/legacy-invoice-transactions', async (req, res) => {
     try {
       const accountId = parseInt(req.params.id);
       const result = await storage.deleteLegacyInvoiceTransactions(accountId);
-      res.json({ 
-        message: "Legacy invoice transactions deleted successfully",
-        deletedCount: result.deletedCount 
+      res.json({
+        message: 'Legacy invoice transactions deleted successfully',
+        deletedCount: result.deletedCount,
       });
     } catch (error) {
-      console.error("[DELETE /api/accounts/:id/legacy-invoice-transactions]", error);
-      res.status(500).json({ message: "Failed to delete legacy invoice transactions" });
+      console.error('[DELETE /api/accounts/:id/legacy-invoice-transactions]', error);
+      res.status(500).json({ message: 'Failed to delete legacy invoice transactions' });
     }
   });
 
   // Project routes
-  app.get("/api/accounts/:accountId/projects", async (req, res) => {
+  app.get('/api/accounts/:accountId/projects', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const projects = await storage.getProjects(accountId);
       res.json(projects);
     } catch (error) {
-      console.error("[GET /api/accounts/:accountId/projects]", error);
-      res.status(500).json({ message: "Failed to fetch projects" });
+      console.error('[GET /api/accounts/:accountId/projects]', error);
+      res.status(500).json({ message: 'Failed to fetch projects' });
     }
   });
 
-  app.get("/api/projects/:id", async (req, res) => {
+  app.get('/api/projects/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const project = await storage.getProject(id);
       if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: 'Project not found' });
       }
       res.json(project);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch project" });
+      res.status(500).json({ message: 'Failed to fetch project' });
     }
   });
 
-  app.get("/api/projects/:id/stats", async (req, res) => {
+  app.get('/api/projects/:id/stats', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const stats = await storage.getProjectStats(id);
       if (!stats) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: 'Project not found' });
       }
       res.json(stats);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch project stats" });
+      res.status(500).json({ message: 'Failed to fetch project stats' });
     }
   });
 
-  app.post("/api/accounts/:accountId/projects", async (req, res) => {
+  app.post('/api/accounts/:accountId/projects', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const validatedData = insertProjectSchema.parse({ ...req.body, accountId });
@@ -954,80 +1020,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(project);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        res.status(400).json({ message: "Invalid project data", errors: error.errors });
+        res.status(400).json({ message: 'Invalid project data', errors: error.errors });
       } else {
-        res.status(500).json({ message: "Failed to create project" });
+        res.status(500).json({ message: 'Failed to create project' });
       }
     }
   });
 
-  app.patch("/api/projects/:id", async (req, res) => {
+  app.patch('/api/projects/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertProjectSchema.partial().parse(req.body);
       const project = await storage.updateProject(id, validatedData);
       if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+        return res.status(404).json({ message: 'Project not found' });
       }
       res.json(project);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        res.status(400).json({ message: "Invalid project data", errors: error.errors });
+        res.status(400).json({ message: 'Invalid project data', errors: error.errors });
       } else {
-        res.status(500).json({ message: "Failed to update project" });
+        res.status(500).json({ message: 'Failed to update project' });
       }
     }
   });
 
-  app.delete("/api/projects/:id", async (req, res) => {
+  app.delete('/api/projects/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteProject(id);
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete project" });
+      res.status(500).json({ message: 'Failed to delete project' });
     }
   });
 
   // Cost Center routes
-  app.get("/api/accounts/:accountId/cost-centers", async (req, res) => {
+  app.get('/api/accounts/:accountId/cost-centers', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const costCenters = await storage.getCostCenters(accountId);
       res.json(costCenters);
     } catch (error) {
-      console.error("[GET /api/accounts/:accountId/cost-centers]", error);
-      res.status(500).json({ message: "Failed to fetch cost centers" });
+      console.error('[GET /api/accounts/:accountId/cost-centers]', error);
+      res.status(500).json({ message: 'Failed to fetch cost centers' });
     }
   });
 
-  app.get("/api/cost-centers/:id", async (req, res) => {
+  app.get('/api/cost-centers/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const costCenter = await storage.getCostCenter(id);
       if (!costCenter) {
-        return res.status(404).json({ message: "Cost center not found" });
+        return res.status(404).json({ message: 'Cost center not found' });
       }
       res.json(costCenter);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch cost center" });
+      res.status(500).json({ message: 'Failed to fetch cost center' });
     }
   });
 
-  app.get("/api/cost-centers/:id/stats", async (req, res) => {
+  app.get('/api/cost-centers/:id/stats', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const stats = await storage.getCostCenterStats(id);
       if (!stats) {
-        return res.status(404).json({ message: "Cost center not found" });
+        return res.status(404).json({ message: 'Cost center not found' });
       }
       res.json(stats);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch cost center stats" });
+      res.status(500).json({ message: 'Failed to fetch cost center stats' });
     }
   });
 
-  app.post("/api/accounts/:accountId/cost-centers", async (req, res) => {
+  app.post('/api/accounts/:accountId/cost-centers', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const validatedData = insertCostCenterSchema.parse({ ...req.body, accountId });
@@ -1035,80 +1101,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(costCenter);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        res.status(400).json({ message: "Invalid cost center data", errors: error.errors });
+        res.status(400).json({ message: 'Invalid cost center data', errors: error.errors });
       } else {
-        res.status(500).json({ message: "Failed to create cost center" });
+        res.status(500).json({ message: 'Failed to create cost center' });
       }
     }
   });
 
-  app.patch("/api/cost-centers/:id", async (req, res) => {
+  app.patch('/api/cost-centers/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertCostCenterSchema.partial().parse(req.body);
       const costCenter = await storage.updateCostCenter(id, validatedData);
       if (!costCenter) {
-        return res.status(404).json({ message: "Cost center not found" });
+        return res.status(404).json({ message: 'Cost center not found' });
       }
       res.json(costCenter);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        res.status(400).json({ message: "Invalid cost center data", errors: error.errors });
+        res.status(400).json({ message: 'Invalid cost center data', errors: error.errors });
       } else {
-        res.status(500).json({ message: "Failed to update cost center" });
+        res.status(500).json({ message: 'Failed to update cost center' });
       }
     }
   });
 
-  app.delete("/api/cost-centers/:id", async (req, res) => {
+  app.delete('/api/cost-centers/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteCostCenter(id);
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete cost center" });
+      res.status(500).json({ message: 'Failed to delete cost center' });
     }
   });
 
   // Client routes
-  app.get("/api/accounts/:accountId/clients", async (req, res) => {
+  app.get('/api/accounts/:accountId/clients', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const clients = await storage.getClients(accountId);
       res.json(clients);
     } catch (error) {
-      console.error("[GET /api/accounts/:accountId/clients]", error);
-      res.status(500).json({ message: "Failed to fetch clients" });
+      console.error('[GET /api/accounts/:accountId/clients]', error);
+      res.status(500).json({ message: 'Failed to fetch clients' });
     }
   });
 
-  app.get("/api/clients/:id", async (req, res) => {
+  app.get('/api/clients/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const client = await storage.getClient(id);
       if (!client) {
-        return res.status(404).json({ message: "Client not found" });
+        return res.status(404).json({ message: 'Client not found' });
       }
       res.json(client);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch client" });
+      res.status(500).json({ message: 'Failed to fetch client' });
     }
   });
 
-  app.get("/api/clients/:id/with-projects", async (req, res) => {
+  app.get('/api/clients/:id/with-projects', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const clientWithProjects = await storage.getClientWithProjects(id);
       if (!clientWithProjects) {
-        return res.status(404).json({ message: "Client not found" });
+        return res.status(404).json({ message: 'Client not found' });
       }
       res.json(clientWithProjects);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch client with projects" });
+      res.status(500).json({ message: 'Failed to fetch client with projects' });
     }
   });
 
-  app.post("/api/accounts/:accountId/clients", async (req, res) => {
+  app.post('/api/accounts/:accountId/clients', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const validatedData = insertClientSchema.parse({ ...req.body, accountId });
@@ -1116,76 +1182,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(client);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        res.status(400).json({ message: "Invalid client data", errors: error.errors });
+        res.status(400).json({ message: 'Invalid client data', errors: error.errors });
       } else {
-        res.status(500).json({ message: "Failed to create client" });
+        res.status(500).json({ message: 'Failed to create client' });
       }
     }
   });
 
-  app.patch("/api/clients/:id", async (req, res) => {
+  app.patch('/api/clients/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertClientSchema.partial().parse(req.body);
       const client = await storage.updateClient(id, validatedData);
       if (!client) {
-        return res.status(404).json({ message: "Client not found" });
+        return res.status(404).json({ message: 'Client not found' });
       }
       res.json(client);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        res.status(400).json({ message: "Invalid client data", errors: error.errors });
+        res.status(400).json({ message: 'Invalid client data', errors: error.errors });
       } else {
-        res.status(500).json({ message: "Failed to update client" });
+        res.status(500).json({ message: 'Failed to update client' });
       }
     }
   });
 
-  app.delete("/api/clients/:id", async (req, res) => {
+  app.delete('/api/clients/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteClient(id);
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete client" });
+      res.status(500).json({ message: 'Failed to delete client' });
     }
   });
 
   // Delete all transactions route
-  app.delete("/api/accounts/:accountId/transactions/all", async (req, res) => {
+  app.delete('/api/accounts/:accountId/transactions/all', async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
-      
+
       // Validar se a conta existe
       const account = await storage.getAccount(accountId);
       if (!account) {
-        return res.status(404).json({ message: "Account not found" });
+        return res.status(404).json({ message: 'Account not found' });
       }
 
       // Deletar todas as transações
       const result = await storage.deleteAllTransactions(accountId);
-      
-      console.log(`[DELETE /api/accounts/${accountId}/transactions/all] Deleted ${result.deletedTransactions} transactions and ${result.deletedCreditCardTransactions} credit card transactions`);
-      
+
+      console.log(
+        `[DELETE /api/accounts/${accountId}/transactions/all] Deleted ${result.deletedTransactions} transactions and ${result.deletedCreditCardTransactions} credit card transactions`
+      );
+
       res.json({
-        message: "All transactions deleted successfully",
+        message: 'All transactions deleted successfully',
         deletedTransactions: result.deletedTransactions,
         deletedCreditCardTransactions: result.deletedCreditCardTransactions,
-        totalDeleted: result.deletedTransactions + result.deletedCreditCardTransactions
+        totalDeleted: result.deletedTransactions + result.deletedCreditCardTransactions,
       });
     } catch (error) {
-      console.error("[DELETE /api/accounts/:accountId/transactions/all]", error);
-      res.status(500).json({ message: "Failed to delete all transactions" });
+      console.error('[DELETE /api/accounts/:accountId/transactions/all]', error);
+      res.status(500).json({ message: 'Failed to delete all transactions' });
     }
   });
 
   // Invoice Upload routes
-  app.post("/api/invoice-upload", uploadInvoice);
-  app.post("/api/invoice-upload-multiple", uploadMultipleInvoiceImages);
-  app.post("/api/invoice-paste", pasteInvoiceImage);
-  app.get("/api/invoice-imports/:creditCardId", getCardInvoiceImports);
-  app.get("/api/invoice-import/:importId", getInvoiceImportDetail);
-  app.post("/api/invoice-import/:importId/retry", retryInvoiceImport);
+  app.post('/api/invoice-upload', uploadInvoice);
+  app.post('/api/invoice-upload-multiple', uploadMultipleInvoiceImages);
+  app.post('/api/invoice-paste', pasteInvoiceImage);
+  app.get('/api/invoice-imports/:creditCardId', getCardInvoiceImports);
+  app.get('/api/invoice-import/:importId', getInvoiceImportDetail);
+  app.post('/api/invoice-import/:importId/retry', retryInvoiceImport);
 
   const httpServer = createServer(app);
   return httpServer;

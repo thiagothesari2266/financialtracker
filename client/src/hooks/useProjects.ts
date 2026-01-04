@@ -1,9 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Project, InsertProject, ProjectWithClient, ProjectWithStats } from "@shared/schema";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Project, InsertProject, ProjectWithClient, ProjectWithStats } from '@shared/schema';
 
 export function useProjects(accountId: number) {
   return useQuery({
-    queryKey: ["/api/accounts", accountId, "projects"],
+    queryKey: ['/api/accounts', accountId, 'projects'],
     queryFn: async () => {
       const response = await fetch(`/api/accounts/${accountId}/projects`);
       if (!response.ok) throw new Error('Failed to fetch projects');
@@ -15,7 +15,7 @@ export function useProjects(accountId: number) {
 
 export function useProject(id: number) {
   return useQuery({
-    queryKey: ["/api/projects", id],
+    queryKey: ['/api/projects', id],
     queryFn: async () => {
       const response = await fetch(`/api/projects/${id}`);
       if (!response.ok) throw new Error('Failed to fetch project');
@@ -27,7 +27,7 @@ export function useProject(id: number) {
 
 export function useProjectStats(id: number) {
   return useQuery({
-    queryKey: ["/api/projects", id, "stats"],
+    queryKey: ['/api/projects', id, 'stats'],
     queryFn: async () => {
       const response = await fetch(`/api/projects/${id}/stats`);
       if (!response.ok) throw new Error('Failed to fetch project stats');
@@ -39,13 +39,13 @@ export function useProjectStats(id: number) {
 
 export function useCreateProject(accountId: number) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: InsertProject) => {
       const response = await fetch(`/api/accounts/${accountId}/projects`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
       });
@@ -53,20 +53,20 @@ export function useCreateProject(accountId: number) {
       return (await response.json()) as Project;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "projects"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'projects'] });
     },
   });
 }
 
 export function useUpdateProject() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertProject> }) => {
       const response = await fetch(`/api/projects/${id}`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
       });
@@ -74,9 +74,9 @@ export function useUpdateProject() {
       return (await response.json()) as Project;
     },
     onSuccess: (project: Project) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts", project.accountId, "projects"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/projects", project.id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/projects", project.id, "stats"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', project.accountId, 'projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', project.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', project.id, 'stats'] });
     },
   });
 }
@@ -87,12 +87,12 @@ export function useDeleteProject(accountId: number) {
   return useMutation({
     mutationFn: async (id: number) => {
       const response = await fetch(`/api/projects/${id}`, {
-        method: "DELETE",
+        method: 'DELETE',
       });
       if (!response.ok) throw new Error('Failed to delete project');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "projects"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'projects'] });
     },
   });
 }

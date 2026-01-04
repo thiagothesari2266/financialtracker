@@ -1,11 +1,7 @@
-import { useMemo, useState } from "react";
-import { Check, ChevronsUpDown, PlusCircle, Building2, User2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { useMemo, useState } from 'react';
+import { Check, ChevronsUpDown, PlusCircle, Building2, User2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Command,
   CommandEmpty,
@@ -14,21 +10,21 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@/components/ui/command";
-import { Badge } from "@/components/ui/badge";
-import { useAccount } from "@/contexts/AccountContext";
-import type { Account } from "@shared/schema";
-import { cn } from "@/lib/utils";
-import AccountModal from "@/components/Modals/AccountModal";
+} from '@/components/ui/command';
+import { Badge } from '@/components/ui/badge';
+import { useAccount } from '@/contexts/AccountContext';
+import type { Account } from '@shared/schema';
+import { cn } from '@/lib/utils';
+import AccountModal from '@/components/Modals/AccountModal';
 
-const accountTypeLabels: Record<Account["type"], string> = {
-  personal: "Pessoal",
-  business: "Empresarial",
+const accountTypeLabels: Record<Account['type'], string> = {
+  personal: 'Pessoal',
+  business: 'Empresarial',
 };
 
-const accountTypeBadgeClass: Record<Account["type"], string> = {
-  personal: "bg-blue-50 text-blue-700 border-blue-100",
-  business: "bg-slate-900/5 text-slate-900 border-slate-200",
+const accountTypeBadgeClass: Record<Account['type'], string> = {
+  personal: 'bg-blue-50 text-blue-700 border-blue-100',
+  business: 'bg-slate-900/5 text-slate-900 border-slate-200',
 };
 
 export function AccountSwitcher() {
@@ -51,7 +47,7 @@ export function AccountSwitcher() {
     setOpen(false);
   };
 
-  const CurrentIcon = currentAccount?.type === "business" ? Building2 : User2;
+  const CurrentIcon = currentAccount?.type === 'business' ? Building2 : User2;
 
   return (
     <>
@@ -94,7 +90,7 @@ export function AccountSwitcher() {
               <CommandEmpty>Nenhuma conta encontrada</CommandEmpty>
               <CommandGroup heading="Contas">
                 {orderedAccounts.map((account) => {
-                  const Icon = account.type === "business" ? Building2 : User2;
+                  const Icon = account.type === 'business' ? Building2 : User2;
                   return (
                     <CommandItem
                       key={account.id}
@@ -107,13 +103,11 @@ export function AccountSwitcher() {
                           <Icon className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">
-                            {account.name}
-                          </p>
+                          <p className="truncate text-sm font-medium">{account.name}</p>
                           <Badge
                             variant="outline"
                             className={cn(
-                              "h-5 rounded-full px-2 text-[10px] uppercase tracking-wide",
+                              'h-5 rounded-full px-2 text-[10px] uppercase tracking-wide',
                               accountTypeBadgeClass[account.type]
                             )}
                           >
@@ -123,10 +117,8 @@ export function AccountSwitcher() {
                       </div>
                       <Check
                         className={cn(
-                          "h-4 w-4",
-                          account.id === currentAccount?.id
-                            ? "opacity-100"
-                            : "opacity-0"
+                          'h-4 w-4',
+                          account.id === currentAccount?.id ? 'opacity-100' : 'opacity-0'
                         )}
                       />
                     </CommandItem>

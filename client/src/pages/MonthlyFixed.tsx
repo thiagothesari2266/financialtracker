@@ -1,15 +1,22 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AppShell } from "@/components/Layout/AppShell";
-import { SummaryCard } from "@/components/ui/summary-card";
-import { useAccount } from "@/contexts/AccountContext";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DollarSign, Repeat, TrendingUp, Trash2, Plus, Pencil } from "lucide-react";
-import type { InsertFixedCashflow, MonthlyFixedItem, MonthlyFixedSummary } from "@shared/schema";
-import { Button } from "@/components/ui/button";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
-import { FixedCashflowModal } from "@/components/Modals/FixedCashflowModal";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AppShell } from '@/components/Layout/AppShell';
+import { SummaryCard } from '@/components/ui/summary-card';
+import { useAccount } from '@/contexts/AccountContext';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { DollarSign, Repeat, TrendingUp, Trash2, Plus, Pencil } from 'lucide-react';
+import type { InsertFixedCashflow, MonthlyFixedItem, MonthlyFixedSummary } from '@shared/schema';
+import { Button } from '@/components/ui/button';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
+import { FixedCashflowModal } from '@/components/Modals/FixedCashflowModal';
 
 export default function MonthlyFixed() {
   const { currentAccount } = useAccount();
@@ -28,72 +35,90 @@ export default function MonthlyFixed() {
     const cleaned = raw.trim();
     if (!cleaned) return raw;
 
-    const hasComma = cleaned.includes(",");
-    const hasDot = cleaned.includes(".");
+    const hasComma = cleaned.includes(',');
+    const hasDot = cleaned.includes('.');
 
-    if (hasComma && (!hasDot || cleaned.lastIndexOf(",") > cleaned.lastIndexOf("."))) {
-      const normalized = cleaned.replace(/\./g, "").replace(",", ".");
+    if (hasComma && (!hasDot || cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.'))) {
+      const normalized = cleaned.replace(/\./g, '').replace(',', '.');
       const parsed = Number.parseFloat(normalized);
       if (Number.isFinite(parsed)) return parsed.toFixed(2);
     }
 
     if (hasDot) {
-      const normalized = cleaned.replace(/,/g, "");
+      const normalized = cleaned.replace(/,/g, '');
       const parsed = Number.parseFloat(normalized);
       if (Number.isFinite(parsed)) return parsed.toFixed(2);
     }
 
-    const parsed = Number.parseFloat(cleaned.replace(/\s+/g, ""));
+    const parsed = Number.parseFloat(cleaned.replace(/\s+/g, ''));
     return Number.isFinite(parsed) ? parsed.toFixed(2) : raw;
   };
 
   const createMutation = useMutation({
     mutationFn: async (input: InsertFixedCashflow) => {
-      const res = await apiRequest("POST", `/api/accounts/${input.accountId}/monthly-fixed`, input);
+      const res = await apiRequest('POST', `/api/accounts/${input.accountId}/monthly-fixed`, input);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/accounts/${currentAccount?.id}/monthly-fixed`] });
-      toast({ title: "Fixo criado", description: "Entrada/saída fixa adicionada." });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/accounts/${currentAccount?.id}/monthly-fixed`],
+      });
+      toast({ title: 'Fixo criado', description: 'Entrada/saída fixa adicionada.' });
       setIsModalOpen(false);
       setEditingItem(null);
     },
     onError: () => {
-      toast({ title: "Erro ao salvar", description: "Não foi possível criar o fixo.", variant: "destructive" });
+      toast({
+        title: 'Erro ao salvar',
+        description: 'Não foi possível criar o fixo.',
+        variant: 'destructive',
+      });
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, payload }: { id: number; payload: Partial<InsertFixedCashflow> }) => {
-      const res = await apiRequest("PATCH", `/api/monthly-fixed/${id}`, payload);
+      const res = await apiRequest('PATCH', `/api/monthly-fixed/${id}`, payload);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/accounts/${currentAccount?.id}/monthly-fixed`] });
-      toast({ title: "Fixo atualizado" });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/accounts/${currentAccount?.id}/monthly-fixed`],
+      });
+      toast({ title: 'Fixo atualizado' });
       setIsModalOpen(false);
       setEditingItem(null);
     },
     onError: () => {
-      toast({ title: "Erro ao atualizar", description: "Não foi possível salvar o fixo.", variant: "destructive" });
+      toast({
+        title: 'Erro ao atualizar',
+        description: 'Não foi possível salvar o fixo.',
+        variant: 'destructive',
+      });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/monthly-fixed/${id}`);
+      await apiRequest('DELETE', `/api/monthly-fixed/${id}`);
       return id;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/accounts/${currentAccount?.id}/monthly-fixed`] });
-      toast({ title: "Fixo removido" });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/accounts/${currentAccount?.id}/monthly-fixed`],
+      });
+      toast({ title: 'Fixo removido' });
     },
     onError: () => {
-      toast({ title: "Erro ao remover", description: "Não foi possível remover o fixo.", variant: "destructive" });
+      toast({
+        title: 'Erro ao remover',
+        description: 'Não foi possível remover o fixo.',
+        variant: 'destructive',
+      });
     },
   });
 
-  const handleSubmit = (data: Omit<InsertFixedCashflow, "accountId">) => {
+  const handleSubmit = (data: Omit<InsertFixedCashflow, 'accountId'>) => {
     if (!currentAccount) return;
     const normalizedAmount = normalizeAmountForApi(data.amount);
 
@@ -117,16 +142,16 @@ export default function MonthlyFixed() {
   };
 
   const formatCurrency = (value: string | number) => {
-    const numeric = typeof value === "number" ? value : parseFloat(value);
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
-      Number.isFinite(numeric) ? numeric : 0,
+    const numeric = typeof value === 'number' ? value : parseFloat(value);
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+      Number.isFinite(numeric) ? numeric : 0
     );
   };
 
   const summary: MonthlyFixedSummary = monthlyFixed ?? {
     income: [],
     expenses: [],
-    totals: { income: "0.00", expenses: "0.00", net: "0.00" },
+    totals: { income: '0.00', expenses: '0.00', net: '0.00' },
   };
 
   const handleCloseModal = () => {
@@ -166,14 +191,14 @@ export default function MonthlyFixed() {
             value={formatCurrency(summary.totals.income)}
             tone="positive"
             icon={<TrendingUp className="h-5 w-5 text-green-600" />}
-            helperText={isLoading ? "Carregando..." : `${summary.income.length} recorrência(s)`}
+            helperText={isLoading ? 'Carregando...' : `${summary.income.length} recorrência(s)`}
           />
           <SummaryCard
             label="Saídas fixas"
             value={formatCurrency(summary.totals.expenses)}
             tone="negative"
             icon={<TrendingUp className="h-5 w-5 rotate-180 text-red-600" />}
-            helperText={isLoading ? "Carregando..." : `${summary.expenses.length} recorrência(s)`}
+            helperText={isLoading ? 'Carregando...' : `${summary.expenses.length} recorrência(s)`}
           />
           <SummaryCard
             label="Saldo fixo estimado"
@@ -188,7 +213,9 @@ export default function MonthlyFixed() {
             <div className="flex items-center justify-between border-b px-4 py-3">
               <div>
                 <p className="text-sm font-medium">Entradas fixas</p>
-                <p className="text-xs text-muted-foreground">Recorrências ativas com frequência mensal</p>
+                <p className="text-xs text-muted-foreground">
+                  Recorrências ativas com frequência mensal
+                </p>
               </div>
               <span className="text-xs text-muted-foreground">{summary.income.length} itens</span>
             </div>
@@ -238,7 +265,9 @@ export default function MonthlyFixed() {
                 </TableBody>
               </Table>
             ) : (
-              <div className="p-4 text-sm text-muted-foreground">Nenhuma entrada fixa cadastrada.</div>
+              <div className="p-4 text-sm text-muted-foreground">
+                Nenhuma entrada fixa cadastrada.
+              </div>
             )}
           </div>
 
@@ -246,7 +275,9 @@ export default function MonthlyFixed() {
             <div className="flex items-center justify-between border-b px-4 py-3">
               <div>
                 <p className="text-sm font-medium">Saídas fixas</p>
-                <p className="text-xs text-muted-foreground">Recorrências ativas com frequência mensal</p>
+                <p className="text-xs text-muted-foreground">
+                  Recorrências ativas com frequência mensal
+                </p>
               </div>
               <span className="text-xs text-muted-foreground">{summary.expenses.length} itens</span>
             </div>
@@ -296,7 +327,9 @@ export default function MonthlyFixed() {
                 </TableBody>
               </Table>
             ) : (
-              <div className="p-4 text-sm text-muted-foreground">Nenhuma saída fixa cadastrada.</div>
+              <div className="p-4 text-sm text-muted-foreground">
+                Nenhuma saída fixa cadastrada.
+              </div>
             )}
           </div>
         </div>

@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { useAccount } from "@/contexts/AccountContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery } from '@tanstack/react-query';
+import { useAccount } from '@/contexts/AccountContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function TopCategories() {
   const { currentAccount } = useAccount();
@@ -21,12 +21,12 @@ export default function TopCategories() {
     if (isNaN(numValue) || numValue === null || numValue === undefined) {
       return new Intl.NumberFormat('pt-BR', {
         style: 'currency',
-        currency: 'BRL'
+        currency: 'BRL',
       }).format(0);
     }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(numValue);
   };
 
@@ -40,9 +40,7 @@ export default function TopCategories() {
     return (
       <Card className="bg-white rounded-xl shadow-sm border border-slate-200">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-slate-900">
-            Top Categorias
-          </CardTitle>
+          <CardTitle className="text-lg font-semibold text-slate-900">Top Categorias</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -64,9 +62,7 @@ export default function TopCategories() {
   return (
     <Card className="bg-white rounded-xl shadow-sm border border-slate-200">
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-slate-900">
-          Top Categorias
-        </CardTitle>
+        <CardTitle className="text-lg font-semibold text-slate-900">Top Categorias</CardTitle>
       </CardHeader>
       <CardContent>
         {topCategories.length > 0 ? (
@@ -74,7 +70,7 @@ export default function TopCategories() {
             {topCategories.map((category: any, index: number) => (
               <div key={category.categoryId} className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div 
+                  <div
                     className="w-4 h-4 rounded"
                     style={{ backgroundColor: category.color }}
                   ></div>
@@ -86,9 +82,7 @@ export default function TopCategories() {
                   <div className="text-sm font-semibold text-slate-900">
                     {formatCurrency(category.total)}
                   </div>
-                  <div className="text-xs text-slate-500">
-                    #{index + 1}
-                  </div>
+                  <div className="text-xs text-slate-500">#{index + 1}</div>
                 </div>
               </div>
             ))}

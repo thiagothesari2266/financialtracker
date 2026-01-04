@@ -1,7 +1,6 @@
-import React from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { CreditCard } from "lucide-react";
+import React from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CreditCard } from 'lucide-react';
 
 interface InvoicePaymentsModalProps {
   isOpen: boolean;
@@ -21,7 +20,8 @@ export function InvoicePaymentsModal({ isOpen, onClose }: InvoicePaymentsModalPr
 
         <div className="p-4">
           <p>
-            A funcionalidade de faturas do cartão de crédito foi removida. As faturas agora são lançadas como transações normais.
+            A funcionalidade de faturas do cartão de crédito foi removida. As faturas agora são
+            lançadas como transações normais.
           </p>
         </div>
       </DialogContent>

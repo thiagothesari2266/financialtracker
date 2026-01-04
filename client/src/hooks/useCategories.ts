@@ -1,10 +1,10 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import type { Category, InsertCategory } from "@shared/schema";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
+import type { Category, InsertCategory } from '@shared/schema';
 
 export function useCategories(accountId: number) {
   return useQuery({
-    queryKey: ["/api/categories", accountId],
+    queryKey: ['/api/categories', accountId],
     queryFn: async () => {
       const response = await fetch(`/api/accounts/${accountId}/categories`);
       if (!response.ok) throw new Error('Failed to fetch categories');
@@ -16,9 +16,9 @@ export function useCategories(accountId: number) {
 
 export function useCategory(id: number) {
   return useQuery({
-    queryKey: ["/api/categories", id],
+    queryKey: ['/api/categories', id],
     queryFn: async () => {
-      const response = await apiRequest("GET", `/api/categories/${id}`);
+      const response = await apiRequest('GET', `/api/categories/${id}`);
       return (await response.json()) as Category;
     },
     enabled: !!id,
@@ -27,13 +27,13 @@ export function useCategory(id: number) {
 
 export function useCreateCategory(accountId: number) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: InsertCategory) => {
       const response = await fetch(`/api/accounts/${accountId}/categories`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
       });
@@ -41,7 +41,7 @@ export function useCreateCategory(accountId: number) {
       return (await response.json()) as Category;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/categories", accountId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/categories', accountId] });
     },
   });
 }
@@ -50,15 +50,11 @@ export function useUpdateCategory() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertCategory> }) => {
-      const response = await apiRequest(
-        "PATCH",
-        `/api/categories/${id}`,
-        data
-      );
+      const response = await apiRequest('PATCH', `/api/categories/${id}`, data);
       return (await response.json()) as Category;
     },
     onSuccess: (category: Category) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/categories", category.accountId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/categories', category.accountId] });
     },
   });
 }
@@ -67,10 +63,10 @@ export function useDeleteCategory(accountId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/categories/${id}`);
+      await apiRequest('DELETE', `/api/categories/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/categories", accountId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/categories', accountId] });
     },
   });
 }

@@ -1,20 +1,15 @@
-import React, { useState, useCallback, useEffect } from "react";
-import { useDropzone } from "react-dropzone";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useToast } from "@/hooks/use-toast";
-import { useAccount } from "@/contexts/AccountContext";
-import { Upload, FileText, Image, X, CheckCircle, AlertTriangle, Clipboard } from "lucide-react";
-import type { CreditCard } from "@shared/schema";
-import TransactionReviewModal from "./TransactionReviewModal";
+import React, { useState, useCallback, useEffect } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
+import { useAccount } from '@/contexts/AccountContext';
+import { Upload, FileText, Image, X, CheckCircle, AlertTriangle, Clipboard } from 'lucide-react';
+import type { CreditCard } from '@shared/schema';
+import TransactionReviewModal from './TransactionReviewModal';
 
 interface InvoiceUploadModalProps {
   isOpen: boolean;
@@ -32,13 +27,17 @@ interface UploadedFile {
   importId?: number;
 }
 
-export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: InvoiceUploadModalProps) {
+export default function InvoiceUploadModal({
+  isOpen,
+  onClose,
+  creditCard,
+}: InvoiceUploadModalProps) {
   const { currentAccount } = useAccount();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  
+  const _queryClient = useQueryClient();
+
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [_isProcessing, setIsProcessing] = useState(false);
   const [isPasting, setIsPasting] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewData, setReviewData] = useState<{
@@ -49,21 +48,24 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
   const uploadMutation = useMutation({
     mutationFn: async (files: File[]) => {
       const formData = new FormData();
-      
+
       // Adicionar todos os arquivos
-      files.forEach(file => {
+      files.forEach((file) => {
         formData.append('files', file);
       });
-      
+
       formData.append('creditCardId', creditCard?.id.toString() || '');
       formData.append('accountId', currentAccount?.id.toString() || '');
 
       console.log('[Upload Multiple] Enviando requisição para:', '/api/invoice-upload-multiple');
-      console.log('[Upload Multiple] Arquivos:', files.map(f => f.name));
+      console.log(
+        '[Upload Multiple] Arquivos:',
+        files.map((f) => f.name)
+      );
       console.log('[Upload Multiple] FormData:', {
         fileCount: files.length,
         creditCardId: formData.get('creditCardId'),
-        accountId: formData.get('accountId')
+        accountId: formData.get('accountId'),
       });
 
       const response = await fetch('/api/invoice-upload-multiple', {
@@ -85,31 +87,31 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
     },
     onSuccess: (data, files) => {
       // Marcar todos os arquivos como processando
-      setUploadedFiles(prev => 
-        prev.map(f => 
-          files.some(file => file.name === f.file.name)
+      setUploadedFiles((prev) =>
+        prev.map((f) =>
+          files.some((file) => file.name === f.file.name)
             ? { ...f, status: 'processing', progress: 50 }
             : f
         )
       );
-      
+
       // Simular processamento da IA
       setTimeout(() => {
-        setUploadedFiles(prev => 
-          prev.map(f => 
-            files.some(file => file.name === f.file.name)
-              ? { 
-                  ...f, 
-                  status: 'completed', 
+        setUploadedFiles((prev) =>
+          prev.map((f) =>
+            files.some((file) => file.name === f.file.name)
+              ? {
+                  ...f,
+                  status: 'completed',
                   progress: 100,
                   extractedTransactions: data.transactions || [],
-                  importId: data.importId
+                  importId: data.importId,
                 }
               : f
           )
         );
         setIsProcessing(false);
-        
+
         toast({
           title: 'Sucesso!',
           description: `${data.transactionsCount} transações extraídas de ${files.length} imagem(ns)`,
@@ -118,14 +120,14 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
     },
     onError: (error: any, files) => {
       // Marcar todos os arquivos como erro
-      setUploadedFiles(prev => 
-        prev.map(f => 
-          files.some(file => file.name === f.file.name)
-            ? { 
-                ...f, 
-                status: 'error', 
+      setUploadedFiles((prev) =>
+        prev.map((f) =>
+          files.some((file) => file.name === f.file.name)
+            ? {
+                ...f,
+                status: 'error',
                 progress: 0,
-                errorMessage: error.message 
+                errorMessage: error.message,
               }
             : f
         )
@@ -142,7 +144,7 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
   const pasteMutation = useMutation({
     mutationFn: async (imageData: string) => {
       console.log('[Paste] Enviando imagem colada para:', '/api/invoice-paste');
-      
+
       const response = await fetch('/api/invoice-paste', {
         method: 'POST',
         headers: {
@@ -169,7 +171,7 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
     },
     onSuccess: (data) => {
       setIsPasting(false);
-      
+
       // Add the pasted image to uploaded files list
       const pastedFile: UploadedFile = {
         file: new File([new Blob()], 'imagem-colada.png', { type: 'image/png' }),
@@ -177,11 +179,11 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
         status: 'completed',
         progress: 100,
         extractedTransactions: data.transactions || [],
-        importId: data.importId
+        importId: data.importId,
       };
-      
-      setUploadedFiles(prev => [...prev, pastedFile]);
-      
+
+      setUploadedFiles((prev) => [...prev, pastedFile]);
+
       toast({
         title: 'Sucesso!',
         description: `${data.transactionsCount} transações extraídas da imagem colada`,
@@ -209,18 +211,18 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
 
     try {
       setIsPasting(true);
-      
+
       // Read from clipboard
       const clipboardItems = await navigator.clipboard.read();
-      
+
       for (const clipboardItem of clipboardItems) {
         for (const type of clipboardItem.types) {
           if (type.startsWith('image/')) {
             const blob = await clipboardItem.getType(type);
-            
+
             // Convert blob to base64
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
               const imageData = e.target?.result as string;
               pasteMutation.mutate(imageData);
             };
@@ -229,15 +231,14 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
           }
         }
       }
-      
+
       setIsPasting(false);
       toast({
         title: 'Nenhuma imagem encontrada',
         description: 'Copie uma imagem primeiro e tente novamente',
         variant: 'destructive',
       });
-      
-    } catch (error) {
+    } catch (_error) {
       setIsPasting(false);
       toast({
         title: 'Erro ao acessar área de transferência',
@@ -265,29 +266,32 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
     };
   }, [isOpen, handlePaste]);
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (!creditCard) {
-      toast({
-        title: 'Erro',
-        description: 'Selecione um cartão de crédito primeiro',
-        variant: 'destructive',
-      });
-      return;
-    }
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      if (!creditCard) {
+        toast({
+          title: 'Erro',
+          description: 'Selecione um cartão de crédito primeiro',
+          variant: 'destructive',
+        });
+        return;
+      }
 
-    const newFiles = acceptedFiles.map(file => ({
-      file,
-      preview: URL.createObjectURL(file),
-      status: 'uploading' as const,
-      progress: 0,
-    }));
+      const newFiles = acceptedFiles.map((file) => ({
+        file,
+        preview: URL.createObjectURL(file),
+        status: 'uploading' as const,
+        progress: 0,
+      }));
 
-    setUploadedFiles(prev => [...prev, ...newFiles]);
-    setIsProcessing(true);
+      setUploadedFiles((prev) => [...prev, ...newFiles]);
+      setIsProcessing(true);
 
-    // Upload all files together as a single import
-    uploadMutation.mutate(acceptedFiles);
-  }, [creditCard, uploadMutation, toast]);
+      // Upload all files together as a single import
+      uploadMutation.mutate(acceptedFiles);
+    },
+    [creditCard, uploadMutation, toast]
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -299,12 +303,12 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
   });
 
   const removeFile = (fileName: string) => {
-    setUploadedFiles(prev => {
-      const fileToRemove = prev.find(f => f.file.name === fileName);
+    setUploadedFiles((prev) => {
+      const fileToRemove = prev.find((f) => f.file.name === fileName);
       if (fileToRemove) {
         URL.revokeObjectURL(fileToRemove.preview);
       }
-      return prev.filter(f => f.file.name !== fileName);
+      return prev.filter((f) => f.file.name !== fileName);
     });
   };
 
@@ -346,7 +350,7 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
 
   const handleClose = () => {
     // Limpar previews
-    uploadedFiles.forEach(file => {
+    uploadedFiles.forEach((file) => {
       URL.revokeObjectURL(file.preview);
     });
     setUploadedFiles([]);
@@ -354,8 +358,11 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
     onClose();
   };
 
-  const completedFiles = uploadedFiles.filter(f => f.status === 'completed');
-  const totalTransactions = completedFiles.reduce((sum, f) => sum + (f.extractedTransactions?.length || 0), 0);
+  const completedFiles = uploadedFiles.filter((f) => f.status === 'completed');
+  const totalTransactions = completedFiles.reduce(
+    (sum, f) => sum + (f.extractedTransactions?.length || 0),
+    0
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -372,14 +379,12 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
           <div
             {...getRootProps()}
             className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-              isDragActive
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-300 hover:border-gray-400'
+              isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
             }`}
           >
             <input {...getInputProps()} />
             <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            
+
             {isDragActive ? (
               <p className="text-blue-600">Solte os arquivos aqui...</p>
             ) : (
@@ -388,7 +393,8 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
                   Arraste uma ou múltiplas imagens aqui ou clique para selecionar
                 </p>
                 <p className="text-sm text-gray-500">
-                  Suporta imagens (PNG, JPG) até 10MB cada. Múltiplas imagens serão processadas como uma única fatura.
+                  Suporta imagens (PNG, JPG) até 10MB cada. Múltiplas imagens serão processadas como
+                  uma única fatura.
                 </p>
               </div>
             )}
@@ -410,16 +416,14 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
               <Clipboard className="h-4 w-4 mr-2" />
               {isPasting ? 'Processando...' : 'Colar Imagem da Área de Transferência'}
             </Button>
-            <p className="text-xs text-gray-500 mt-2">
-              Cole uma imagem copiada (Ctrl+V)
-            </p>
+            <p className="text-xs text-gray-500 mt-2">Cole uma imagem copiada (Ctrl+V)</p>
           </div>
 
           {/* Uploaded Files */}
           {uploadedFiles.length > 0 && (
             <div className="space-y-4">
               <h3 className="font-medium text-gray-900">Arquivos Enviados</h3>
-              
+
               {uploadedFiles.map((uploadedFile) => (
                 <div key={uploadedFile.file.name} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -434,7 +438,7 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                       {getStatusIcon(uploadedFile.status)}
                       <span className="text-sm text-gray-600">
@@ -459,10 +463,9 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
                     <Alert className="mt-3">
                       <CheckCircle className="h-4 w-4" />
                       <AlertDescription>
-                        {uploadedFiles.filter(f => f.status === 'completed').length > 1 
+                        {uploadedFiles.filter((f) => f.status === 'completed').length > 1
                           ? `Parte de ${totalTransactions} transações encontradas em ${completedFiles.length} imagens`
-                          : `${uploadedFile.extractedTransactions.length} transações encontradas`
-                        }
+                          : `${uploadedFile.extractedTransactions.length} transações encontradas`}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -470,9 +473,7 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
                   {uploadedFile.status === 'error' && uploadedFile.errorMessage && (
                     <Alert variant="destructive" className="mt-3">
                       <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>
-                        {uploadedFile.errorMessage}
-                      </AlertDescription>
+                      <AlertDescription>{uploadedFile.errorMessage}</AlertDescription>
                     </Alert>
                   )}
                 </div>
@@ -485,7 +486,8 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
             <Alert>
               <CheckCircle className="h-4 w-4" />
               <AlertDescription>
-                <strong>Resumo:</strong> {completedFiles.length} arquivo(s) processado(s) com {totalTransactions} transação(ões) encontrada(s)
+                <strong>Resumo:</strong> {completedFiles.length} arquivo(s) processado(s) com{' '}
+                {totalTransactions} transação(ões) encontrada(s)
               </AlertDescription>
             </Alert>
           )}
@@ -495,23 +497,27 @@ export default function InvoiceUploadModal({ isOpen, onClose, creditCard }: Invo
             <Button variant="outline" onClick={handleClose}>
               Cancelar
             </Button>
-            
+
             {completedFiles.length > 0 && (
-              <Button onClick={() => {
-                const allTransactions = completedFiles.flatMap(f => f.extractedTransactions || []);
-                setReviewData({
-                  transactions: allTransactions,
-                  importId: completedFiles[0]?.importId,
-                });
-                setShowReviewModal(true);
-              }}>
+              <Button
+                onClick={() => {
+                  const allTransactions = completedFiles.flatMap(
+                    (f) => f.extractedTransactions || []
+                  );
+                  setReviewData({
+                    transactions: allTransactions,
+                    importId: completedFiles[0]?.importId,
+                  });
+                  setShowReviewModal(true);
+                }}
+              >
                 Revisar Transações ({totalTransactions})
               </Button>
             )}
           </div>
         </div>
       </DialogContent>
-      
+
       {/* Transaction Review Modal */}
       <TransactionReviewModal
         isOpen={showReviewModal}

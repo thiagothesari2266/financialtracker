@@ -1,15 +1,10 @@
-import React, { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
-import { format, parse } from "date-fns";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
+import { format, parse } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -17,41 +12,48 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { CurrencyInput } from "@/components/ui/currency-input";
-import { Button } from "@/components/ui/button";
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { useAccount } from "@/contexts/AccountContext";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { useCategories } from "@/hooks/useCategories";
-import { useDeleteTransaction, useUpdateTransaction, useCreateTransaction } from "@/hooks/useTransactions";
-import { useBankAccounts } from "@/hooks/useBankAccounts";
-import { useCreditCards, useDeleteCreditCardTransaction, useUpdateCreditCardTransaction } from "@/hooks/useCreditCards";
-import type { Category } from "@shared/schema";
-import { Checkbox } from "@/components/ui/checkbox";
-import { DatePicker } from "@/components/ui/date-picker";
+} from '@/components/ui/select';
+import { useAccount } from '@/contexts/AccountContext';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import { useCategories } from '@/hooks/useCategories';
+import {
+  useDeleteTransaction,
+  useUpdateTransaction,
+  useCreateTransaction,
+} from '@/hooks/useTransactions';
+import { useBankAccounts } from '@/hooks/useBankAccounts';
+import {
+  useCreditCards,
+  useDeleteCreditCardTransaction,
+  useUpdateCreditCardTransaction,
+} from '@/hooks/useCreditCards';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DatePicker } from '@/components/ui/date-picker';
 
 // Adiciona ao schema
 const transactionSchema = z.object({
-  description: z.string().min(1, "Descrição é obrigatória"),
-  amount: z.string().min(1, "Valor é obrigatório"),
-  type: z.enum(["income", "expense"]),
-  date: z.string().min(1, "Data é obrigatória"),
-  categoryId: z.string().min(1, "Categoria é obrigatória"),
+  description: z.string().min(1, 'Descrição é obrigatória'),
+  amount: z.string().min(1, 'Valor é obrigatório'),
+  type: z.enum(['income', 'expense']),
+  date: z.string().min(1, 'Data é obrigatória'),
+  categoryId: z.string().min(1, 'Categoria é obrigatória'),
   bankAccountId: z.string().optional(),
   creditCardId: z.string().optional(), // <-- novo campo
   clientName: z.string().optional(),
   projectName: z.string().optional(),
   costCenter: z.string().optional(),
-  launchType: z.enum(["unica", "recorrente", "parcelada"]).default("unica"),
+  launchType: z.enum(['unica', 'recorrente', 'parcelada']).default('unica'),
   installments: z.string().optional(), // para parcelada
   recurrenceFrequency: z.string().optional(), // para recorrente
   recurrenceEndDate: z.string().optional(), // para recorrente
@@ -64,7 +66,12 @@ interface TransactionModalProps {
   editScope?: 'single' | 'all' | 'future' | null;
 }
 
-export default function TransactionModal({ isOpen, onClose, transaction, editScope }: TransactionModalProps) {
+export default function TransactionModal({
+  isOpen,
+  onClose,
+  transaction,
+  editScope: _editScope,
+}: TransactionModalProps) {
   const { currentAccount } = useAccount();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -77,102 +84,129 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
   const form = useForm<z.infer<typeof transactionSchema>>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
-      description: "",
-      amount: "",
-      type: "expense",
+      description: '',
+      amount: '',
+      type: 'expense',
       date: new Date().toISOString().split('T')[0],
-      categoryId: "",
-      bankAccountId: "",
-      clientName: "",
-      projectName: "",
-      costCenter: "",
-      launchType: "unica",
-      installments: "",
-      recurrenceFrequency: "",
-      recurrenceEndDate: "",
+      categoryId: '',
+      bankAccountId: '',
+      clientName: '',
+      projectName: '',
+      costCenter: '',
+      launchType: 'unica',
+      installments: '',
+      recurrenceFrequency: '',
+      recurrenceEndDate: '',
     },
-    values: transaction ? {
-      description: transaction.description || "",
-      amount: transaction.amount || "",
-      type: transaction.type || "expense",
-      date: transaction.date && transaction.date !== "" ? transaction.date.split('T')[0] : new Date().toISOString().split('T')[0],
-      categoryId: transaction.categoryId ? String(transaction.categoryId) : "",
-      bankAccountId: transaction.bankAccountId ? String(transaction.bankAccountId) : "",
-      clientName: transaction.clientName || "",
-      projectName: transaction.projectName || "",
-      costCenter: transaction.costCenter || "",
-      launchType:
-        transaction.launchType === "recorrente" || transaction.launchType === "parcelada" || transaction.launchType === "unica"
-          ? transaction.launchType
-          : transaction.installments && transaction.installments > 1
-            ? "parcelada"
-            : "unica",
-      installments: transaction.installments ? String(transaction.installments) : "",
-      recurrenceFrequency: transaction.recurrenceFrequency || "",
-      recurrenceEndDate: transaction.recurrenceEndDate ? transaction.recurrenceEndDate.split('T')[0] : "",
-    } : undefined,
+    values: transaction
+      ? {
+          description: transaction.description || '',
+          amount: transaction.amount || '',
+          type: transaction.type || 'expense',
+          date:
+            transaction.date && transaction.date !== ''
+              ? transaction.date.split('T')[0]
+              : new Date().toISOString().split('T')[0],
+          categoryId: transaction.categoryId ? String(transaction.categoryId) : '',
+          bankAccountId: transaction.bankAccountId ? String(transaction.bankAccountId) : '',
+          clientName: transaction.clientName || '',
+          projectName: transaction.projectName || '',
+          costCenter: transaction.costCenter || '',
+          launchType:
+            transaction.launchType === 'recorrente' ||
+            transaction.launchType === 'parcelada' ||
+            transaction.launchType === 'unica'
+              ? transaction.launchType
+              : transaction.installments && transaction.installments > 1
+                ? 'parcelada'
+                : 'unica',
+          installments: transaction.installments ? String(transaction.installments) : '',
+          recurrenceFrequency: transaction.recurrenceFrequency || '',
+          recurrenceEndDate: transaction.recurrenceEndDate
+            ? transaction.recurrenceEndDate.split('T')[0]
+            : '',
+        }
+      : undefined,
   });
 
   // Atualiza valores do formulário ao abrir para edição
   React.useEffect(() => {
     if (transaction) {
       const transactionLaunchType =
-        transaction.launchType === "recorrente" || transaction.launchType === "parcelada" || transaction.launchType === "unica"
+        transaction.launchType === 'recorrente' ||
+        transaction.launchType === 'parcelada' ||
+        transaction.launchType === 'unica'
           ? transaction.launchType
           : transaction.installments && transaction.installments > 1
-            ? "parcelada"
-            : "unica";
+            ? 'parcelada'
+            : 'unica';
       setLaunchType(transactionLaunchType);
       form.reset({
-        description: transaction.description || "",
-        amount: transaction.amount || "",
-        type: transaction.type || "expense",
-        date: transaction.date && transaction.date !== "" ? transaction.date.split('T')[0] : new Date().toISOString().split('T')[0],
-        categoryId: transaction.categoryId ? String(transaction.categoryId) : "",
-        bankAccountId: transaction.bankAccountId ? String(transaction.bankAccountId) : "",
-        clientName: transaction.clientName || "",
-        projectName: transaction.projectName || "",
-        costCenter: transaction.costCenter || "",
+        description: transaction.description || '',
+        amount: transaction.amount || '',
+        type: transaction.type || 'expense',
+        date:
+          transaction.date && transaction.date !== ''
+            ? transaction.date.split('T')[0]
+            : new Date().toISOString().split('T')[0],
+        categoryId: transaction.categoryId ? String(transaction.categoryId) : '',
+        bankAccountId: transaction.bankAccountId ? String(transaction.bankAccountId) : '',
+        clientName: transaction.clientName || '',
+        projectName: transaction.projectName || '',
+        costCenter: transaction.costCenter || '',
         launchType: transactionLaunchType,
-        installments: transaction.installments ? String(transaction.installments) : "",
-        recurrenceFrequency: transaction.recurrenceFrequency || "",
-        recurrenceEndDate: transaction.recurrenceEndDate ? transaction.recurrenceEndDate.split('T')[0] : "",
+        installments: transaction.installments ? String(transaction.installments) : '',
+        recurrenceFrequency: transaction.recurrenceFrequency || '',
+        recurrenceEndDate: transaction.recurrenceEndDate
+          ? transaction.recurrenceEndDate.split('T')[0]
+          : '',
       });
     } else {
       // Define a primeira conta bancária como padrão ao criar nova transação
-      const defaultBankAccountId = bankAccounts.length > 0 ? String(bankAccounts[0].id) : "";
-      setLaunchType("unica");
+      const defaultBankAccountId = bankAccounts.length > 0 ? String(bankAccounts[0].id) : '';
+      setLaunchType('unica');
       form.reset({
-        description: "",
-        amount: "",
-        type: "expense",
+        description: '',
+        amount: '',
+        type: 'expense',
         date: new Date().toISOString().split('T')[0],
-        categoryId: "",
+        categoryId: '',
         bankAccountId: defaultBankAccountId,
-        clientName: "",
-        projectName: "",
-        costCenter: "",
-        launchType: "unica",
-        installments: "",
-        recurrenceFrequency: "",
-        recurrenceEndDate: "",
+        clientName: '',
+        projectName: '',
+        costCenter: '',
+        launchType: 'unica',
+        installments: '',
+        recurrenceFrequency: '',
+        recurrenceEndDate: '',
       });
     }
-  }, [transaction, form, bankAccounts, isOpen]);  // Determina se é uma transação de cartão de crédito
+  }, [transaction, form, bankAccounts, isOpen]); // Determina se é uma transação de cartão de crédito
   // Verifica se a transação tem creditCardId definido (não null, undefined ou 0)
-  const isCreditCardTransaction = transaction && 
-    (transaction.creditCardId !== null && 
-     transaction.creditCardId !== undefined && 
-     transaction.creditCardId !== 0);
-  
+  const isCreditCardTransaction =
+    transaction &&
+    transaction.creditCardId !== null &&
+    transaction.creditCardId !== undefined &&
+    transaction.creditCardId !== 0;
+
   const deleteTransactionMutation = useDeleteTransaction(currentAccount?.id || 0);
   const deleteCreditCardTransactionMutation = useDeleteCreditCardTransaction();
   const updateTransactionMutation = useUpdateTransaction(currentAccount?.id || 0);
-  const updateCreditCardTransactionMutation = useUpdateCreditCardTransaction();
+  const _updateCreditCardTransactionMutation = useUpdateCreditCardTransaction();
   const createTransactionMutation = useCreateTransaction(currentAccount?.id || 0);
 
   // Modal para escolher escopo de edição de parcelas
-  function EditInstallmentScopeModal({ open, onSelect, onCancel, canEditAll }: { open: boolean; onSelect: (scope: 'single' | 'all' | 'future') => void; onCancel: () => void; canEditAll: boolean }) {
+  function EditInstallmentScopeModal({
+    open,
+    onSelect,
+    onCancel,
+    canEditAll,
+  }: {
+    open: boolean;
+    onSelect: (scope: 'single' | 'all' | 'future') => void;
+    onCancel: () => void;
+    canEditAll: boolean;
+  }) {
     return (
       <Dialog open={open} onOpenChange={onCancel}>
         <DialogContent className="max-w-xs">
@@ -180,11 +214,26 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
             <DialogTitle>Aplicar edição</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <p>Esta transação faz parte de um lançamento parcelado ou recorrente. Onde aplicar a mudança?</p>
-            <Button className="w-full" variant="outline" onClick={() => onSelect('single')}>Apenas esta</Button>
-            {canEditAll && <Button className="w-full" variant="outline" onClick={() => onSelect('all')}>Todas</Button>}
-            {canEditAll && <Button className="w-full" variant="outline" onClick={() => onSelect('future')}>Esta e as próximas</Button>}
-            <Button className="w-full" variant="ghost" onClick={onCancel}>Cancelar</Button>
+            <p>
+              Esta transação faz parte de um lançamento parcelado ou recorrente. Onde aplicar a
+              mudança?
+            </p>
+            <Button className="w-full" variant="outline" onClick={() => onSelect('single')}>
+              Apenas esta
+            </Button>
+            {canEditAll && (
+              <Button className="w-full" variant="outline" onClick={() => onSelect('all')}>
+                Todas
+              </Button>
+            )}
+            {canEditAll && (
+              <Button className="w-full" variant="outline" onClick={() => onSelect('future')}>
+                Esta e as próximas
+              </Button>
+            )}
+            <Button className="w-full" variant="ghost" onClick={onCancel}>
+              Cancelar
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -192,7 +241,17 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
   }
 
   // Modal para escolher escopo de exclusão
-  function DeleteInstallmentScopeModal({ open, onSelect, onCancel, canEditAll }: { open: boolean; onSelect: (scope: 'single' | 'all' | 'future') => void; onCancel: () => void; canEditAll: boolean }) {
+  function DeleteInstallmentScopeModal({
+    open,
+    onSelect,
+    onCancel,
+    canEditAll,
+  }: {
+    open: boolean;
+    onSelect: (scope: 'single' | 'all' | 'future') => void;
+    onCancel: () => void;
+    canEditAll: boolean;
+  }) {
     return (
       <Dialog open={open} onOpenChange={onCancel}>
         <DialogContent className="max-w-xs">
@@ -201,10 +260,22 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
           </DialogHeader>
           <div className="space-y-2">
             <p>Esta transação faz parte de um lançamento em série. O que deseja excluir?</p>
-            <Button className="w-full" variant="outline" onClick={() => onSelect('single')}>Apenas esta</Button>
-            {canEditAll && <Button className="w-full" variant="outline" onClick={() => onSelect('all')}>Todas</Button>}
-            {canEditAll && <Button className="w-full" variant="outline" onClick={() => onSelect('future')}>Esta e as próximas</Button>}
-            <Button className="w-full" variant="ghost" onClick={onCancel}>Cancelar</Button>
+            <Button className="w-full" variant="outline" onClick={() => onSelect('single')}>
+              Apenas esta
+            </Button>
+            {canEditAll && (
+              <Button className="w-full" variant="outline" onClick={() => onSelect('all')}>
+                Todas
+              </Button>
+            )}
+            {canEditAll && (
+              <Button className="w-full" variant="outline" onClick={() => onSelect('future')}>
+                Esta e as próximas
+              </Button>
+            )}
+            <Button className="w-full" variant="ghost" onClick={onCancel}>
+              Cancelar
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -214,15 +285,15 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
   // Novo onSubmit
   const onSubmit = async (data: z.infer<typeof transactionSchema>) => {
     // Corrige o campo launchType conforme seleção do usuário
-    let launchTypeValue = launchType;
-      if (launchTypeValue === "recorrente") {
-        data.launchType = "recorrente";
-        // Força envio do campo mesmo quando removido para limpar no backend
-        if (!data.recurrenceEndDate) {
-          data.recurrenceEndDate = "";
-        }
-    } else if (launchTypeValue === "parcelada") {
-      data.launchType = "parcelada";
+    const launchTypeValue = launchType;
+    if (launchTypeValue === 'recorrente') {
+      data.launchType = 'recorrente';
+      // Força envio do campo mesmo quando removido para limpar no backend
+      if (!data.recurrenceEndDate) {
+        data.recurrenceEndDate = '';
+      }
+    } else if (launchTypeValue === 'parcelada') {
+      data.launchType = 'parcelada';
       // Validação extra para parcelada
       const installmentsNum = Number(data.installments);
       if (!data.installments || isNaN(installmentsNum) || installmentsNum < 2) {
@@ -235,12 +306,17 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
       }
       // installments será convertido para número na mutation
     } else {
-      data.launchType = "unica";
-    }    if (destinationType === 'credit') {
+      data.launchType = 'unica';
+    }
+    if (destinationType === 'credit') {
       // Encontra o cartão de crédito selecionado para validação
-      const selectedCard = creditCards.find(card => card.id === Number(data.creditCardId));
+      const selectedCard = creditCards.find((card) => card.id === Number(data.creditCardId));
       if (!selectedCard) {
-        toast({ title: 'Erro', description: 'Cartão de crédito não encontrado', variant: 'destructive' });
+        toast({
+          title: 'Erro',
+          description: 'Cartão de crédito não encontrado',
+          variant: 'destructive',
+        });
         return;
       }
 
@@ -257,42 +333,61 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
         bankAccountId: undefined,
       };
       // Remove campos undefined
-      Object.keys(payload).forEach(key => {
+      Object.keys(payload).forEach((key) => {
         if ((payload as any)[key] === undefined) {
           delete (payload as any)[key];
         }
       });
-      
+
       console.log('[TransactionModal] Criando transação de cartão:', {
         transactionDate: data.date,
         closingDay: selectedCard.closingDay,
         invoiceMonth: calculateInvoiceMonth(data.date, selectedCard.closingDay),
-        payload
+        payload,
       });
-      
+
       try {
-        const response = await apiRequest('POST', `/api/accounts/${currentAccount?.id}/credit-card-transactions`, payload);
+        const response = await apiRequest(
+          'POST',
+          `/api/accounts/${currentAccount?.id}/credit-card-transactions`,
+          payload
+        );
         if (!response.ok) {
           const errorData = await response.text();
           console.error('[TransactionModal] Erro na resposta da API:', errorData);
-          toast({ title: 'Erro', description: 'Erro ao criar transação no cartão', variant: 'destructive' });
+          toast({
+            title: 'Erro',
+            description: 'Erro ao criar transação no cartão',
+            variant: 'destructive',
+          });
           return;
         }
-        
+
         // Invalida queries relacionadas a cartões de crédito
-        queryClient.invalidateQueries({ queryKey: ['/api/accounts', currentAccount?.id, 'credit-card-invoices'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/accounts', currentAccount?.id, 'credit-card-transactions'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/accounts', currentAccount?.id, 'transactions'], exact: false });
-          toast({ 
-          title: 'Sucesso', 
-          description: `Transação lançada na fatura de ${formatInvoiceMonth(data.date, selectedCard.closingDay)}!` 
+        queryClient.invalidateQueries({
+          queryKey: ['/api/accounts', currentAccount?.id, 'credit-card-invoices'],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ['/api/accounts', currentAccount?.id, 'credit-card-transactions'],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ['/api/accounts', currentAccount?.id, 'transactions'],
+          exact: false,
+        });
+        toast({
+          title: 'Sucesso',
+          description: `Transação lançada na fatura de ${formatInvoiceMonth(data.date, selectedCard.closingDay)}!`,
         });
         form.reset();
         onClose();
         return;
       } catch (error) {
         console.error('[TransactionModal] Erro ao criar transação de cartão:', error);
-        toast({ title: 'Erro', description: 'Erro ao criar transação no cartão', variant: 'destructive' });
+        toast({
+          title: 'Erro',
+          description: 'Erro ao criar transação no cartão',
+          variant: 'destructive',
+        });
         return;
       }
     }
@@ -329,7 +424,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
             onSuccess: () => {
               toast({
                 title: 'Sucesso',
-                description: 'Transação editada com sucesso'
+                description: 'Transação editada com sucesso',
               });
               form.reset();
               onClose();
@@ -350,7 +445,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
         onSuccess: () => {
           toast({
             title: 'Sucesso',
-            description: 'Transação criada com sucesso'
+            description: 'Transação criada com sucesso',
           });
           form.reset();
           onClose();
@@ -371,19 +466,19 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
     const changed: any = {};
     for (const key of Object.keys(updated)) {
       // Ignora campos de controle
-      if (["editScope", "installmentsGroupId"].includes(key)) continue;
+      if (['editScope', 'installmentsGroupId'].includes(key)) continue;
       // Compara valores (convertendo ambos para string para evitar problemas de tipo)
-      if (String(updated[key] ?? "") !== String(original[key] ?? "")) {
+      if (String(updated[key] ?? '') !== String(original[key] ?? '')) {
         // Nunca envia categoryId se não for número válido
-        if (key === "categoryId") {
+        if (key === 'categoryId') {
           const val = updated[key];
           const numVal = Number(val);
           if (
             val === null ||
             val === undefined ||
-            val === "" ||
-            val === "null" ||
-            (typeof val === "string" && val.trim() === "") ||
+            val === '' ||
+            val === 'null' ||
+            (typeof val === 'string' && val.trim() === '') ||
             Number.isNaN(numVal) ||
             !Number.isFinite(numVal)
           ) {
@@ -393,9 +488,9 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
           continue;
         }
         // Só inclui se não for null/undefined
-        if (updated[key] !== null && updated[key] !== undefined && updated[key] !== "") {
+        if (updated[key] !== null && updated[key] !== undefined && updated[key] !== '') {
           // Converte campos numéricos para número
-          if (["bankAccountId", "installments"].includes(key)) {
+          if (['bankAccountId', 'installments'].includes(key)) {
             changed[key] = Number(updated[key]);
           } else {
             changed[key] = updated[key];
@@ -415,7 +510,9 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
         payload[key] === undefined ||
         (payload[key] === '' && key !== 'recurrenceEndDate') ||
         payload[key] === 'null' ||
-        (typeof payload[key] === 'string' && payload[key].trim() === '' && key !== 'recurrenceEndDate')
+        (typeof payload[key] === 'string' &&
+          payload[key].trim() === '' &&
+          key !== 'recurrenceEndDate')
       ) {
         // Nunca inclua o campo 'date' se for vazio/nulo
         if (key === 'date') continue;
@@ -429,7 +526,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
         continue;
       }
       // categoryId, bankAccountId, installments devem ser numéricos
-      if (["categoryId", "bankAccountId", "installments"].includes(key)) {
+      if (['categoryId', 'bankAccountId', 'installments'].includes(key)) {
         const numVal = Number(payload[key]);
         if (Number.isNaN(numVal) || !Number.isFinite(numVal)) continue;
         cleaned[key] = numVal;
@@ -445,11 +542,18 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
     if (!pendingScopeData) return;
     // Limpa o campo date se for vazio/nulo antes de enviar
     const cleanedScopeData = { ...pendingScopeData };
-    if (!cleanedScopeData.date || cleanedScopeData.date === '' || cleanedScopeData.date === 'null') {
+    if (
+      !cleanedScopeData.date ||
+      cleanedScopeData.date === '' ||
+      cleanedScopeData.date === 'null'
+    ) {
       delete cleanedScopeData.date;
     }
     const isParcelado = !!transaction.installmentsGroupId;
-    const isRecorrente = !!transaction.recurrenceGroupId || transaction.launchType === 'recorrente' || !!transaction.recurrenceFrequency;
+    const isRecorrente =
+      !!transaction.recurrenceGroupId ||
+      transaction.launchType === 'recorrente' ||
+      !!transaction.recurrenceFrequency;
 
     if (scope === 'single') {
       const singlePayload = cleanPatchPayload({
@@ -465,7 +569,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
           onSuccess: () => {
             toast({
               title: 'Sucesso',
-              description: 'Transação editada com sucesso'
+              description: 'Transação editada com sucesso',
             });
             form.reset();
             onClose();
@@ -492,15 +596,15 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
           changedFields.categoryId === undefined ||
           changedFields.categoryId === '' ||
           changedFields.categoryId === 'null' ||
-          (typeof changedFields.categoryId === 'string' && changedFields.categoryId.trim() === '') ||
+          (typeof changedFields.categoryId === 'string' &&
+            changedFields.categoryId.trim() === '') ||
           Number.isNaN(Number(changedFields.categoryId)) ||
-          !Number.isFinite(Number(changedFields.categoryId))
-        )
+          !Number.isFinite(Number(changedFields.categoryId)))
       ) {
         delete changedFields.categoryId;
       }
 
-      let patchPayload = cleanPatchPayload({
+      const patchPayload = cleanPatchPayload({
         ...changedFields,
         editScope: scope,
         installmentsGroupId: transaction.installmentsGroupId,
@@ -519,18 +623,22 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
           patchPayload.categoryId === 'null' ||
           (typeof patchPayload.categoryId === 'string' && patchPayload.categoryId.trim() === '') ||
           Number.isNaN(Number(patchPayload.categoryId)) ||
-          !Number.isFinite(Number(patchPayload.categoryId))
-        )
+          !Number.isFinite(Number(patchPayload.categoryId)))
       ) {
         delete patchPayload.categoryId;
       }
 
-      if ('date' in patchPayload && (!patchPayload.date || patchPayload.date === '' || patchPayload.date === 'null')) {
+      if (
+        'date' in patchPayload &&
+        (!patchPayload.date || patchPayload.date === '' || patchPayload.date === 'null')
+      ) {
         delete patchPayload.date;
       }
 
       const keysToIgnore = ['editScope', 'installmentsGroupId', 'recurrenceGroupId'];
-      const hasRelevantFields = Object.keys(patchPayload).some(key => !keysToIgnore.includes(key));
+      const hasRelevantFields = Object.keys(patchPayload).some(
+        (key) => !keysToIgnore.includes(key)
+      );
       if (!hasRelevantFields) {
         toast({
           title: 'Nada alterado',
@@ -549,7 +657,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
           onSuccess: () => {
             toast({
               title: 'Sucesso',
-              description: 'Transações editadas com sucesso'
+              description: 'Transações editadas com sucesso',
             });
             form.reset();
             onClose();
@@ -574,7 +682,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
         onSuccess: () => {
           toast({
             title: 'Sucesso',
-            description: 'Transação editada com sucesso'
+            description: 'Transação editada com sucesso',
           });
           form.reset();
           onClose();
@@ -599,10 +707,12 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
 
   // Estado para modal de escopo de exclusão
   const [showDeleteScopeModal, setShowDeleteScopeModal] = useState(false);
-  const [pendingDeleteScope, setPendingDeleteScope] = useState<'single' | 'all' | 'future' | null>(null);
+  const [_pendingDeleteScope, _setPendingDeleteScope] = useState<
+    'single' | 'all' | 'future' | null
+  >(null);
 
   // Estado para modal de confirmação de exclusão
-  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);  // Handler para mostrar confirmação de exclusão
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false); // Handler para mostrar confirmação de exclusão
   const handleDelete = () => {
     if (!transaction?.id) return;
     setShowDeleteConfirmModal(true);
@@ -622,7 +732,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
       setShowDeleteScopeModal(true);
       return;
     }
-    
+
     try {
       // Usa o hook correto baseado no tipo de transação
       if (isCreditCardTransaction) {
@@ -632,10 +742,10 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
         console.log('[TransactionModal] Usando deleteTransactionMutation');
         await deleteTransactionMutation.mutateAsync(transaction.id);
       }
-      
+
       toast({
         title: 'Transação excluída',
-        description: 'A transação foi removida com sucesso.'
+        description: 'A transação foi removida com sucesso.',
       });
       form.reset();
       onClose();
@@ -644,10 +754,11 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
       toast({
         title: 'Erro',
         description: 'Erro ao excluir a transação.',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     }
-  };  const handleDeleteScopeSelect = async (scope: 'single' | 'all' | 'future') => {
+  };
+  const handleDeleteScopeSelect = async (scope: 'single' | 'all' | 'future') => {
     setShowDeleteScopeModal(false);
     if (!transaction?.id) return;
 
@@ -673,10 +784,10 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
         }
         await deleteTransactionMutation.mutateAsync({ id: transaction.id, data });
       }
-      
+
       toast({
         title: 'Transação excluída',
-        description: 'A transação foi removida com sucesso.'
+        description: 'A transação foi removida com sucesso.',
       });
       form.reset();
       onClose();
@@ -685,7 +796,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
       toast({
         title: 'Erro',
         description: 'Erro ao excluir a transação.',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     }
   };
@@ -694,21 +805,26 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
   };
 
   const costCenters = [
-    "Vendas",
-    "Marketing",
-    "Administrativo",
-    "Tecnologia",
-    "Recursos Humanos",
-    "Financeiro",
+    'Vendas',
+    'Marketing',
+    'Administrativo',
+    'Tecnologia',
+    'Recursos Humanos',
+    'Financeiro',
   ];
 
   // Estado para tipo de lançamento
-  const [launchType, setLaunchType] = useState<string>("unica");
+  const [launchType, setLaunchType] = useState<string>('unica');
 
   // Estado para modal de escopo de edição
   const [showScopeModal, setShowScopeModal] = useState(false);
   const [pendingScopeData, setPendingScopeData] = useState<any>(null);
-  const canEditAll = !!(transaction?.installmentsGroupId || transaction?.recurrenceGroupId || transaction?.recurrenceFrequency || transaction?.launchType === 'recorrente');
+  const canEditAll = !!(
+    transaction?.installmentsGroupId ||
+    transaction?.recurrenceGroupId ||
+    transaction?.recurrenceFrequency ||
+    transaction?.launchType === 'recorrente'
+  );
 
   // Estado local para controle do checkbox de pago
   const [localPaid, setLocalPaid] = useState<boolean>(!!transaction?.paid);
@@ -719,20 +835,22 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
   }, [transaction]);
 
   // Handler para alternar status de pago
-  const handleTogglePaid = (checked: boolean | "indeterminate") => {
+  const handleTogglePaid = (checked: boolean | 'indeterminate') => {
     if (!transaction?.id) return;
     setLocalPaid(Boolean(checked)); // Atualiza visual imediatamente
     updateTransactionMutation.mutate({
       id: transaction.id,
       data: { paid: Boolean(checked) },
     });
-  };  // Estado para tipo de destino
-  const [destinationType, setDestinationType] = useState<'bank' | 'credit'>((transaction && transaction.creditCardId) ? 'credit' : 'bank');  // Função utilitária para calcular o mês da fatura baseado na data da transação e dia de fechamento
+  }; // Estado para tipo de destino
+  const [destinationType, setDestinationType] = useState<'bank' | 'credit'>(
+    transaction && transaction.creditCardId ? 'credit' : 'bank'
+  ); // Função utilitária para calcular o mês da fatura baseado na data da transação e dia de fechamento
   const calculateInvoiceMonth = (transactionDate: string, closingDay: number): string => {
     const purchaseDate = new Date(transactionDate);
     let invoiceMonth = purchaseDate.getMonth() + 1; // 1-12
     let invoiceYear = purchaseDate.getFullYear();
-    
+
     // Para cartões que fecham no final do mês (>=25), as compras vão sempre para o próximo mês
     if (closingDay >= 25) {
       if (purchaseDate.getDate() <= closingDay) {
@@ -762,7 +880,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
       }
       // Compra antes/no fechamento -> mesmo mês (não altera)
     }
-    
+
     return `${invoiceYear}-${String(invoiceMonth).padStart(2, '0')}`;
   };
 
@@ -771,8 +889,18 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
     const yearMonth = calculateInvoiceMonth(transactionDate, closingDay);
     const [year, month] = yearMonth.split('-');
     const monthNames = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
     ];
     return `${monthNames[parseInt(month) - 1]} de ${year}`;
   };
@@ -789,11 +917,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
           {/* Checkbox de pago */}
           {transaction && transaction.id && (
             <div className="flex items-center gap-2 mb-2">
-              <Checkbox
-                checked={localPaid}
-                onCheckedChange={handleTogglePaid}
-                id="paid-checkbox"
-              />
+              <Checkbox checked={localPaid} onCheckedChange={handleTogglePaid} id="paid-checkbox" />
               <label htmlFor="paid-checkbox" className="text-sm select-none cursor-pointer">
                 {localPaid ? 'Pago' : 'Marcar como pago'}
               </label>
@@ -826,7 +950,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                         <CurrencyInput
                           placeholder="0,00"
                           value={field.value ? parseFloat(field.value) : null}
-                          onValueChange={(val) => field.onChange(val == null ? "" : val.toString())}
+                          onValueChange={(val) => field.onChange(val == null ? '' : val.toString())}
                         />
                       </FormControl>
                       <FormMessage />
@@ -834,7 +958,6 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                   )}
                 />
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
@@ -866,8 +989,12 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                       <FormLabel>Data</FormLabel>
                       <FormControl>
                         <DatePicker
-                          date={field.value ? parse(field.value, "yyyy-MM-dd", new Date()) : undefined}
-                          onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                          date={
+                            field.value ? parse(field.value, 'yyyy-MM-dd', new Date()) : undefined
+                          }
+                          onSelect={(date) =>
+                            field.onChange(date ? format(date, 'yyyy-MM-dd') : '')
+                          }
                         />
                       </FormControl>
                       <FormMessage />
@@ -889,7 +1016,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                         </FormControl>
                         <SelectContent>
                           {categories
-                            .filter((category) => category.type === form.watch("type"))
+                            .filter((category) => category.type === form.watch('type'))
                             .map((category) => (
                               <SelectItem key={category.id} value={category.id.toString()}>
                                 {category.name}
@@ -902,12 +1029,14 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                   )}
                 />
               </div>
-
               {/* Seleção de destino */}
               <div className="grid grid-cols-2 gap-4">
                 <FormItem>
                   <FormLabel>Lançar em</FormLabel>
-                  <Select value={destinationType} onValueChange={v => setDestinationType(v as 'bank' | 'credit')}>
+                  <Select
+                    value={destinationType}
+                    onValueChange={(v) => setDestinationType(v as 'bank' | 'credit')}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o destino" />
@@ -936,7 +1065,10 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                           <SelectContent>
                             {bankAccounts.map((ba) => (
                               <SelectItem key={ba.id} value={ba.id.toString()}>
-                                {ba.name}{ba.shared && ba.accountId !== currentAccount?.id && " (compartilhada)"}
+                                {ba.name}
+                                {ba.shared &&
+                                  ba.accountId !== currentAccount?.id &&
+                                  ' (compartilhada)'}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -953,10 +1085,12 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                     name="creditCardId"
                     render={({ field }) => {
                       const selectedCardId = field.value;
-                      const selectedCard = selectedCardId ? creditCards.find(cc => cc.id === Number(selectedCardId)) : null;
-                      const transactionDate = form.watch("date");
+                      const selectedCard = selectedCardId
+                        ? creditCards.find((cc) => cc.id === Number(selectedCardId))
+                        : null;
+                      const transactionDate = form.watch('date');
                       // Calcula qual fatura será afetada
-                      let invoiceInfo = "";
+                      let invoiceInfo = '';
                       if (selectedCard && transactionDate) {
                         invoiceInfo = `Fatura de ${formatInvoiceMonth(transactionDate, selectedCard.closingDay || 1)}`;
                       }
@@ -988,7 +1122,6 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                   />
                 )}
               </div>
-
               {/* Tipo de lançamento */}
               <div className="grid grid-cols-1 gap-4">
                 <FormItem>
@@ -1006,8 +1139,9 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                     </SelectContent>
                   </Select>
                 </FormItem>
-              </div>              {/* Campos dinâmicos para parcelada/recorrente */}
-              {launchType === "parcelada" && (
+              </div>{' '}
+              {/* Campos dinâmicos para parcelada/recorrente */}
+              {launchType === 'parcelada' && (
                 <div className="space-y-4">
                   <FormField
                     control={form.control}
@@ -1022,26 +1156,42 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                       </FormItem>
                     )}
                   />
-                  
+
                   {/* Preview das faturas que serão afetadas */}
-                  {destinationType === 'credit' && form.watch("creditCardId") && form.watch("installments") && Number(form.watch("installments")) >= 2 && form.watch("date") && (
+                  {destinationType === 'credit' &&
+                    form.watch('creditCardId') &&
+                    form.watch('installments') &&
+                    Number(form.watch('installments')) >= 2 &&
+                    form.watch('date') &&
                     (() => {
-                      const selectedCardId = form.watch("creditCardId");
-                      const selectedCard = selectedCardId ? creditCards.find(cc => cc.id === Number(selectedCardId)) : null;
-                      const transactionDate = form.watch("date");
-                      const installments = Number(form.watch("installments"));
-                      
+                      const selectedCardId = form.watch('creditCardId');
+                      const selectedCard = selectedCardId
+                        ? creditCards.find((cc) => cc.id === Number(selectedCardId))
+                        : null;
+                      const transactionDate = form.watch('date');
+                      const installments = Number(form.watch('installments'));
+
                       if (!selectedCard || !transactionDate || installments < 2) return null;
-                      
+
                       const affectedInvoices = [];
                       for (let i = 0; i < installments; i++) {
                         const currentDate = new Date(transactionDate);
                         currentDate.setMonth(currentDate.getMonth() + i);
-                        const invoiceMonth = calculateInvoiceMonth(currentDate.toISOString().split('T')[0], selectedCard.closingDay || 1);
-                        const formattedMonth = formatInvoiceMonth(currentDate.toISOString().split('T')[0], selectedCard.closingDay || 1);
-                        affectedInvoices.push({ month: invoiceMonth, formatted: formattedMonth, installment: i + 1 });
+                        const invoiceMonth = calculateInvoiceMonth(
+                          currentDate.toISOString().split('T')[0],
+                          selectedCard.closingDay || 1
+                        );
+                        const formattedMonth = formatInvoiceMonth(
+                          currentDate.toISOString().split('T')[0],
+                          selectedCard.closingDay || 1
+                        );
+                        affectedInvoices.push({
+                          month: invoiceMonth,
+                          formatted: formattedMonth,
+                          installment: i + 1,
+                        });
                       }
-                      
+
                       return (
                         <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                           <h4 className="text-sm font-medium text-amber-800 mb-2">
@@ -1049,7 +1199,10 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                           </h4>
                           <div className="space-y-1 max-h-32 overflow-y-auto">
                             {affectedInvoices.map((invoice, index) => (
-                              <div key={index} className="text-xs text-amber-700 flex justify-between">
+                              <div
+                                key={index}
+                                className="text-xs text-amber-700 flex justify-between"
+                              >
                                 <span>Parcela {invoice.installment}:</span>
                                 <span className="font-medium">{invoice.formatted}</span>
                               </div>
@@ -1057,11 +1210,10 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                           </div>
                         </div>
                       );
-                    })()
-                  )}
+                    })()}
                 </div>
               )}
-              {launchType === "recorrente" && (
+              {launchType === 'recorrente' && (
                 <div className="grid grid-cols-1 gap-4">
                   <FormField
                     control={form.control}
@@ -1087,12 +1239,13 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                   />
                 </div>
               )}
-
               {/* Business account specific fields */}
               {currentAccount?.type === 'business' && (
                 <div className="space-y-4 border-t border-slate-200 pt-4">
-                  <div className="text-sm font-medium text-slate-700 mb-2">Informações Empresariais</div>
-                  
+                  <div className="text-sm font-medium text-slate-700 mb-2">
+                    Informações Empresariais
+                  </div>
+
                   <FormField
                     control={form.control}
                     name="clientName"
@@ -1132,26 +1285,39 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                     )}
                   />
                 </div>
-              )}              <div className="flex justify-end gap-2 pt-2">
+              )}{' '}
+              <div className="flex justify-end gap-2 pt-2">
                 {transaction && transaction.id && (
                   <Button
                     type="button"
                     variant="destructive"
                     onClick={handleDelete}
-                    disabled={deleteTransactionMutation.isPending || deleteCreditCardTransactionMutation.isPending}
+                    disabled={
+                      deleteTransactionMutation.isPending ||
+                      deleteCreditCardTransactionMutation.isPending
+                    }
                   >
-                    {(deleteTransactionMutation.isPending || deleteCreditCardTransactionMutation.isPending) ? 'Excluindo...' : 'Excluir'}
+                    {deleteTransactionMutation.isPending ||
+                    deleteCreditCardTransactionMutation.isPending
+                      ? 'Excluindo...'
+                      : 'Excluir'}
                   </Button>
                 )}
                 <Button type="submit" disabled={createTransactionMutation.isPending}>
-                  {createTransactionMutation.isPending ? (transaction ? 'Salvando...' : 'Criando...') : (transaction ? 'Salvar' : 'Criar')}
+                  {createTransactionMutation.isPending
+                    ? transaction
+                      ? 'Salvando...'
+                      : 'Criando...'
+                    : transaction
+                      ? 'Salvar'
+                      : 'Criar'}
                 </Button>
               </div>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
-      
+
       {/* Modal de confirmação de exclusão */}
       <Dialog open={showDeleteConfirmModal} onOpenChange={setShowDeleteConfirmModal}>
         <DialogContent className="max-w-sm">
@@ -1163,26 +1329,39 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
               Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita.
             </p>
             <div className="flex justify-end gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowDeleteConfirmModal(false)}
-              >
+              <Button variant="outline" onClick={() => setShowDeleteConfirmModal(false)}>
                 Cancelar
               </Button>
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={handleConfirmDelete}
-                disabled={deleteTransactionMutation.isPending || deleteCreditCardTransactionMutation.isPending}
+                disabled={
+                  deleteTransactionMutation.isPending ||
+                  deleteCreditCardTransactionMutation.isPending
+                }
               >
-                {(deleteTransactionMutation.isPending || deleteCreditCardTransactionMutation.isPending) ? 'Excluindo...' : 'Excluir'}
+                {deleteTransactionMutation.isPending ||
+                deleteCreditCardTransactionMutation.isPending
+                  ? 'Excluindo...'
+                  : 'Excluir'}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      <EditInstallmentScopeModal open={showScopeModal} onSelect={handleScopeSelect} onCancel={handleScopeCancel} canEditAll={canEditAll} />
-      <DeleteInstallmentScopeModal open={showDeleteScopeModal} onSelect={handleDeleteScopeSelect} onCancel={handleDeleteScopeCancel} canEditAll={!!(transaction?.installmentsGroupId || transaction?.recurrenceGroupId)} />
+      <EditInstallmentScopeModal
+        open={showScopeModal}
+        onSelect={handleScopeSelect}
+        onCancel={handleScopeCancel}
+        canEditAll={canEditAll}
+      />
+      <DeleteInstallmentScopeModal
+        open={showDeleteScopeModal}
+        onSelect={handleDeleteScopeSelect}
+        onCancel={handleDeleteScopeCancel}
+        canEditAll={!!(transaction?.installmentsGroupId || transaction?.recurrenceGroupId)}
+      />
     </>
   );
 }

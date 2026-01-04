@@ -1,18 +1,18 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import { useState } from 'react';
+import { useLocation } from 'wouter';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
-type Mode = "login" | "register";
+type Mode = 'login' | 'register';
 
 export default function LoginPage() {
-  const [mode, setMode] = useState<Mode>("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<Mode>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -24,17 +24,17 @@ export default function LoginPage() {
 
     try {
       const payload = { email: email.trim(), password };
-      if (mode === "login") {
+      if (mode === 'login') {
         await login(payload);
-        toast({ title: "Bem-vindo de volta" });
+        toast({ title: 'Bem-vindo de volta' });
       } else {
         await register(payload);
-        toast({ title: "Conta criada", description: "Você foi autenticado automaticamente." });
+        toast({ title: 'Conta criada', description: 'Você foi autenticado automaticamente.' });
       }
-      setLocation("/dashboard");
+      setLocation('/dashboard');
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Falha ao autenticar";
-      toast({ title: message, variant: "destructive" });
+      const message = error instanceof Error ? error.message : 'Falha ao autenticar';
+      toast({ title: message, variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
@@ -45,12 +45,12 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader>
           <CardTitle className="text-2xl text-slate-900">
-            {mode === "login" ? "Acessar painel" : "Criar conta"}
+            {mode === 'login' ? 'Acessar painel' : 'Criar conta'}
           </CardTitle>
           <CardDescription className="text-slate-600">
-            {mode === "login"
-              ? "Entre para visualizar e gerenciar seus dados financeiros."
-              : "Cadastre-se para começar a usar o Nexfin."}
+            {mode === 'login'
+              ? 'Entre para visualizar e gerenciar seus dados financeiros.'
+              : 'Cadastre-se para começar a usar o Nexfin.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -72,44 +72,40 @@ export default function LoginPage() {
               <Input
                 id="password"
                 type="password"
-                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 required
-                minLength={mode === "login" ? 1 : 8}
+                minLength={mode === 'login' ? 1 : 8}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
             </div>
 
             <Button className="w-full" type="submit" disabled={isSubmitting}>
-              {isSubmitting
-                ? "Processando..."
-                : mode === "login"
-                ? "Entrar"
-                : "Registrar"}
+              {isSubmitting ? 'Processando...' : mode === 'login' ? 'Entrar' : 'Registrar'}
             </Button>
           </form>
 
           <div className="mt-6 text-center text-sm text-slate-600">
-            {mode === "login" ? (
+            {mode === 'login' ? (
               <span>
-                Ainda não tem conta?{" "}
+                Ainda não tem conta?{' '}
                 <Button
                   type="button"
                   variant="link"
                   className="h-auto p-0 font-medium text-primary"
-                  onClick={() => setMode("register")}
+                  onClick={() => setMode('register')}
                 >
                   Criar agora
                 </Button>
               </span>
             ) : (
               <span>
-                Já possui cadastro?{" "}
+                Já possui cadastro?{' '}
                 <Button
                   type="button"
                   variant="link"
                   className="h-auto p-0 font-medium text-primary"
-                  onClick={() => setMode("login")}
+                  onClick={() => setMode('login')}
                 >
                   Fazer login
                 </Button>

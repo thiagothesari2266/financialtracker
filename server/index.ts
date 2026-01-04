@@ -1,23 +1,23 @@
-import "dotenv/config";
-import express, { type Request, Response, NextFunction } from "express";
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
-import { registerRoutes } from "./routes";
-import { registerAuthRoutes } from "./routes/auth.routes";
-import { setupVite, serveStatic, log } from "./vite";
+import 'dotenv/config';
+import express, { type Request, Response, NextFunction } from 'express';
+import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
+import { registerRoutes } from './routes';
+import { registerAuthRoutes } from './routes/auth.routes';
+import { setupVite, serveStatic, log } from './vite';
 
-const shouldLogRequests = process.env.LOG_REQUESTS === "true";
+const shouldLogRequests = process.env.LOG_REQUESTS === 'true';
 
 const app = express();
 // Necessário para cookies "secure" funcionarem atrás do Nginx/Cloudflare
 // (usa X-Forwarded-Proto para detectar HTTPS)
-app.set("trust proxy", 1);
+app.set('trust proxy', 1);
 const PgSession = connectPgSimple(session);
 // Increase request size limits for image uploads
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
-const sessionSecret = process.env.SESSION_SECRET ?? "change-me";
+const sessionSecret = process.env.SESSION_SECRET ?? 'change-me';
 
 app.use(
   session({
@@ -30,10 +30,10 @@ app.use(
     saveUninitialized: false,
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 dias
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
     },
-  }),
+  })
 );
 
 if (shouldLogRequests) {
@@ -54,16 +54,16 @@ if (shouldLogRequests) {
       return originalResJson.apply(res, [bodyJson, ...args]);
     };
 
-    res.on("finish", () => {
+    res.on('finish', () => {
       const duration = Date.now() - start;
-      if (path.startsWith("/api")) {
+      if (path.startsWith('/api')) {
         let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
         if (capturedJsonResponse) {
           logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
         }
 
         if (logLine.length > 80) {
-          logLine = logLine.slice(0, 79) + "…";
+          logLine = logLine.slice(0, 79) + '…';
         }
 
         log(logLine);
@@ -77,11 +77,11 @@ if (shouldLogRequests) {
 registerAuthRoutes(app);
 
 app.use((req, res, next) => {
-  if (!req.path.startsWith("/api")) {
+  if (!req.path.startsWith('/api')) {
     return next();
   }
 
-  if (req.path.startsWith("/api/auth")) {
+  if (req.path.startsWith('/api/auth')) {
     return next();
   }
 
@@ -89,7 +89,7 @@ app.use((req, res, next) => {
     return next();
   }
 
-  return res.status(401).json({ message: "Não autenticado" });
+  return res.status(401).json({ message: 'Não autenticado' });
 });
 
 (async () => {
@@ -97,10 +97,10 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    const message = err.message || 'Internal Server Error';
 
-    if (process.env.NODE_ENV === "production") {
-      console.error("[error]", err);
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[error]', err);
       return res.status(status).json({ message });
     }
 
@@ -111,7 +111,7 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  if (app.get('env') === 'development') {
     await setupVite(app, server);
   } else {
     serveStatic(app);
@@ -121,11 +121,14 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+  server.listen(
+    {
+      port,
+      host: '0.0.0.0',
+      reusePort: true,
+    },
+    () => {
+      log(`serving on port ${port}`);
+    }
+  );
 })();

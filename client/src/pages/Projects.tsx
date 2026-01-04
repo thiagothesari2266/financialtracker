@@ -1,21 +1,30 @@
-import { useState } from "react";
-import { useAccount } from "@/contexts/AccountContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Plus, Folder, Calendar, DollarSign, User, MoreHorizontal, Edit, Trash2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { useProjects, useDeleteProject } from "@/hooks/useProjects";
-import { useToast } from "@/hooks/use-toast";
-import ProjectModal from "@/components/Modals/ProjectModal";
+import { useState } from 'react';
+import { useAccount } from '@/contexts/AccountContext';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Plus,
+  Folder,
+  Calendar,
+  DollarSign,
+  User,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { useProjects, useDeleteProject } from '@/hooks/useProjects';
+import { useToast } from '@/hooks/use-toast';
+import ProjectModal from '@/components/Modals/ProjectModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import type { ProjectWithClient } from "@shared/schema";
-import { AppShell } from "@/components/Layout/AppShell";
-import { EmptyState } from "@/components/ui/empty-state";
+} from '@/components/ui/dropdown-menu';
+import type { ProjectWithClient } from '@shared/schema';
+import { AppShell } from '@/components/Layout/AppShell';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export default function Projects() {
   const { currentAccount } = useAccount();
@@ -37,7 +46,7 @@ export default function Projects() {
     );
   }
 
-  if (currentAccount.type !== "business") {
+  if (currentAccount.type !== 'business') {
     return (
       <AppShell title="Projetos" description="Gerencie seus projetos e acompanhe o progresso">
         <EmptyState
@@ -51,11 +60,11 @@ export default function Projects() {
 
   const getStatusBadge = (status: string) => {
     const statusMap = {
-      planning: { label: "Planejamento", variant: "secondary" as const },
-      active: { label: "Ativo", variant: "default" as const },
-      "on-hold": { label: "Em Espera", variant: "outline" as const },
-      completed: { label: "Concluído", variant: "secondary" as const },
-      cancelled: { label: "Cancelado", variant: "destructive" as const },
+      planning: { label: 'Planejamento', variant: 'secondary' as const },
+      active: { label: 'Ativo', variant: 'default' as const },
+      'on-hold': { label: 'Em Espera', variant: 'outline' as const },
+      completed: { label: 'Concluído', variant: 'secondary' as const },
+      cancelled: { label: 'Cancelado', variant: 'destructive' as const },
     };
 
     const statusInfo = statusMap[status as keyof typeof statusMap] || statusMap.planning;
@@ -72,30 +81,30 @@ export default function Projects() {
       try {
         await deleteMutation.mutateAsync(project.id);
         toast({
-          title: "Projeto excluído!",
+          title: 'Projeto excluído!',
           description: `O projeto "${project.name}" foi excluído com sucesso.`,
         });
-      } catch (error) {
+      } catch (_error) {
         toast({
-          title: "Erro",
-          description: "Não foi possível excluir o projeto.",
-          variant: "destructive",
+          title: 'Erro',
+          description: 'Não foi possível excluir o projeto.',
+          variant: 'destructive',
         });
       }
     }
   };
 
   const formatCurrency = (amount?: string) => {
-    if (!amount) return "R$ 0,00";
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
+    if (!amount) return 'R$ 0,00';
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
     }).format(parseFloat(amount));
   };
 
   const formatDate = (dateString?: string) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("pt-BR");
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
   const handleOpenCreateModal = () => {
@@ -128,7 +137,7 @@ export default function Projects() {
             title="Nenhum projeto encontrado"
             description="Comece criando seu primeiro projeto para organizar suas atividades."
             action={{
-              label: "Criar projeto",
+              label: 'Criar projeto',
               onClick: handleOpenCreateModal,
             }}
           />
@@ -139,7 +148,9 @@ export default function Projects() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="mb-2 text-lg font-semibold text-slate-900">{project.name}</CardTitle>
+                      <CardTitle className="mb-2 text-lg font-semibold text-slate-900">
+                        {project.name}
+                      </CardTitle>
                       {getStatusBadge(project.status)}
                     </div>
                     <DropdownMenu>
@@ -153,7 +164,10 @@ export default function Projects() {
                           <Edit className="mr-2 h-4 w-4" />
                           Editar
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteProject(project)} className="text-red-600">
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteProject(project)}
+                          className="text-red-600"
+                        >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Excluir
                         </DropdownMenuItem>
@@ -162,7 +176,9 @@ export default function Projects() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {project.description && <p className="text-sm text-slate-600 line-clamp-2">{project.description}</p>}
+                  {project.description && (
+                    <p className="text-sm text-slate-600 line-clamp-2">{project.description}</p>
+                  )}
 
                   <div className="grid grid-cols-2 gap-3 text-sm text-slate-600">
                     <div className="flex items-center gap-2">
@@ -171,7 +187,7 @@ export default function Projects() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-slate-400" />
-                      <span>{project.endDate ? formatDate(project.endDate) : "-"}</span>
+                      <span>{project.endDate ? formatDate(project.endDate) : '-'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <DollarSign className="h-4 w-4 text-slate-400" />
@@ -179,7 +195,7 @@ export default function Projects() {
                     </div>
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4 text-slate-400" />
-                      <span>{project.client?.name || "Sem cliente"}</span>
+                      <span>{project.client?.name || 'Sem cliente'}</span>
                     </div>
                   </div>
                 </CardContent>
