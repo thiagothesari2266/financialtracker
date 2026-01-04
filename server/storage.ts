@@ -204,6 +204,7 @@ const mapDebt = (debt: PrismaDebt): Debt => ({
   ratePeriod: debt.ratePeriod,
   targetDate: ensureDateString(debt.targetDate),
   createdAt: ensureDateTimeString(debt.createdAt) ?? '',
+  notes: debt.notes ?? null,
 });
 
 const mapCreditCardTransaction = (
@@ -1521,6 +1522,7 @@ export class DatabaseStorage implements IStorage {
         interestRate: insertDebt.interestRate,
         ratePeriod: insertDebt.ratePeriod ?? 'monthly',
         targetDate: insertDebt.targetDate ? parseDateInput(insertDebt.targetDate) : null,
+        notes: insertDebt.notes ?? null,
       },
     });
 
@@ -1557,6 +1559,7 @@ export class DatabaseStorage implements IStorage {
               : debt.targetDate
                 ? parseDateInput(debt.targetDate)
                 : null,
+          notes: debt.notes === undefined ? undefined : (debt.notes ?? null),
         },
       });
 

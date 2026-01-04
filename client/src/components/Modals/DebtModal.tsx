@@ -18,6 +18,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -36,6 +37,7 @@ const debtSchema = z.object({
   interestRate: z.string().min(1, 'Juros é obrigatório'),
   ratePeriod: z.enum(['monthly', 'yearly']),
   targetDate: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 export type DebtFormValues = z.infer<typeof debtSchema>;
@@ -64,6 +66,7 @@ export function DebtModal({
       interestRate: '',
       ratePeriod: 'monthly',
       targetDate: '',
+      notes: '',
     },
   });
 
@@ -76,6 +79,7 @@ export function DebtModal({
         interestRate: editing.interestRate,
         ratePeriod: editing.ratePeriod,
         targetDate: editing.targetDate ?? '',
+        notes: editing.notes ?? '',
       });
       return;
     }
@@ -87,6 +91,7 @@ export function DebtModal({
       interestRate: '',
       ratePeriod: 'monthly',
       targetDate: '',
+      notes: '',
     });
   }, [editing, form, open]);
 
@@ -209,6 +214,25 @@ export function DebtModal({
                 />
               </div>
             </div>
+
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Observações (opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Propostas de negociação, acordos, informações relevantes..."
+                      className="resize-none"
+                      rows={3}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={onClose}>

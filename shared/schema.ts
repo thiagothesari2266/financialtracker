@@ -124,6 +124,7 @@ export const insertDebtSchema = z.object({
   interestRate: z.string().min(1),
   ratePeriod: debtRatePeriodEnum.default('monthly'),
   targetDate: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
 });
 export type InsertDebt = z.infer<typeof insertDebtSchema>;
 
@@ -374,6 +375,7 @@ export interface Debt {
   ratePeriod: DebtRatePeriod;
   targetDate: string | null;
   createdAt: string;
+  notes: string | null;
 }
 
 export interface MonthlyFixedSummary {

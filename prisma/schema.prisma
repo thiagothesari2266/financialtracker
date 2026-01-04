@@ -301,6 +301,7 @@ model Debt {
   ratePeriod   DebtRatePeriod @default(monthly) @map("rate_period")
   targetDate   DateTime?      @db.Date @map("target_date")
   createdAt    DateTime       @default(now()) @map("created_at")
+  notes        String?
 
   account Account @relation(fields: [accountId], references: [id])
 
