@@ -17,7 +17,7 @@ export default function BankAccounts() {
   const { data: bankAccounts = [], isLoading } = useBankAccounts(currentAccount?.id || 0);
   const createBankAccount = useCreateBankAccount(currentAccount?.id || 0);
   const updateBankAccount = useUpdateBankAccount();
-  const deleteBankAccount = useDeleteBankAccount();
+  const deleteBankAccount = useDeleteBankAccount(currentAccount?.id || 0);
   const { toast } = useToast();
 
   function handleSaveBankAccount(data: InsertBankAccount) {
@@ -95,28 +95,42 @@ export default function BankAccounts() {
               {bankAccounts.map((ba) => (
                 <Card key={ba.id} className="relative">
                   <CardHeader>
-                    <CardTitle className="text-xl">{ba.name}</CardTitle>
+                    <CardTitle className="text-xl flex items-center gap-2">
+                      {ba.name}
+                      {ba.shared && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                          Compartilhada
+                        </span>
+                      )}
+                      {ba.accountId !== currentAccount?.id && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                          De outra conta
+                        </span>
+                      )}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="mb-2 text-xs text-slate-500">Pix: {ba.pix}</div>
                     <div className="mb-2 text-xs text-slate-500">
                       Saldo Inicial: R$ {parseFloat(ba.initialBalance || "0").toFixed(2)}
                     </div>
-                    <div className="mt-4 flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditingBankAccount(ba);
-                          setIsModalOpen(true);
-                        }}
-                      >
-                        Editar
-                      </Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleDeleteBankAccount(ba.id)}>
-                        Excluir
-                      </Button>
-                    </div>
+                    {ba.accountId === currentAccount?.id && (
+                      <div className="mt-4 flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingBankAccount(ba);
+                            setIsModalOpen(true);
+                          }}
+                        >
+                          Editar
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => handleDeleteBankAccount(ba.id)}>
+                          Excluir
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}

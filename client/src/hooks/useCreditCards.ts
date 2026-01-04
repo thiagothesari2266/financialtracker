@@ -31,7 +31,6 @@ export function useCreateCreditCard(accountId: number) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'credit-cards'] });
-      queryClient.refetchQueries({ queryKey: ['/api/accounts', accountId, 'credit-cards'] });
     },
   });
 }
@@ -85,44 +84,34 @@ export function useUpdateCreditCardTransaction() {
 
 export function useDeleteCreditCardTransaction() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: number) => {
-      console.log('[useDeleteCreditCardTransaction] Tentando excluir transação ID:', id);
-      
       // Busca todas as transações de cartão de crédito no cache para encontrar o accountId
       const allQueries = queryClient.getQueriesData({ queryKey: ['/api/accounts'] });
       let accountId: number | null = null;
-      
-      console.log('[useDeleteCreditCardTransaction] Queries no cache:', allQueries.length);
-      
+
       // Procura especificamente por queries de transações de cartão de crédito
-      for (const [queryKey, data] of allQueries) {
-        console.log('[useDeleteCreditCardTransaction] Verificando query:', queryKey);
+      for (const [, data] of allQueries) {
         if (Array.isArray(data)) {
           const transaction = data.find((t: any) => t.id === id && t.creditCardId);
           if (transaction) {
             accountId = transaction.accountId;
-            console.log('[useDeleteCreditCardTransaction] Transação encontrada:', transaction);
-            console.log('[useDeleteCreditCardTransaction] AccountId encontrado:', accountId);
             break;
           }
         }
       }
-      
+
       // Se não encontrou no cache, tenta buscar via queries de invoices
       if (!accountId) {
         const invoiceQueries = queryClient.getQueriesData({ queryKey: ['/api/accounts'], type: 'active' });
-        for (const [queryKey, data] of invoiceQueries) {
+        for (const [, data] of invoiceQueries) {
           if (Array.isArray(data)) {
-            // Busca em faturas (que contêm arrays de transações)
             for (const invoice of data) {
               if (invoice.transactions && Array.isArray(invoice.transactions)) {
                 const transaction = invoice.transactions.find((t: any) => t.id === id);
                 if (transaction) {
                   accountId = transaction.accountId;
-                  console.log('[useDeleteCreditCardTransaction] Transação encontrada em fatura:', transaction);
-                  console.log('[useDeleteCreditCardTransaction] AccountId encontrado:', accountId);
                   break;
                 }
               }
@@ -131,30 +120,15 @@ export function useDeleteCreditCardTransaction() {
           }
         }
       }
-      
-      console.log('[useDeleteCreditCardTransaction] Fazendo chamada DELETE para:', `/api/credit-card-transactions/${id}`);
-      const response = await apiRequest('DELETE', `/api/credit-card-transactions/${id}`);
-      console.log('[useDeleteCreditCardTransaction] Resposta da API:', response.status, response.statusText);
-      
+
+      await apiRequest('DELETE', `/api/credit-card-transactions/${id}`);
       return { id, accountId };
     },
     onSuccess: ({ accountId }) => {
-      console.log('[useDeleteCreditCardTransaction] onSuccess - AccountId:', accountId);
       if (accountId) {
-        console.log('[useDeleteCreditCardTransaction] Invalidando queries de cartão de crédito');
         queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'credit-card-transactions'] });
         queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'credit-card-invoices'] });
-        
-        // Força um refetch das faturas para atualizar a UI
-        queryClient.refetchQueries({ queryKey: ['/api/accounts', accountId, 'credit-card-invoices'] });
-      } else {
-        console.log('[useDeleteCreditCardTransaction] AccountId não encontrado, invalidando todas as queries');
-        // Fallback: invalida todas as queries se não conseguiu encontrar o accountId
-        queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
       }
-    },
-    onError: (error) => {
-      console.error('[useDeleteCreditCardTransaction] Erro:', error);
     },
   });
 }

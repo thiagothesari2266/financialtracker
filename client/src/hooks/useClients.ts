@@ -81,9 +81,9 @@ export function useUpdateClient() {
   });
 }
 
-export function useDeleteClient() {
+export function useDeleteClient(accountId: number) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: number) => {
       const response = await fetch(`/api/clients/${id}`, {
@@ -92,7 +92,7 @@ export function useDeleteClient() {
       if (!response.ok) throw new Error('Failed to delete client');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "clients"] });
     },
   });
 }

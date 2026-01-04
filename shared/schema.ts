@@ -6,6 +6,9 @@ export type AccountType = z.infer<typeof accountTypeEnum>;
 export const categoryTypeEnum = z.enum(["income", "expense"]);
 export type CategoryType = z.infer<typeof categoryTypeEnum>;
 
+export const debtRatePeriodEnum = z.enum(["monthly", "yearly"]);
+export type DebtRatePeriod = z.infer<typeof debtRatePeriodEnum>;
+
 export const invoicePaymentStatusEnum = z.enum(["pending", "paid", "overdue"]);
 export type InvoicePaymentStatus = z.infer<typeof invoicePaymentStatusEnum>;
 
@@ -114,9 +117,21 @@ export const insertBankAccountSchema = z.object({
   name: z.string().min(1),
   initialBalance: z.string().optional(),
   pix: z.string().optional().nullable(),
+  shared: z.boolean().optional().default(false),
   accountId: z.number(),
 });
 export type InsertBankAccount = z.infer<typeof insertBankAccountSchema>;
+
+export const insertDebtSchema = z.object({
+  accountId: z.number(),
+  name: z.string().min(1),
+  type: z.string().optional().nullable(),
+  balance: z.string().min(1),
+  interestRate: z.string().min(1),
+  ratePeriod: debtRatePeriodEnum.default("monthly"),
+  targetDate: z.string().optional().nullable(),
+});
+export type InsertDebt = z.infer<typeof insertDebtSchema>;
 
 export const insertInvoicePaymentSchema = z.object({
   creditCardId: z.number(),
@@ -263,6 +278,7 @@ export interface BankAccount {
   name: string;
   initialBalance: string;
   pix: string | null;
+  shared: boolean;
   accountId: number;
   createdAt: string;
 }
@@ -352,6 +368,18 @@ export interface MonthlyFixedItem {
   type: CategoryType;
   startMonth: string;
   endMonth: string | null;
+}
+
+export interface Debt {
+  id: number;
+  accountId: number;
+  name: string;
+  type: string | null;
+  balance: string;
+  interestRate: string;
+  ratePeriod: DebtRatePeriod;
+  targetDate: string | null;
+  createdAt: string;
 }
 
 export interface MonthlyFixedSummary {

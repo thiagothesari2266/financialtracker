@@ -24,7 +24,7 @@ export default function CostCenters() {
   const { toast } = useToast();
 
   const { data: costCenters = [], isLoading } = useCostCenters(currentAccount?.id || 0);
-  const deleteMutation = useDeleteCostCenter();
+  const deleteMutation = useDeleteCostCenter(currentAccount?.id || 0);
 
   if (!currentAccount) {
     return (

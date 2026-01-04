@@ -39,7 +39,7 @@ export function useCreateTransaction(accountId: number) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'transactions'] });
     },
   });
 }
@@ -64,12 +64,13 @@ export function useUpdateTransaction(accountId: number) {
       if (data) {
         queryClient.invalidateQueries({ queryKey: ['/api/accounts', data.accountId] });
         queryClient.invalidateQueries({ queryKey: ['/api/transactions', data.id] });
+        queryClient.invalidateQueries({ queryKey: ['/api/accounts', data.accountId, 'transactions'] });
       }
     },
   });
 }
 
-export function useDeleteTransaction() {
+export function useDeleteTransaction(accountId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: number | { id: number; data?: any }) => {
@@ -81,18 +82,14 @@ export function useDeleteTransaction() {
         id = input.id;
         data = input.data;
       }
-      const transaction = await queryClient.getQueryData<TransactionWithCategory>(['/api/transactions', id]);
       if (data) {
         await apiRequest('DELETE', `/api/transactions/${id}`, data);
       } else {
         await apiRequest('DELETE', `/api/transactions/${id}`);
       }
-      return transaction;
     },
-    onSuccess: (transaction) => {
-      if (transaction) {
-        queryClient.invalidateQueries({ queryKey: ['/api/accounts', transaction.accountId] });
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'transactions'] });
     },
   });
 }

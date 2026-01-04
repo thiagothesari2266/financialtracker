@@ -18,6 +18,7 @@ import NotFound from "@/pages/not-found";
 import BankAccounts from "@/pages/BankAccounts";
 import Settings from "@/pages/Settings";
 import MonthlyFixed from "@/pages/MonthlyFixed";
+import Debts from "@/pages/Debts";
 import FloatingChatButton from "@/components/Chat/FloatingChatButton";
 import LoginPage from "@/pages/Login";
 
@@ -55,6 +56,7 @@ function AuthenticatedRoutes() {
         <Route path="/cost-centers" component={CostCenters} />
         <Route path="/accounts" component={AccountSelector} />
         <Route path="/bank-accounts" component={BankAccounts} />
+        <Route path="/debts" component={Debts} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>

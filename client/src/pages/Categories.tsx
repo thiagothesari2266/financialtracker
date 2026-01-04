@@ -4,13 +4,11 @@ import { useCategories, useDeleteCategory } from "@/hooks/useCategories";
 import { AppShell } from "@/components/Layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Folder, Plus, Edit, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import CategoryModal from "@/components/Modals/CategoryModal";
 import type { Category } from "@shared/schema";
 import { getCategoryIcon, categoryColors } from "@/lib/categoryIcons";
-import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
 
 export default function Categories() {
@@ -20,7 +18,7 @@ export default function Categories() {
   const { toast } = useToast();
 
   const { data: categories = [], isLoading } = useCategories(currentAccount?.id || 0);
-  const deleteMutation = useDeleteCategory();
+  const deleteMutation = useDeleteCategory(currentAccount?.id || 0);
 
   if (!currentAccount) {
     return (
@@ -60,48 +58,35 @@ export default function Categories() {
       <CardHeader className="pb-4">
         <CardTitle className={tone === "income" ? "text-green-600" : "text-red-600"}>{title}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2">
         {items.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">Nenhuma categoria cadastrada</p>
         ) : (
           items.map((category) => (
             <div
               key={category.id}
-              className="flex items-center justify-between rounded-lg border border-muted bg-background/80 p-3 transition hover:bg-muted/40"
+              className="flex items-center justify-between rounded-md border border-muted bg-background/80 px-2.5 py-1.5 transition hover:bg-muted/40"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <div
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-white"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-white"
                   style={{ backgroundColor: categoryColors[tone] }}
                 >
-                  {getCategoryIcon(category.icon, "h-5 w-5", "white")}
+                  {getCategoryIcon(category.icon, "h-3.5 w-3.5", "white")}
                 </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">{category.name}</h3>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "text-xs",
-                      tone === "income"
-                        ? "border-green-100 text-green-600"
-                        : "border-red-100 text-red-600",
-                    )}
-                  >
-                    {tone === "income" ? "Receita" : "Despesa"}
-                  </Badge>
-                </div>
+                <span className="text-sm font-medium text-foreground">{category.name}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => handleEdit(category)}>
-                  <Edit className="h-4 w-4" />
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(category)}>
+                  <Edit className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="text-destructive"
+                  size="icon"
+                  className="h-7 w-7 text-destructive"
                   onClick={() => handleDelete(category.id)}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>

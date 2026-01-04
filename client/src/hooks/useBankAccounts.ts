@@ -27,10 +27,11 @@ export function useCreateBankAccount(accountId: number) {
   return useMutation({
     mutationFn: async (data: InsertBankAccount) => {
       const response = await apiRequest("POST", `/api/accounts/${accountId}/bank-accounts`, data);
-      return response.json();
+      return response.json() as Promise<BankAccount>;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "bank-accounts"] });
+      // Invalida cache de todos os accounts para contas compartilhadas aparecerem
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
     },
   });
 }
@@ -40,21 +41,24 @@ export function useUpdateBankAccount() {
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<InsertBankAccount> }) => {
       const response = await apiRequest("PATCH", `/api/bank-accounts/${id}`, data);
-      return response.json();
+      return response.json() as Promise<BankAccount>;
     },
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts", id] });
+    onSuccess: (bankAccount) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts", bankAccount.id] });
+      // Invalida cache de todos os accounts para contas compartilhadas
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
     },
   });
 }
 
-export function useDeleteBankAccount() {
+export function useDeleteBankAccount(accountId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/bank-accounts/${id}`);
     },
     onSuccess: () => {
+      // Invalida cache de todos os accounts para contas compartilhadas
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
     },
   });

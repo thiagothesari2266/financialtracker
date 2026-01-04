@@ -37,6 +37,11 @@ enum ProjectStatus {
   cancelled
 }
 
+enum DebtRatePeriod {
+  monthly
+  yearly
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   email        String   @unique
@@ -64,6 +69,7 @@ model Account {
   costCenters         CostCenter[]
   clients             Client[]
   fixedCashflows     FixedCashflow[]
+  debts              Debt[]
 
   @@map("accounts")
 }
@@ -169,6 +175,7 @@ model BankAccount {
   name           String
   initialBalance Decimal   @default("0") @db.Decimal(12, 2) @map("initial_balance")
   pix            String    @default("")
+  shared         Boolean   @default(false)
   accountId      Int       @map("account_id")
   createdAt      DateTime  @default(now()) @map("created_at")
 
@@ -282,4 +289,20 @@ model FixedCashflow {
   account Account @relation(fields: [accountId], references: [id])
 
   @@map("fixed_cashflow")
+}
+
+model Debt {
+  id           Int            @id @default(autoincrement())
+  accountId    Int            @map("account_id")
+  name         String
+  type         String?
+  balance      Decimal        @db.Decimal(12, 2)
+  interestRate Decimal        @db.Decimal(6, 3) @map("interest_rate")
+  ratePeriod   DebtRatePeriod @default(monthly) @map("rate_period")
+  targetDate   DateTime?      @db.Date @map("target_date")
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@map("debts")
 }

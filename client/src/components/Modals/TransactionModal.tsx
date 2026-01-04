@@ -165,7 +165,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
      transaction.creditCardId !== undefined && 
      transaction.creditCardId !== 0);
   
-  const deleteTransactionMutation = useDeleteTransaction();
+  const deleteTransactionMutation = useDeleteTransaction(currentAccount?.id || 0);
   const deleteCreditCardTransactionMutation = useDeleteCreditCardTransaction();
   const updateTransactionMutation = useUpdateTransaction(currentAccount?.id || 0);
   const updateCreditCardTransactionMutation = useUpdateCreditCardTransaction();
@@ -177,12 +177,12 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
       <Dialog open={open} onOpenChange={onCancel}>
         <DialogContent className="max-w-xs">
           <DialogHeader>
-            <DialogTitle>Editar parcelas</DialogTitle>
+            <DialogTitle>Aplicar edição</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <p>Esta transação faz parte de um lançamento parcelado. O que deseja editar?</p>
-            <Button className="w-full" variant="outline" onClick={() => onSelect('single')}>Apenas esta parcela</Button>
-            {canEditAll && <Button className="w-full" variant="outline" onClick={() => onSelect('all')}>Todas as parcelas</Button>}
+            <p>Esta transação faz parte de um lançamento parcelado ou recorrente. Onde aplicar a mudança?</p>
+            <Button className="w-full" variant="outline" onClick={() => onSelect('single')}>Apenas esta</Button>
+            {canEditAll && <Button className="w-full" variant="outline" onClick={() => onSelect('all')}>Todas</Button>}
             {canEditAll && <Button className="w-full" variant="outline" onClick={() => onSelect('future')}>Esta e as próximas</Button>}
             <Button className="w-full" variant="ghost" onClick={onCancel}>Cancelar</Button>
           </div>
@@ -191,18 +191,18 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
     );
   }
 
-  // Modal para escolher escopo de exclusão de parcelas
+  // Modal para escolher escopo de exclusão
   function DeleteInstallmentScopeModal({ open, onSelect, onCancel, canEditAll }: { open: boolean; onSelect: (scope: 'single' | 'all' | 'future') => void; onCancel: () => void; canEditAll: boolean }) {
     return (
       <Dialog open={open} onOpenChange={onCancel}>
         <DialogContent className="max-w-xs">
           <DialogHeader>
-            <DialogTitle>Excluir parcelas</DialogTitle>
+            <DialogTitle>Excluir transações</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <p>Esta transação faz parte de um lançamento parcelado. O que deseja excluir?</p>
-            <Button className="w-full" variant="outline" onClick={() => onSelect('single')}>Apenas esta parcela</Button>
-            {canEditAll && <Button className="w-full" variant="outline" onClick={() => onSelect('all')}>Todas as parcelas</Button>}
+            <p>Esta transação faz parte de um lançamento em série. O que deseja excluir?</p>
+            <Button className="w-full" variant="outline" onClick={() => onSelect('single')}>Apenas esta</Button>
+            {canEditAll && <Button className="w-full" variant="outline" onClick={() => onSelect('all')}>Todas</Button>}
             {canEditAll && <Button className="w-full" variant="outline" onClick={() => onSelect('future')}>Esta e as próximas</Button>}
             <Button className="w-full" variant="ghost" onClick={onCancel}>Cancelar</Button>
           </div>
@@ -215,12 +215,12 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
   const onSubmit = async (data: z.infer<typeof transactionSchema>) => {
     // Corrige o campo launchType conforme seleção do usuário
     let launchTypeValue = launchType;
-    if (launchTypeValue === "recorrente") {
-      data.launchType = "recorrente";
-      // Força envio do campo mesmo quando removido para limpar no backend
-      if (!data.recurrenceEndDate) {
-        data.recurrenceEndDate = "";
-      }
+      if (launchTypeValue === "recorrente") {
+        data.launchType = "recorrente";
+        // Força envio do campo mesmo quando removido para limpar no backend
+        if (!data.recurrenceEndDate) {
+          data.recurrenceEndDate = "";
+        }
     } else if (launchTypeValue === "parcelada") {
       data.launchType = "parcelada";
       // Validação extra para parcelada
@@ -306,9 +306,20 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
       installments: data.installments ? Number(data.installments) : undefined,
     };
 
+    // Para recorrentes, preserva recurrenceGroupId existente ao enviar edições
+    if (transaction?.recurrenceGroupId) {
+      (payload as any).recurrenceGroupId = transaction.recurrenceGroupId;
+    }
+
     if (transaction && transaction.id) {
       // Editar transação existente
-      if (transaction.installments > 1) {
+      const shouldAskScope =
+        (transaction.installments && transaction.installments > 1) ||
+        transaction.launchType === 'recorrente' ||
+        Boolean(transaction.recurrenceGroupId) ||
+        Boolean(transaction.recurrenceFrequency);
+
+      if (shouldAskScope) {
         setPendingScopeData({ ...payload, date: data.date });
         setShowScopeModal(true);
       } else {
@@ -360,7 +371,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
     const changed: any = {};
     for (const key of Object.keys(updated)) {
       // Ignora campos de controle
-      if (["editScope", "installmentsGroupId", "date"].includes(key)) continue;
+      if (["editScope", "installmentsGroupId"].includes(key)) continue;
       // Compara valores (convertendo ambos para string para evitar problemas de tipo)
       if (String(updated[key] ?? "") !== String(original[key] ?? "")) {
         // Nunca envia categoryId se não for número válido
@@ -408,6 +419,8 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
       ) {
         // Nunca inclua o campo 'date' se for vazio/nulo
         if (key === 'date') continue;
+        // Ignora identificadores de grupo vazios/nulos
+        if (key === 'recurrenceGroupId' || key === 'installmentsGroupId') continue;
         continue;
       }
       // Permite limpar data de recorrência enviando string vazia
@@ -435,10 +448,19 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
     if (!cleanedScopeData.date || cleanedScopeData.date === '' || cleanedScopeData.date === 'null') {
       delete cleanedScopeData.date;
     }
-    if (scope === 'single' || !transaction.installmentsGroupId) {
-      // Para escopo single, usa updateTransactionMutation
+    const isParcelado = !!transaction.installmentsGroupId;
+    const isRecorrente = !!transaction.recurrenceGroupId || transaction.launchType === 'recorrente' || !!transaction.recurrenceFrequency;
+
+    if (scope === 'single') {
+      const singlePayload = cleanPatchPayload({
+        ...cleanedScopeData,
+        editScope: scope,
+        installmentsGroupId: transaction.installmentsGroupId,
+        recurrenceGroupId: transaction.recurrenceGroupId,
+      });
+
       updateTransactionMutation.mutate(
-        { id: transaction.id, data: cleanedScopeData },
+        { id: transaction.id, data: singlePayload },
         {
           onSuccess: () => {
             toast({
@@ -457,10 +479,13 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
           },
         }
       );
-    } else {
-      // Só envia campos alterados para edição em lote
+      setShowScopeModal(false);
+      setPendingScopeData(null);
+      return;
+    }
+
+    if (scope !== 'single' && (isParcelado || isRecorrente)) {
       const changedFields = getChangedFields(transaction, cleanedScopeData);
-      // FILTRO FINAL: nunca envie categoryId inválido (reforçado)
       if (
         'categoryId' in changedFields &&
         (changedFields.categoryId === null ||
@@ -474,13 +499,18 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
       ) {
         delete changedFields.categoryId;
       }
-      // Limpeza final de todos os campos
-      let patchPayload = cleanPatchPayload({ ...changedFields, editScope: scope, installmentsGroupId: transaction.installmentsGroupId });
-      // Se categoryId não está no patchPayload, inclua o valor atual da transação (para evitar erro no backend)
+
+      let patchPayload = cleanPatchPayload({
+        ...changedFields,
+        editScope: scope,
+        installmentsGroupId: transaction.installmentsGroupId,
+        recurrenceGroupId: transaction.recurrenceGroupId,
+      });
+
       if (!('categoryId' in patchPayload) && transaction.categoryId) {
         patchPayload.categoryId = Number(transaction.categoryId);
       }
-      // Garantia máxima: remova categoryId se for null, undefined, string vazia, 'null', não numérico ou não finito
+
       if (
         'categoryId' in patchPayload &&
         (patchPayload.categoryId === null ||
@@ -494,12 +524,12 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
       ) {
         delete patchPayload.categoryId;
       }
-      // Garantia máxima: remova date se for vazio/nulo
+
       if ('date' in patchPayload && (!patchPayload.date || patchPayload.date === '' || patchPayload.date === 'null')) {
         delete patchPayload.date;
       }
-      // Não envie PATCH se não houver campos relevantes alterados além do escopo
-      const keysToIgnore = ['editScope', 'installmentsGroupId'];
+
+      const keysToIgnore = ['editScope', 'installmentsGroupId', 'recurrenceGroupId'];
       const hasRelevantFields = Object.keys(patchPayload).some(key => !keysToIgnore.includes(key));
       if (!hasRelevantFields) {
         toast({
@@ -511,6 +541,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
         setPendingScopeData(null);
         return;
       }
+
       console.log('[Transaction PATCH payload]', patchPayload);
       updateTransactionMutation.mutate(
         { id: transaction.id, data: patchPayload },
@@ -532,9 +563,34 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
           },
         }
       );
+      setShowScopeModal(false);
+      setPendingScopeData(null);
+      return;
     }
+
+    updateTransactionMutation.mutate(
+      { id: transaction.id, data: cleanedScopeData },
+      {
+        onSuccess: () => {
+          toast({
+            title: 'Sucesso',
+            description: 'Transação editada com sucesso'
+          });
+          form.reset();
+          onClose();
+        },
+        onError: (error: any) => {
+          toast({
+            title: 'Erro',
+            description: error.message || 'Erro ao editar transação',
+            variant: 'destructive',
+          });
+        },
+      }
+    );
     setShowScopeModal(false);
     setPendingScopeData(null);
+    return;
   };
   const handleScopeCancel = () => {
     setShowScopeModal(false);
@@ -555,13 +611,14 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
   // Handler para confirmar exclusão
   const handleConfirmDelete = async () => {
     if (!transaction?.id) return;
-    
-    console.log('[TransactionModal] handleConfirmDelete - transaction:', transaction);
-    console.log('[TransactionModal] handleConfirmDelete - isCreditCardTransaction:', isCreditCardTransaction);
-    
+
     setShowDeleteConfirmModal(false);
-    
-    if (transaction.installments > 1 && transaction.installmentsGroupId) {
+
+    // Verifica se é parcelada ou recorrente
+    const isParcelada = transaction.installments > 1 && transaction.installmentsGroupId;
+    const isRecorrente = transaction.recurrenceGroupId || transaction.launchType === 'recorrente';
+
+    if (isParcelada || isRecorrente) {
       setShowDeleteScopeModal(true);
       return;
     }
@@ -593,25 +650,28 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
   };  const handleDeleteScopeSelect = async (scope: 'single' | 'all' | 'future') => {
     setShowDeleteScopeModal(false);
     if (!transaction?.id) return;
-    
+
+    const isParcelada = transaction.installments > 1 && transaction.installmentsGroupId;
+    const isRecorrente = transaction.recurrenceGroupId || transaction.launchType === 'recorrente';
+
     try {
-      if (scope === 'single' || !transaction.installmentsGroupId) {
-        // Usa o hook correto baseado no tipo de transação
+      if (scope === 'single' || (!isParcelada && !isRecorrente)) {
+        // Deleta apenas esta transação
         if (isCreditCardTransaction) {
-          console.log('[TransactionModal] Scope delete usando deleteCreditCardTransactionMutation');
           await deleteCreditCardTransactionMutation.mutateAsync(transaction.id);
         } else {
-          console.log('[TransactionModal] Scope delete usando deleteTransactionMutation');
           await deleteTransactionMutation.mutateAsync(transaction.id);
         }
       } else {
-        // Para transações de cartão de crédito parceladas, ainda usamos a API regular
-        // pois a lógica de escopo está implementada lá
-        console.log('[TransactionModal] Scope delete usando deleteTransactionMutation (parcelado)');
-        await deleteTransactionMutation.mutateAsync({
-          id: transaction.id,
-          data: { editScope: scope, installmentsGroupId: transaction.installmentsGroupId }
-        });
+        // Deleta em lote (parcelada ou recorrente)
+        const data: any = { editScope: scope };
+        if (isParcelada) {
+          data.installmentsGroupId = transaction.installmentsGroupId;
+        }
+        if (isRecorrente) {
+          data.recurrenceGroupId = transaction.recurrenceGroupId;
+        }
+        await deleteTransactionMutation.mutateAsync({ id: transaction.id, data });
       }
       
       toast({
@@ -648,6 +708,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
   // Estado para modal de escopo de edição
   const [showScopeModal, setShowScopeModal] = useState(false);
   const [pendingScopeData, setPendingScopeData] = useState<any>(null);
+  const canEditAll = !!(transaction?.installmentsGroupId || transaction?.recurrenceGroupId || transaction?.recurrenceFrequency || transaction?.launchType === 'recorrente');
 
   // Estado local para controle do checkbox de pago
   const [localPaid, setLocalPaid] = useState<boolean>(!!transaction?.paid);
@@ -843,7 +904,7 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
               </div>
 
               {/* Seleção de destino */}
-              <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
                 <FormItem>
                   <FormLabel>Lançar em</FormLabel>
                   <Select value={destinationType} onValueChange={v => setDestinationType(v as 'bank' | 'credit')}>
@@ -869,13 +930,13 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Selecione a conta bancária" />
+                              <SelectValue placeholder="Selecione a conta" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             {bankAccounts.map((ba) => (
                               <SelectItem key={ba.id} value={ba.id.toString()}>
-                                {ba.name}
+                                {ba.name}{ba.shared && ba.accountId !== currentAccount?.id && " (compartilhada)"}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -897,9 +958,9 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                       // Calcula qual fatura será afetada
                       let invoiceInfo = "";
                       if (selectedCard && transactionDate) {
-                        invoiceInfo = `Esta transação será lançada na fatura de ${formatInvoiceMonth(transactionDate, selectedCard.closingDay || 1)}`;
+                        invoiceInfo = `Fatura de ${formatInvoiceMonth(transactionDate, selectedCard.closingDay || 1)}`;
                       }
-                      
+
                       return (
                         <FormItem>
                           <FormLabel>Cartão de Crédito</FormLabel>
@@ -917,11 +978,8 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
                               ))}
                             </SelectContent>
                           </Select>
-                          {selectedCard && (
-                            <div className="text-xs text-slate-600 mt-1 p-2 bg-blue-50 rounded border">
-                              <p><strong>Dia de fechamento:</strong> {selectedCard.closingDay}</p>
-                              {invoiceInfo && <p className="mt-1 text-blue-700 font-medium">{invoiceInfo}</p>}
-                            </div>
+                          {selectedCard && invoiceInfo && (
+                            <p className="text-xs text-blue-600 mt-1">{invoiceInfo}</p>
                           )}
                           <FormMessage />
                         </FormItem>
@@ -1123,8 +1181,8 @@ export default function TransactionModal({ isOpen, onClose, transaction, editSco
         </DialogContent>
       </Dialog>
 
-      <EditInstallmentScopeModal open={showScopeModal} onSelect={handleScopeSelect} onCancel={handleScopeCancel} canEditAll={!!transaction?.installmentsGroupId} />
-      <DeleteInstallmentScopeModal open={showDeleteScopeModal} onSelect={handleDeleteScopeSelect} onCancel={handleDeleteScopeCancel} canEditAll={!!transaction?.installmentsGroupId} />
+      <EditInstallmentScopeModal open={showScopeModal} onSelect={handleScopeSelect} onCancel={handleScopeCancel} canEditAll={canEditAll} />
+      <DeleteInstallmentScopeModal open={showDeleteScopeModal} onSelect={handleDeleteScopeSelect} onCancel={handleDeleteScopeCancel} canEditAll={!!(transaction?.installmentsGroupId || transaction?.recurrenceGroupId)} />
     </>
   );
 }

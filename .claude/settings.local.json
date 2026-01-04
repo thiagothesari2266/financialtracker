@@ -25,7 +25,9 @@
       "Bash(mkdir:*)",
       "Bash(npm uninstall:*)",
       "Bash(mv:*)",
-      "Bash(npx dotenv -e .env tsx:*)"
+      "Bash(npx dotenv -e .env tsx:*)",
+      "Bash(git stash:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

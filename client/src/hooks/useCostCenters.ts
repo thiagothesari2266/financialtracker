@@ -81,9 +81,9 @@ export function useUpdateCostCenter() {
   });
 }
 
-export function useDeleteCostCenter() {
+export function useDeleteCostCenter(accountId: number) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: number) => {
       const response = await fetch(`/api/cost-centers/${id}`, {
@@ -92,7 +92,7 @@ export function useDeleteCostCenter() {
       if (!response.ok) throw new Error('Failed to delete cost center');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "cost-centers"] });
     },
   });
 }

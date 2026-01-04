@@ -81,9 +81,9 @@ export function useUpdateProject() {
   });
 }
 
-export function useDeleteProject() {
+export function useDeleteProject(accountId: number) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: number) => {
       const response = await fetch(`/api/projects/${id}`, {
@@ -92,7 +92,7 @@ export function useDeleteProject() {
       if (!response.ok) throw new Error('Failed to delete project');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "projects"] });
     },
   });
 }

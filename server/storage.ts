@@ -12,6 +12,7 @@ import type {
   Project as PrismaProject,
   CostCenter as PrismaCostCenter,
   Client as PrismaClientEntity,
+  Debt as PrismaDebt,
   User as PrismaUser,
 } from "@prisma/client";
 import { prisma } from "./db";
@@ -48,6 +49,8 @@ import type {
   MonthlyFixedSummary,
   InsertFixedCashflow,
   MonthlyFixedItem,
+  Debt,
+  InsertDebt,
 } from "@shared/schema";
 
 const DATE_ONLY_LENGTH = 10;
@@ -98,6 +101,17 @@ const addMonthsPreserveDay = (date: Date, months: number): Date => {
     newDate.setDate(Math.min(date.getDate(), lastDayOfMonth));
   }
   return newDate;
+};
+
+const addDays = (date: Date, days: number): Date => {
+  const result = new Date(date);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+};
+
+const differenceInDays = (to: Date, from: Date): number => {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.round((to.getTime() - from.getTime()) / msPerDay);
 };
 
 const computeInvoiceDueDate = (invoiceMonth: string, dueDay: number): Date => {
@@ -180,6 +194,18 @@ const mapCreditCard = (card: PrismaCreditCard): CreditCard => ({
   createdAt: ensureDateTimeString(card.createdAt) ?? "",
 });
 
+const mapDebt = (debt: PrismaDebt): Debt => ({
+  id: debt.id,
+  accountId: debt.accountId,
+  name: debt.name,
+  type: debt.type ?? null,
+  balance: decimalToString(debt.balance),
+  interestRate: decimalToString(debt.interestRate),
+  ratePeriod: debt.ratePeriod,
+  targetDate: ensureDateString(debt.targetDate),
+  createdAt: ensureDateTimeString(debt.createdAt) ?? "",
+});
+
 const mapCreditCardTransaction = (
   transaction: PrismaCreditCardTransaction,
   category?: PrismaCategory | null,
@@ -216,6 +242,7 @@ const mapBankAccount = (bankAccount: PrismaBankAccount): BankAccount => ({
   name: bankAccount.name,
   initialBalance: decimalToString(bankAccount.initialBalance),
   pix: bankAccount.pix ?? null,
+  shared: bankAccount.shared,
   accountId: bankAccount.accountId,
   createdAt: ensureDateTimeString(bankAccount.createdAt) ?? "",
 });
@@ -312,6 +339,7 @@ export interface IStorage {
     data: Partial<InsertTransaction> & {
       editScope?: "single" | "all" | "future";
       installmentsGroupId?: string;
+      recurrenceGroupId?: string;
     },
   ): Promise<Transaction | undefined>;
   deleteTransaction(
@@ -340,6 +368,12 @@ export interface IStorage {
   getBankAccount(id: number): Promise<BankAccount | undefined>;
   updateBankAccount(id: number, bankAccount: Partial<InsertBankAccount>): Promise<BankAccount | undefined>;
   deleteBankAccount(id: number): Promise<void>;
+
+  createDebt(debt: InsertDebt): Promise<Debt>;
+  getDebts(accountId: number): Promise<Debt[]>;
+  getDebt(id: number): Promise<Debt | undefined>;
+  updateDebt(id: number, debt: Partial<InsertDebt>): Promise<Debt | undefined>;
+  deleteDebt(id: number): Promise<void>;
 
   getAccountStats(accountId: number, month: string): Promise<AccountWithStats | undefined>;
   getCategoryStats(
@@ -438,6 +472,7 @@ export class DatabaseStorage implements IStorage {
       await tx.category.deleteMany({ where: { accountId: id } });
       await tx.creditCard.deleteMany({ where: { accountId: id } });
       await tx.bankAccount.deleteMany({ where: { accountId: id } });
+      await tx.debt.deleteMany({ where: { accountId: id } });
       await tx.project.deleteMany({ where: { accountId: id } });
       await tx.costCenter.deleteMany({ where: { accountId: id } });
       await tx.client.deleteMany({ where: { accountId: id } });
@@ -742,43 +777,167 @@ export class DatabaseStorage implements IStorage {
 
   async updateTransactionWithScope(
     id: number,
-    data: Partial<InsertTransaction> & { editScope?: "single" | "all" | "future"; installmentsGroupId?: string },
+    data: Partial<InsertTransaction> & {
+      editScope?: "single" | "all" | "future";
+      installmentsGroupId?: string;
+      recurrenceGroupId?: string;
+    },
   ): Promise<Transaction | undefined> {
-    if (!data.editScope || !data.installmentsGroupId || data.editScope === "single") {
-      return this.updateTransaction(id, data);
-    }
-
-    const groupId = data.installmentsGroupId;
-    const scope = data.editScope;
+    const scope = data.editScope ?? "single";
+    console.log('[updateTransactionWithScope] start', {
+      id,
+      editScope: scope,
+      installmentsGroupId: data.installmentsGroupId,
+      recurrenceGroupId: data.recurrenceGroupId,
+      hasRecurrenceFrequency: !!data.recurrenceFrequency,
+    });
 
     const current = await prisma.transaction.findUnique({ where: { id } });
     if (!current) return undefined;
 
-    const where: Prisma.TransactionWhereInput = {
-      installmentsGroupId: groupId,
-    };
+    // Edição de recorrente apenas para esta ocorrência: cria transação única, divide a recorrência e mantém futuras intactas
+    if (
+      scope === "single" &&
+      (
+        current.launchType === "recorrente" ||
+        !!current.recurrenceFrequency ||
+        !!current.recurrenceGroupId
+      )
+    ) {
+      console.log('[updateTransactionWithScope] splitting recurrence (single scope)', { transactionId: id, targetDate: data.date ?? current.date });
+      const targetDate = parseDateInput(data.date ?? ensureDateString(current.date));
+      const originalEndDate = current.recurrenceEndDate ?? null;
+      const continuationGroupId = randomUUID();
+
+      const standalone = await prisma.transaction.create({
+        data: {
+          description: data.description ?? current.description,
+          amount: data.amount ?? current.amount,
+          type: data.type ?? current.type,
+          date: targetDate,
+          categoryId: data.categoryId ?? current.categoryId,
+          accountId: current.accountId,
+          bankAccountId: data.bankAccountId ?? current.bankAccountId,
+          paymentMethod: data.paymentMethod ?? current.paymentMethod,
+          clientName: data.clientName ?? current.clientName,
+          projectName: data.projectName ?? current.projectName,
+          costCenter: data.costCenter ?? current.costCenter,
+          installments: 1,
+          currentInstallment: 1,
+          installmentsGroupId: null,
+          recurrenceFrequency: null,
+          recurrenceEndDate: null,
+          launchType: "unica",
+          recurrenceGroupId: null,
+          creditCardInvoiceId: current.creditCardInvoiceId,
+          creditCardId: current.creditCardId,
+          isInvoiceTransaction: current.isInvoiceTransaction,
+          paid: data.paid ?? current.paid,
+        },
+        include: { category: true },
+      });
+
+      // Encerra a recorrência anterior antes da data alvo (mantém descrição original)
+      await prisma.transaction.update({
+        where: { id: current.id },
+        data: { recurrenceEndDate: addDays(targetDate, -1) },
+      });
+
+      // Cria continuação da recorrência após a data editada, se ainda houver período
+      const nextStart = addMonthsPreserveDay(targetDate, 1);
+      const canContinue = !originalEndDate || nextStart <= originalEndDate;
+      if (canContinue) {
+        await prisma.transaction.create({
+          data: {
+            description: current.description,
+            amount: current.amount,
+            type: current.type,
+            date: nextStart,
+            categoryId: current.categoryId,
+            accountId: current.accountId,
+            bankAccountId: current.bankAccountId,
+            paymentMethod: current.paymentMethod,
+            clientName: current.clientName,
+            projectName: current.projectName,
+            costCenter: current.costCenter,
+            installments: 1,
+            currentInstallment: 1,
+            installmentsGroupId: null,
+            recurrenceFrequency: current.recurrenceFrequency,
+            recurrenceEndDate: originalEndDate,
+            launchType: current.launchType,
+            recurrenceGroupId: continuationGroupId,
+            creditCardInvoiceId: current.creditCardInvoiceId,
+            creditCardId: current.creditCardId,
+            isInvoiceTransaction: current.isInvoiceTransaction,
+            paid: false,
+          },
+        });
+      }
+
+      return mapTransaction(standalone, standalone.category);
+    }
+
+    if (!data.editScope || data.editScope === "single") {
+      console.log('[updateTransactionWithScope] fallback single update');
+      return this.updateTransaction(id, data);
+    }
+
+    let groupId = data.installmentsGroupId ?? data.recurrenceGroupId ?? current.installmentsGroupId ?? current.recurrenceGroupId;
+    const isInstallmentGroup = Boolean(data.installmentsGroupId ?? current.installmentsGroupId);
+
+    // Para recorrentes sem recurrenceGroupId, cria um grupo na hora para permitir escopos all/future
+    if (!groupId && !isInstallmentGroup && (current.launchType === "recorrente" || current.recurrenceFrequency)) {
+      groupId = randomUUID();
+      await prisma.transaction.update({
+        where: { id: current.id },
+        data: { recurrenceGroupId: groupId },
+      });
+    }
+
+    if (!groupId) {
+      return this.updateTransaction(id, data);
+    }
+
+    const where: Prisma.TransactionWhereInput = isInstallmentGroup
+      ? { installmentsGroupId: groupId }
+      : { recurrenceGroupId: groupId };
 
     if (scope === "future") {
-      where.currentInstallment = { gte: current.currentInstallment };
+      if (isInstallmentGroup) {
+        where.currentInstallment = { gte: current.currentInstallment };
+      } else {
+        where.date = { gte: current.date };
+      }
     }
 
     const transactionsToUpdate = await prisma.transaction.findMany({
       where,
-      orderBy: { currentInstallment: "asc" },
+      orderBy: isInstallmentGroup ? { currentInstallment: "asc" } : { date: "asc" },
     });
     if (transactionsToUpdate.length === 0) {
       return undefined;
     }
 
+    const scopeReferenceDate = scope === "future"
+      ? current.date
+      : transactionsToUpdate[0]?.date;
+
+    const baseDate = data.date ? parseDateInput(data.date) : undefined;
+
     await prisma.$transaction(
       transactionsToUpdate.map((transactionToUpdate) => {
-        const baseDate =
-          data.date && scope !== "single"
+        const scopedBaseDate = baseDate && scope !== "single"
+          ? isInstallmentGroup
             ? addMonthsPreserveDay(
-                parseDateInput(data.date),
+                baseDate,
                 transactionToUpdate.currentInstallment - transactionsToUpdate[0].currentInstallment,
               )
-            : undefined;
+            : addDays(
+                baseDate,
+                differenceInDays(new Date(transactionToUpdate.date), new Date(scopeReferenceDate ?? transactionToUpdate.date)),
+              )
+          : undefined;
         const updatePayload: Prisma.TransactionUpdateInput = {
           description: data.description,
           amount: data.amount,
@@ -813,7 +972,7 @@ export class DatabaseStorage implements IStorage {
         if (data.date) {
           updatePayload.date = scope === "single"
             ? parseDateInput(data.date)
-            : baseDate ?? parseDateInput(data.date);
+            : scopedBaseDate ?? parseDateInput(data.date);
         }
 
         return prisma.transaction.update({
@@ -1262,7 +1421,12 @@ export class DatabaseStorage implements IStorage {
 
   async getBankAccounts(accountId: number): Promise<BankAccount[]> {
     const accounts = await prisma.bankAccount.findMany({
-      where: { accountId },
+      where: {
+        OR: [
+          { accountId },
+          { shared: true },
+        ],
+      },
       orderBy: { name: "asc" },
     });
     return accounts.map(mapBankAccount);
@@ -1288,6 +1452,72 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBankAccount(id: number): Promise<void> {
     await prisma.bankAccount.delete({ where: { id } });
+  }
+
+  // Debt methods
+  async createDebt(insertDebt: InsertDebt): Promise<Debt> {
+    const created = await prisma.debt.create({
+      data: {
+        accountId: insertDebt.accountId,
+        name: insertDebt.name,
+        type: insertDebt.type ?? null,
+        balance: insertDebt.balance,
+        interestRate: insertDebt.interestRate,
+        ratePeriod: insertDebt.ratePeriod ?? "monthly",
+        targetDate: insertDebt.targetDate ? parseDateInput(insertDebt.targetDate) : null,
+      },
+    });
+
+    return mapDebt(created);
+  }
+
+  async getDebts(accountId: number): Promise<Debt[]> {
+    const debts = await prisma.debt.findMany({
+      where: { accountId },
+      orderBy: [
+        { targetDate: "asc" },
+        { createdAt: "desc" },
+      ],
+    });
+
+    return debts.map(mapDebt);
+  }
+
+  async getDebt(id: number): Promise<Debt | undefined> {
+    const debt = await prisma.debt.findUnique({ where: { id } });
+    return debt ? mapDebt(debt) : undefined;
+  }
+
+  async updateDebt(id: number, debt: Partial<InsertDebt>): Promise<Debt | undefined> {
+    try {
+      const updated = await prisma.debt.update({
+        where: { id },
+        data: {
+          name: debt.name ?? undefined,
+          type: debt.type === undefined ? undefined : debt.type ?? null,
+          balance: debt.balance ?? undefined,
+          interestRate: debt.interestRate ?? undefined,
+          ratePeriod: debt.ratePeriod ?? undefined,
+          targetDate:
+            debt.targetDate === undefined
+              ? undefined
+              : debt.targetDate
+                ? parseDateInput(debt.targetDate)
+                : null,
+        },
+      });
+
+      return mapDebt(updated);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        return undefined;
+      }
+      throw error;
+    }
+  }
+
+  async deleteDebt(id: number): Promise<void> {
+    await prisma.debt.delete({ where: { id } });
   }
 
   // Analytics

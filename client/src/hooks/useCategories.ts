@@ -63,17 +63,14 @@ export function useUpdateCategory() {
   });
 }
 
-export function useDeleteCategory() {
+export function useDeleteCategory(accountId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest(
-        "DELETE",
-        `/api/categories/${id}`
-      );
+      await apiRequest("DELETE", `/api/categories/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/categories", accountId] });
     },
   });
 }

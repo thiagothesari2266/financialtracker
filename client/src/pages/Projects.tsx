@@ -24,7 +24,7 @@ export default function Projects() {
   const { toast } = useToast();
 
   const { data: projects = [], isLoading } = useProjects(currentAccount?.id || 0);
-  const deleteMutation = useDeleteProject();
+  const deleteMutation = useDeleteProject(currentAccount?.id || 0);
 
   if (!currentAccount) {
     return (

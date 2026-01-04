@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { insertBankAccountSchema, type InsertBankAccount, type BankAccount } from "@shared/schema";
 
 interface BankAccountModalProps {
@@ -22,12 +23,14 @@ export default function BankAccountModal({ isOpen, onClose, onSaved, accountId, 
       name: "",
       initialBalance: "0.00",
       pix: "",
+      shared: false,
       accountId,
     },
     values: bankAccount ? {
       name: bankAccount.name,
       initialBalance: bankAccount.initialBalance || "0.00",
       pix: bankAccount.pix,
+      shared: bankAccount.shared ?? false,
       accountId: bankAccount.accountId,
     } : undefined,
   });
@@ -38,6 +41,7 @@ export default function BankAccountModal({ isOpen, onClose, onSaved, accountId, 
         name: bankAccount.name,
         initialBalance: bankAccount.initialBalance || "0.00",
         pix: bankAccount.pix,
+        shared: bankAccount.shared ?? false,
         accountId: bankAccount.accountId,
       });
     } else {
@@ -45,6 +49,7 @@ export default function BankAccountModal({ isOpen, onClose, onSaved, accountId, 
         name: "",
         initialBalance: "0.00",
         pix: "",
+        shared: false,
         accountId,
       });
     }
@@ -56,6 +61,7 @@ export default function BankAccountModal({ isOpen, onClose, onSaved, accountId, 
       name: data.name,
       initialBalance: data.initialBalance || "0.00",
       pix: data.pix,
+      shared: data.shared ?? false,
       accountId: data.accountId
     } as any);
   };
@@ -80,6 +86,22 @@ export default function BankAccountModal({ isOpen, onClose, onSaved, accountId, 
             )}
           />
           <Input placeholder="Pix (chave obrigatória)" {...form.register("pix")} />
+          <Controller
+            control={form.control}
+            name="shared"
+            render={({ field }) => (
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="shared"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+                <label htmlFor="shared" className="text-sm cursor-pointer">
+                  Compartilhada (visível em todas as contas)
+                </label>
+              </div>
+            )}
+          />
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
             <Button type="submit">Salvar</Button>

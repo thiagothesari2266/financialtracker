@@ -5,6 +5,14 @@ import { useTransactions } from "@/hooks/useTransactions";
 import { AppShell } from "@/components/Layout/AppShell";
 import { PageHeading } from "@/components/layout/PageHeading";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -50,7 +58,6 @@ export default function Transactions() {
   const [editScope, setEditScope] = useState<"single" | "all" | "future" | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [currentDate, setCurrentDate] = useState(() => new Date().toISOString().substring(0, 10));
   const [viewType, setViewType] = useState<ViewType>("month");
@@ -267,8 +274,6 @@ export default function Transactions() {
   }, [transactions, searchTerm]);
 
   const handleEditTransaction = (transaction: TransactionWithCategory) => {
-    if (isSelectionMode) return;
-
     setSelectedTransaction(transaction);
 
     if (transaction.isInvoiceTransaction) {
@@ -310,14 +315,7 @@ export default function Transactions() {
     );
   };
 
-  const handleToggleSelectionMode = () => {
-    setIsSelectionMode((prev) => !prev);
-    setSelectedTransactions(new Set());
-    setLastSelectedIndex(null);
-  };
-
   const handleCancelSelection = () => {
-    setIsSelectionMode(false);
     setSelectedTransactions(new Set());
     setLastSelectedIndex(null);
   };
@@ -352,7 +350,7 @@ export default function Transactions() {
     filteredTransactions.length > 0 &&
     filteredTransactions.every((transaction) => selectedTransactions.has(transaction.id));
 
-  const headerActions = isSelectionMode ? (
+  const headerActions = selectedTransactions.size > 0 ? (
     <div className="flex flex-wrap items-center gap-2">
       <Badge variant="secondary" className="text-xs">
         {selectedTransactions.size} selecionada(s)
@@ -364,7 +362,7 @@ export default function Transactions() {
         variant="destructive"
         size="sm"
         onClick={() => deleteTransactionsMutation.mutate(Array.from(selectedTransactions))}
-        disabled={selectedTransactions.size === 0 || deleteTransactionsMutation.isPending}
+        disabled={deleteTransactionsMutation.isPending}
       >
         <Trash2 className="mr-2 h-4 w-4" />
         {deleteTransactionsMutation.isPending ? "Excluindo..." : "Excluir"}
@@ -414,37 +412,31 @@ export default function Transactions() {
         actions={headerActions}
       >
         <div className="space-y-6">
-          <PageHeading
-            title={formatCurrentPeriod()}
-            description={`Período selecionado • Visualização ${getViewTypeLabel(viewType)}`}
-            icon={<Calendar className="h-5 w-5 text-muted-foreground" />}
-            actions={
-              <>
-                <Button variant="ghost" size="icon" onClick={handlePreviousPeriod}>
-                  <ChevronLeft className="h-4 w-4" />
+          <div className="flex items-center justify-center gap-1 rounded-lg border bg-card/60 px-3 py-2">
+            <Button variant="secondary" size="sm" onClick={handleCurrentPeriod}>
+              Hoje
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handlePreviousPeriod}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="text-sm font-medium px-2">
+                  {formatCurrentPeriod()}
+                  <ChevronDown className="h-4 w-4 ml-1" />
                 </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="gap-2 text-sm">
-                      {getViewTypeLabel(viewType)}
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="center" className="w-40">
-                    <DropdownMenuItem onClick={() => setViewType("month")}>Por mês</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setViewType("week")}>Por semana</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setViewType("day")}>Por dia</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Button variant="ghost" size="icon" onClick={handleNextPeriod}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <Button variant="secondary" size="sm" onClick={handleCurrentPeriod}>
-                  Hoje
-                </Button>
-              </>
-            }
-          />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center">
+                <DropdownMenuItem onClick={() => setViewType("month")}>Por mês</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setViewType("week")}>Por semana</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setViewType("day")}>Por dia</DropdownMenuItem>
+                <DropdownMenuItem disabled>Personalizado</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="ghost" size="icon" onClick={handleNextPeriod}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
 
           <Card>
             <CardContent className="flex flex-col gap-3 pt-4 sm:flex-row">
@@ -455,19 +447,13 @@ export default function Transactions() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9"
-                  disabled={isSelectionMode}
                 />
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" disabled={isSelectionMode}>
+                <Button variant="outline">
                   <Filter className="mr-2 h-4 w-4" />
                   Filtros
                 </Button>
-                {!isSelectionMode && filteredTransactions.length > 0 && (
-                  <Button variant="outline" onClick={handleToggleSelectionMode}>
-                    Seleção em massa
-                  </Button>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -496,38 +482,21 @@ export default function Transactions() {
                   }}
                 />
               ) : (
-                <div className="divide-y">
-                  <div
-                    className={cn(
-                      "hidden bg-muted/40 px-4 py-3 text-sm font-semibold text-muted-foreground sm:grid",
-                      isSelectionMode ? "sm:grid-cols-13" : "sm:grid-cols-12",
-                    )}
-                  >
-                    {isSelectionMode && (
-                      <div className="col-span-1 flex items-center">
-                        <Checkbox checked={isAllSelected} onCheckedChange={handleSelectAll} />
-                      </div>
-                    )}
-                    <div className="col-span-4">Descrição</div>
-                    <div className="col-span-2">Categoria</div>
-                    <div className="col-span-2">Data</div>
-                    <div className="col-span-2">Método</div>
-                    <div className="col-span-1 text-right">Valor</div>
-                    <div className="col-span-1 text-center">Status</div>
-                  </div>
-                  {filteredTransactions.map((transaction, index) => (
-                    <div
-                      key={transaction.id}
-                      className={cn(
-                        "cursor-pointer px-4 py-3 transition-colors hover:bg-muted/30",
-                        selectedTransactions.has(transaction.id) && "bg-primary/5",
-                      )}
-                      onClick={() => handleEditTransaction(transaction)}
-                    >
-                      <div className="sm:hidden space-y-2 text-sm">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex flex-1 items-start gap-2">
-                            {isSelectionMode && (
+                <>
+                  {/* Mobile view */}
+                  <div className="divide-y sm:hidden">
+                    {filteredTransactions.map((transaction, index) => (
+                      <div
+                        key={transaction.id}
+                        className={cn(
+                          "cursor-pointer px-4 py-3 transition-colors hover:bg-muted/30",
+                          selectedTransactions.has(transaction.id) && "bg-primary/5",
+                        )}
+                        onClick={() => handleEditTransaction(transaction)}
+                      >
+                        <div className="space-y-2 text-sm">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex flex-1 items-start gap-2">
                               <Checkbox
                                 checked={selectedTransactions.has(transaction.id)}
                                 onCheckedChange={(checked) =>
@@ -536,107 +505,130 @@ export default function Transactions() {
                                 onClick={(e) => e.stopPropagation()}
                                 className="mt-1"
                               />
-                            )}
-                            <div>
-                              <div className="flex items-center gap-2 font-semibold">
-                                {transaction.isInvoiceTransaction && (
-                                  <CreditCard className="h-4 w-4 text-blue-600" />
-                                )}
-                                {transaction.description}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {transaction.category?.name || "Sem categoria"}
+                              <div>
+                                <div className="flex items-center gap-2 font-semibold">
+                                  {transaction.isInvoiceTransaction && (
+                                    <CreditCard className="h-4 w-4 text-blue-600" />
+                                  )}
+                                  {transaction.description}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {transaction.category?.name || "Sem categoria"}
+                                </div>
                               </div>
                             </div>
+                            <div className="text-right">
+                              <p
+                                className={cn(
+                                  "text-sm font-semibold",
+                                  transaction.type === "income" ? "text-green-600" : "text-red-600",
+                                )}
+                              >
+                                {formatCurrency(transaction.amount)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{formatDate(transaction.date)}</p>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p
-                              className={cn(
-                                "text-sm font-semibold",
-                                transaction.type === "income" ? "text-green-600" : "text-red-600",
-                              )}
-                            >
-                              {formatCurrency(transaction.amount)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{formatDate(transaction.date)}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>{transaction.paymentMethod || "Método não informado"}</span>
-                          {transaction.installments > 1 && (
-                            <span className="rounded-full bg-muted px-2 py-0.5">
-                              {transaction.currentInstallment}/{transaction.installments}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div
-                        className={cn(
-                          "hidden items-center text-sm text-muted-foreground sm:grid",
-                          isSelectionMode ? "sm:grid-cols-13" : "sm:grid-cols-12",
-                        )}
-                      >
-                        {isSelectionMode && (
-                          <div className="col-span-1">
-                            <Checkbox
-                              checked={selectedTransactions.has(transaction.id)}
-                              onCheckedChange={(checked) =>
-                                handleSelectTransaction(transaction.id, Boolean(checked), undefined, index)
-                              }
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          </div>
-                        )}
-                        <div className="col-span-4 flex flex-col text-foreground">
-                          <div className="flex items-center gap-2 font-medium">
-                            {transaction.isInvoiceTransaction && (
-                              <CreditCard className="h-4 w-4 text-blue-600" />
-                            )}
-                            {transaction.description}
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>{transaction.paymentMethod || "Método não informado"}</span>
                             {transaction.installments > 1 && (
-                              <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
+                              <span className="rounded-full bg-muted px-2 py-0.5">
                                 {transaction.currentInstallment}/{transaction.installments}
                               </span>
                             )}
                           </div>
                         </div>
-                        <div className="col-span-2">
-                          <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-foreground">
-                            {transaction.category?.name || "Sem categoria"}
-                          </span>
-                        </div>
-                        <div className="col-span-2 flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
-                          <span>{formatDate(transaction.date)}</span>
-                        </div>
-                        <div className="col-span-2">
-                          {transaction.paymentMethod || <span className="text-muted-foreground">-</span>}
-                        </div>
-                        <div className="col-span-1 text-right font-semibold text-foreground">
-                          <span
-                            className={cn(
-                              transaction.type === "income" ? "text-green-600" : "text-red-600",
-                            )}
-                          >
-                            {formatCurrency(transaction.amount)}
-                          </span>
-                        </div>
-                        <div className="col-span-1 flex justify-center">
-                          {transaction.paid ? (
-                            <div className="rounded-full bg-green-100 p-1" title="Pago">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            </div>
-                          ) : (
-                            <div className="rounded-full bg-amber-100 p-1" title="Pendente">
-                              <Clock className="h-4 w-4 text-amber-600" />
-                            </div>
-                          )}
-                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop view - Table */}
+                  <div className="hidden sm:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]">
+                            <Checkbox checked={isAllSelected} onCheckedChange={handleSelectAll} />
+                          </TableHead>
+                          <TableHead>Descrição</TableHead>
+                          <TableHead>Categoria</TableHead>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Método</TableHead>
+                          <TableHead className="text-right">Valor</TableHead>
+                          <TableHead className="text-center">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredTransactions.map((transaction, index) => (
+                          <TableRow
+                            key={transaction.id}
+                            className="cursor-pointer"
+                            data-state={selectedTransactions.has(transaction.id) ? "selected" : undefined}
+                            onClick={() => handleEditTransaction(transaction)}
+                          >
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={selectedTransactions.has(transaction.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectTransaction(
+                                    transaction.id,
+                                    !selectedTransactions.has(transaction.id),
+                                    e as unknown as MouseEvent,
+                                    index
+                                  );
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2 font-medium">
+                                {transaction.isInvoiceTransaction && (
+                                  <CreditCard className="h-4 w-4 text-blue-600" />
+                                )}
+                                {transaction.description}
+                                {transaction.installments > 1 && (
+                                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
+                                    {transaction.currentInstallment}/{transaction.installments}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">
+                                {transaction.category?.name || "Sem categoria"}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Calendar className="h-4 w-4" />
+                                {formatDate(transaction.date)}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {transaction.paymentMethod || "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold">
+                              <span className={transaction.type === "income" ? "text-green-600" : "text-red-600"}>
+                                {formatCurrency(transaction.amount)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {transaction.paid ? (
+                                <div className="inline-flex rounded-full bg-green-100 p-1" title="Pago">
+                                  <CheckCircle className="h-4 w-4 text-green-600" />
+                                </div>
+                              ) : (
+                                <div className="inline-flex rounded-full bg-amber-100 p-1" title="Pendente">
+                                  <Clock className="h-4 w-4 text-amber-600" />
+                                </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

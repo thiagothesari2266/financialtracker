@@ -44,6 +44,7 @@ import {
   Layers3,
   CircleDollarSign,
   Repeat,
+  BadgePercent,
 } from "lucide-react";
 import { AccountSwitcher } from "./AccountSwitcher";
 import { useAccount } from "@/contexts/AccountContext";
@@ -70,6 +71,7 @@ const primaryNavigation: NavigationItem[] = [
   { title: "Cartões", href: "/credit-cards", icon: CreditCard },
   { title: "Faturas", href: "/credit-card-invoice", icon: FileSpreadsheet },
   { title: "Relatórios", href: "/reports", icon: LineChart },
+  { title: "Painel de Dívidas", href: "/debts", icon: BadgePercent },
   { title: "Fixos mensais", href: "/monthly-fixed", icon: Repeat },
   { title: "Contas Bancárias", href: "/bank-accounts", icon: Wallet },
 ];

@@ -17,9 +17,9 @@ import {
   insertClientSchema
 } from "@shared/schema";
 import { z } from "zod";
-import { insertFixedCashflowSchema } from "@shared/schema";
+import { insertFixedCashflowSchema, insertDebtSchema } from "@shared/schema";
 
-const normalizeAmount = (value: unknown): string | undefined => {
+const normalizeAmount = (value: unknown, decimals = 2): string | undefined => {
   if (value === null || value === undefined) return undefined;
 
   const raw = String(value).trim();
@@ -33,19 +33,19 @@ const normalizeAmount = (value: unknown): string | undefined => {
     const withoutThousands = raw.replace(/\./g, "");
     const normalized = withoutThousands.replace(",", ".");
     const parsed = Number.parseFloat(normalized);
-    if (Number.isFinite(parsed)) return parsed.toFixed(2);
+    if (Number.isFinite(parsed)) return parsed.toFixed(decimals);
   }
 
   // Ponto como decimal: remover vírgulas usadas como milhar
   if (hasDot) {
     const normalized = raw.replace(/,/g, "");
     const parsed = Number.parseFloat(normalized);
-    if (Number.isFinite(parsed)) return parsed.toFixed(2);
+    if (Number.isFinite(parsed)) return parsed.toFixed(decimals);
   }
 
   // Sem separadores explícitos: interpretar como número inteiro ou decimal já no formato do usuário
   const parsed = Number.parseFloat(raw.replace(/\s+/g, ""));
-  return Number.isFinite(parsed) ? parsed.toFixed(2) : undefined;
+  return Number.isFinite(parsed) ? parsed.toFixed(decimals) : undefined;
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -144,6 +144,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[DELETE /api/monthly-fixed/:id]", error);
       res.status(500).json({ message: "Failed to delete monthly fixed entry" });
+    }
+  });
+
+  app.get("/api/accounts/:accountId/debts", async (req, res) => {
+    try {
+      const accountId = parseInt(req.params.accountId);
+      const debts = await storage.getDebts(accountId);
+      res.json(debts);
+    } catch (error) {
+      console.error("[GET /api/accounts/:accountId/debts]", error);
+      res.status(500).json({ message: "Failed to fetch debts" });
+    }
+  });
+
+  app.get("/api/debts/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const debt = await storage.getDebt(id);
+      if (!debt) return res.status(404).json({ message: "Debt not found" });
+      res.json(debt);
+    } catch (error) {
+      console.error("[GET /api/debts/:id]", error);
+      res.status(500).json({ message: "Failed to fetch debt" });
+    }
+  });
+
+  app.post("/api/accounts/:accountId/debts", async (req, res) => {
+    try {
+      const accountId = parseInt(req.params.accountId);
+      const validated = insertDebtSchema.parse({
+        ...req.body,
+        balance: normalizeAmount(req.body.balance),
+        interestRate: normalizeAmount(req.body.interestRate, 3),
+        accountId,
+      });
+
+      const created = await storage.createDebt(validated);
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("[POST /api/accounts/:accountId/debts]", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create debt" });
+    }
+  });
+
+  app.patch("/api/debts/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validated = insertDebtSchema.partial().parse({
+        ...req.body,
+        balance: req.body.balance !== undefined ? normalizeAmount(req.body.balance) : undefined,
+        interestRate:
+          req.body.interestRate !== undefined ? normalizeAmount(req.body.interestRate, 3) : undefined,
+      });
+
+      const updated = await storage.updateDebt(id, validated);
+      if (!updated) return res.status(404).json({ message: "Debt not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("[PATCH /api/debts/:id]", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update debt" });
+    }
+  });
+
+  app.delete("/api/debts/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteDebt(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[DELETE /api/debts/:id]", error);
+      res.status(500).json({ message: "Failed to delete debt" });
     }
   });
 
@@ -399,11 +476,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       // Permite campos extras para edição em lote
-      const { editScope, installmentsGroupId, ...raw } = req.body;
+      const { editScope, installmentsGroupId, recurrenceGroupId, ...raw } = req.body;
+      console.log('[PATCH /api/transactions/:id] incoming', {
+        id,
+        editScope,
+        installmentsGroupId,
+        recurrenceGroupId,
+        rawKeys: Object.keys(raw),
+      });
+      // Remove identificadores de grupo nulos/vazios para evitar falha de validação
+      if (recurrenceGroupId === null || recurrenceGroupId === '') {
+        delete (raw as any).recurrenceGroupId;
+      }
+      if (installmentsGroupId === null || installmentsGroupId === '') {
+        delete (raw as any).installmentsGroupId;
+      }
       const validatedData = insertTransactionSchema.partial().parse(raw);
       let transaction;
-      if (editScope && installmentsGroupId) {
-        transaction = await storage.updateTransactionWithScope(id, { ...validatedData, editScope, installmentsGroupId });
+      if (editScope) {
+        const scopedPayload: any = { ...validatedData, editScope };
+        if (installmentsGroupId) scopedPayload.installmentsGroupId = installmentsGroupId;
+        if (recurrenceGroupId) scopedPayload.recurrenceGroupId = recurrenceGroupId;
+        transaction = await storage.updateTransactionWithScope(id, scopedPayload);
       } else {
         transaction = await storage.updateTransaction(id, validatedData);
       }

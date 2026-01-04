@@ -225,19 +225,6 @@ export default function CategoryModal({ isOpen, onClose, accountId, category }: 
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Cor</Label>
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <div 
-                  className="w-4 h-4 rounded-full" 
-                  style={{ backgroundColor: selectedColor }}
-                />
-                <span>
-                  {selectedType === 'income' ? 'Verde (Receitas)' : 'Vermelho (Despesas)'}
-                </span>
-              </div>
-            </div>
-
             <div className="flex justify-end space-x-2 pt-4">
               <Button type="button" variant="outline" onClick={onClose} disabled={createMutation.isPending || updateMutation.isPending}>
                 Cancelar
