@@ -55,29 +55,25 @@ export default function Dashboard() {
         title="Dashboard"
         description="Resumo do mês com indicadores essenciais e atalhos compactos."
         actions={
-          <Button size="sm" onClick={() => setIsTransactionModalOpen(true)}>
-            Nova transação
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 rounded-md border bg-muted/40 px-1">
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePreviousMonth}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="min-w-[100px] text-center text-sm font-medium capitalize">
+                {formattedMonth}
+              </span>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNextMonth}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button size="sm" onClick={() => setIsTransactionModalOpen(true)}>
+              Nova transação
+            </Button>
+          </div>
         }
       >
         <div className="space-y-6">
-          <div className="rounded-xl border bg-card/60 p-4 sm:p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase text-muted-foreground">Período</p>
-                <p className="text-base font-semibold capitalize">{formattedMonth}</p>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" onClick={handlePreviousMonth}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={handleNextMonth}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-
           <MetricsCards currentMonth={currentMonth} />
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
