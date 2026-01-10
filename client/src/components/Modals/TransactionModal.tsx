@@ -561,6 +561,8 @@ export default function TransactionModal({
         editScope: scope,
         installmentsGroupId: transaction.installmentsGroupId,
         recurrenceGroupId: transaction.recurrenceGroupId,
+        // Enviar a data original da ocorrência virtual para criação de exceção
+        exceptionForDate: transaction.virtualDate || transaction.date?.split('T')[0],
       });
 
       updateTransactionMutation.mutate(
@@ -840,7 +842,12 @@ export default function TransactionModal({
     setLocalPaid(Boolean(checked)); // Atualiza visual imediatamente
     updateTransactionMutation.mutate({
       id: transaction.id,
-      data: { paid: Boolean(checked) },
+      data: {
+        paid: Boolean(checked),
+        editScope: 'single', // Sempre atualiza apenas esta transação
+        // Enviar a data da ocorrência sendo marcada como paga (para criar exceção)
+        exceptionForDate: transaction.virtualDate || transaction.date?.split('T')[0],
+      },
     });
   }; // Estado para tipo de destino
   const [destinationType, setDestinationType] = useState<'bank' | 'credit'>(

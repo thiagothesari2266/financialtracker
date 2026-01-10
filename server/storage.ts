@@ -179,6 +179,8 @@ const mapTransaction = (
   isInvoiceTransaction: transaction.isInvoiceTransaction ?? false,
   createdAt: ensureDateTimeString(transaction.createdAt) ?? '',
   paid: transaction.paid ?? false,
+  isException: transaction.isException ?? false,
+  exceptionForDate: ensureDateString(transaction.exceptionForDate),
   category: category ? mapCategory(category) : null,
 });
 
@@ -727,10 +729,12 @@ export class DatabaseStorage implements IStorage {
     const start = parseDateInput(startDate);
     const end = parseDateInput(endDate);
 
+    // 1. Buscar transações físicas (únicas, parceladas, e NÃO-recorrentes mensais)
     const physical = await prisma.transaction.findMany({
       where: {
         accountId,
         date: { gte: start, lte: end },
+        isException: false, // Exceções são tratadas separadamente
         OR: [
           { launchType: null },
           { launchType: '' },
@@ -750,37 +754,89 @@ export class DatabaseStorage implements IStorage {
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
     });
 
+    // 2. Buscar TODAS as exceções desta conta (para saber quais virtuais ignorar)
+    const allExceptions = await prisma.transaction.findMany({
+      where: {
+        accountId,
+        isException: true,
+      },
+      include: { category: true },
+    });
+
+    // 3. Criar Set de datas que têm exceção (para não gerar virtual)
+    // Chave: recurrenceGroupId + exceptionForDate
+    const exceptionKeys = new Set(
+      allExceptions
+        .filter((e) => e.exceptionForDate && e.recurrenceGroupId)
+        .map((e) => `${e.recurrenceGroupId}-${ensureDateString(e.exceptionForDate)}`)
+    );
+
+    // 4. Buscar definições de recorrência mensal
     const recurrenceDefinitions = await prisma.transaction.findMany({
       where: {
         accountId,
         launchType: 'recorrente',
         recurrenceFrequency: 'mensal',
-        currentInstallment: 1,
+        isException: false,
       },
       include: { category: true },
     });
 
+    // 5. Gerar virtuais, exceto onde há exceção
     const virtualTransactions: TransactionWithCategory[] = [];
     for (const definition of recurrenceDefinitions) {
       const base = mapTransaction(definition, definition.category);
       const firstDate = parseDateInput(base.date);
       const recurrenceEnd = base.recurrenceEndDate ? parseDateInput(base.recurrenceEndDate) : null;
-      let cursor = new Date(firstDate);
+      let monthOffset = 0;
 
-      while (cursor <= end) {
-        if (cursor >= start && (!recurrenceEnd || cursor <= recurrenceEnd)) {
-          virtualTransactions.push({
-            ...base,
-            date: ensureDateString(cursor) ?? base.date,
-            paid: false,
-          });
+      while (true) {
+        const virtualDate = addMonthsPreserveDay(firstDate, monthOffset);
+
+        // Passou do fim do período? Para.
+        if (virtualDate > end) break;
+
+        // Respeita recurrenceEndDate
+        if (recurrenceEnd && virtualDate > recurrenceEnd) break;
+
+        // Está dentro do período?
+        if (virtualDate >= start) {
+          const virtualDateStr = ensureDateString(virtualDate);
+          const key = `${definition.recurrenceGroupId}-${virtualDateStr}`;
+
+          // Só gera se NÃO houver exceção para esta data
+          if (!exceptionKeys.has(key)) {
+            virtualTransactions.push({
+              ...base,
+              date: virtualDateStr ?? base.date,
+              virtualDate: virtualDateStr ?? base.date, // Campo extra para o frontend
+              paid: false,
+            });
+          }
         }
-        cursor = addMonthsPreserveDay(cursor, 1);
+
+        monthOffset++;
+        // Limite de segurança (10 anos)
+        if (monthOffset > 120) break;
       }
     }
 
+    // 6. Buscar exceções cuja DATA REAL (date) está no período
+    // (podem ter exceptionForDate em outro mês, mas aparecem neste)
+    const exceptionsInPeriod = allExceptions.filter(
+      (e) => e.date >= start && e.date <= end
+    );
+
+    // 7. Combinar: físicas + exceções (pela date real) + virtuais
     const mappedPhysical = physical.map((item) => mapTransaction(item, item.category));
-    return [...mappedPhysical, ...virtualTransactions];
+    const mappedExceptions = exceptionsInPeriod.map((e) => ({
+      ...mapTransaction(e, e.category),
+      // Exceções também precisam do virtualDate para re-edição
+      virtualDate: ensureDateString(e.exceptionForDate) ?? undefined,
+    }));
+
+    const all = [...mappedPhysical, ...mappedExceptions, ...virtualTransactions];
+    return all.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }
 
   async getTransaction(id: number): Promise<TransactionWithCategory | undefined> {
@@ -820,6 +876,7 @@ export class DatabaseStorage implements IStorage {
       editScope?: 'single' | 'all' | 'future';
       installmentsGroupId?: string;
       recurrenceGroupId?: string;
+      exceptionForDate?: string; // Data da ocorrência virtual sendo editada
     }
   ): Promise<Transaction | undefined> {
     const scope = data.editScope ?? 'single';
@@ -828,94 +885,107 @@ export class DatabaseStorage implements IStorage {
       editScope: scope,
       installmentsGroupId: data.installmentsGroupId,
       recurrenceGroupId: data.recurrenceGroupId,
+      exceptionForDate: data.exceptionForDate,
       hasRecurrenceFrequency: !!data.recurrenceFrequency,
     });
 
-    const current = await prisma.transaction.findUnique({ where: { id } });
+    let current = await prisma.transaction.findUnique({ where: { id } });
     if (!current) return undefined;
 
-    // Edição de recorrente apenas para esta ocorrência: cria transação única, divide a recorrência e mantém futuras intactas
+    // CASO 1: Edição "single" de transação recorrente → criar exceção
     if (
       scope === 'single' &&
       (current.launchType === 'recorrente' ||
         !!current.recurrenceFrequency ||
         !!current.recurrenceGroupId)
     ) {
-      console.log('[updateTransactionWithScope] splitting recurrence (single scope)', {
+      console.log('[updateTransactionWithScope] creating exception for recurrence', {
         transactionId: id,
-        targetDate: data.date ?? current.date,
+        exceptionForDate: data.exceptionForDate,
+        targetDate: data.date,
       });
-      const targetDate = parseDateInput(data.date ?? ensureDateString(current.date));
-      const originalEndDate = current.recurrenceEndDate ?? null;
-      const continuationGroupId = randomUUID();
 
-      const standalone = await prisma.transaction.create({
+      // Se não tem recurrenceGroupId, criar um primeiro
+      if (!current.recurrenceGroupId) {
+        const newGroupId = randomUUID();
+        current = await prisma.transaction.update({
+          where: { id: current.id },
+          data: { recurrenceGroupId: newGroupId },
+        });
+        console.log('[updateTransactionWithScope] created recurrenceGroupId', newGroupId);
+      }
+
+      // A data da ocorrência sendo editada vem do frontend
+      const originalDate = data.exceptionForDate
+        ? parseDateInput(data.exceptionForDate)
+        : current.date;
+
+      // Verificar se já existe exceção para esta data
+      const existingException = await prisma.transaction.findFirst({
+        where: {
+          accountId: current.accountId,
+          recurrenceGroupId: current.recurrenceGroupId,
+          isException: true,
+          exceptionForDate: originalDate,
+        },
+      });
+
+      if (existingException) {
+        // Atualiza a exceção existente
+        console.log('[updateTransactionWithScope] updating existing exception', existingException.id);
+        const updated = await prisma.transaction.update({
+          where: { id: existingException.id },
+          data: {
+            description: data.description ?? existingException.description,
+            amount: data.amount ?? existingException.amount,
+            type: data.type ?? existingException.type,
+            date: data.date ? parseDateInput(data.date) : existingException.date,
+            categoryId: data.categoryId ?? existingException.categoryId,
+            bankAccountId: data.bankAccountId !== undefined ? data.bankAccountId : existingException.bankAccountId,
+            paid: data.paid ?? existingException.paid,
+          },
+          include: { category: true },
+        });
+        return mapTransaction(updated, updated.category);
+      }
+
+      // Criar nova exceção
+      console.log('[updateTransactionWithScope] creating new exception');
+      const exception = await prisma.transaction.create({
         data: {
           description: data.description ?? current.description,
           amount: data.amount ?? current.amount,
           type: data.type ?? current.type,
-          date: targetDate,
+          date: data.date ? parseDateInput(data.date) : originalDate,
           categoryId: data.categoryId ?? current.categoryId,
           accountId: current.accountId,
-          bankAccountId: data.bankAccountId ?? current.bankAccountId,
-          paymentMethod: data.paymentMethod ?? current.paymentMethod,
-          clientName: data.clientName ?? current.clientName,
-          projectName: data.projectName ?? current.projectName,
-          costCenter: data.costCenter ?? current.costCenter,
-          installments: 1,
-          currentInstallment: 1,
-          installmentsGroupId: null,
+          bankAccountId: data.bankAccountId !== undefined ? data.bankAccountId : current.bankAccountId,
+          paymentMethod: current.paymentMethod,
+          clientName: current.clientName,
+          projectName: current.projectName,
+          costCenter: current.costCenter,
+
+          // Campos de exceção
+          isException: true,
+          exceptionForDate: originalDate,
+          recurrenceGroupId: current.recurrenceGroupId,
+
+          // Não é mais recorrente (é uma instância única)
+          launchType: 'unica',
           recurrenceFrequency: null,
           recurrenceEndDate: null,
-          launchType: 'unica',
-          recurrenceGroupId: null,
+          installments: 1,
+          currentInstallment: 1,
+
           creditCardInvoiceId: current.creditCardInvoiceId,
           creditCardId: current.creditCardId,
           isInvoiceTransaction: current.isInvoiceTransaction,
-          paid: data.paid ?? current.paid,
+          paid: data.paid ?? false,
         },
         include: { category: true },
       });
 
-      // Encerra a recorrência anterior antes da data alvo (mantém descrição original)
-      await prisma.transaction.update({
-        where: { id: current.id },
-        data: { recurrenceEndDate: addDays(targetDate, -1) },
-      });
-
-      // Cria continuação da recorrência após a data editada, se ainda houver período
-      const nextStart = addMonthsPreserveDay(targetDate, 1);
-      const canContinue = !originalEndDate || nextStart <= originalEndDate;
-      if (canContinue) {
-        await prisma.transaction.create({
-          data: {
-            description: current.description,
-            amount: current.amount,
-            type: current.type,
-            date: nextStart,
-            categoryId: current.categoryId,
-            accountId: current.accountId,
-            bankAccountId: current.bankAccountId,
-            paymentMethod: current.paymentMethod,
-            clientName: current.clientName,
-            projectName: current.projectName,
-            costCenter: current.costCenter,
-            installments: 1,
-            currentInstallment: 1,
-            installmentsGroupId: null,
-            recurrenceFrequency: current.recurrenceFrequency,
-            recurrenceEndDate: originalEndDate,
-            launchType: current.launchType,
-            recurrenceGroupId: continuationGroupId,
-            creditCardInvoiceId: current.creditCardInvoiceId,
-            creditCardId: current.creditCardId,
-            isInvoiceTransaction: current.isInvoiceTransaction,
-            paid: false,
-          },
-        });
-      }
-
-      return mapTransaction(standalone, standalone.category);
+      return mapTransaction(exception, exception.category);
     }
 
     if (!data.editScope || data.editScope === 'single') {

@@ -74,6 +74,8 @@ export const insertTransactionSchema = z.object({
   creditCardId: z.number().optional().nullable(),
   isInvoiceTransaction: z.boolean().optional(),
   paid: z.boolean().optional(),
+  isException: z.boolean().optional().default(false),
+  exceptionForDate: z.string().optional(), // Data original que está sendo sobrescrita
 });
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 
@@ -234,6 +236,8 @@ export interface Transaction {
   isInvoiceTransaction: boolean;
   createdAt: string;
   paid: boolean;
+  isException: boolean;
+  exceptionForDate: string | null;
 }
 
 export interface CreditCard {
@@ -346,6 +350,7 @@ export interface Client {
 
 export type TransactionWithCategory = Transaction & {
   category: Category | null;
+  virtualDate?: string; // Data da ocorrência virtual (para transações recorrentes)
 };
 
 export type CreditCardTransactionWithCategory = CreditCardTransaction & {

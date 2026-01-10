@@ -47,11 +47,19 @@ export function useCreateTransaction(accountId: number) {
   });
 }
 
+// Tipo estendido para payload de atualização com campos de escopo e exceção
+type UpdateTransactionData = Partial<InsertTransaction> & {
+  editScope?: 'single' | 'all' | 'future';
+  installmentsGroupId?: string;
+  recurrenceGroupId?: string;
+  exceptionForDate?: string;
+};
+
 export function useUpdateTransaction(accountId: number) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertTransaction> }) => {
+    mutationFn: async ({ id, data }: { id: number; data: UpdateTransactionData }) => {
       const response = await apiRequest('PATCH', `/api/transactions/${id}`, data);
       // Se não for 2xx, apiRequest já lança erro e o onError do mutation será chamado
       // Se for 204 No Content, não tente fazer response.json()
