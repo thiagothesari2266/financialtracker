@@ -141,6 +141,9 @@ export default function TransactionModal({
             ? 'parcelada'
             : 'unica';
       setLaunchType(transactionLaunchType);
+      setOriginalLaunchType(transactionLaunchType);
+      setOriginalDestinationType(transaction.creditCardId ? 'credit' : 'bank');
+      setDestinationType(transaction.creditCardId ? 'credit' : 'bank');
       form.reset({
         description: transaction.description || '',
         amount: transaction.amount || '',
@@ -165,6 +168,9 @@ export default function TransactionModal({
       // Define a primeira conta bancária como padrão ao criar nova transação
       const defaultBankAccountId = bankAccounts.length > 0 ? String(bankAccounts[0].id) : '';
       setLaunchType('unica');
+      setOriginalLaunchType('unica');
+      setDestinationType('bank');
+      setOriginalDestinationType('bank');
       form.reset({
         description: '',
         amount: '',
@@ -817,6 +823,7 @@ export default function TransactionModal({
 
   // Estado para tipo de lançamento
   const [launchType, setLaunchType] = useState<string>('unica');
+  const [originalLaunchType, setOriginalLaunchType] = useState<string>('unica');
 
   // Estado para modal de escopo de edição
   const [showScopeModal, setShowScopeModal] = useState(false);
@@ -852,7 +859,19 @@ export default function TransactionModal({
   }; // Estado para tipo de destino
   const [destinationType, setDestinationType] = useState<'bank' | 'credit'>(
     transaction && transaction.creditCardId ? 'credit' : 'bank'
-  ); // Função utilitária para calcular o mês da fatura baseado na data da transação e dia de fechamento
+  );
+  const [originalDestinationType, setOriginalDestinationType] = useState<'bank' | 'credit'>(
+    transaction && transaction.creditCardId ? 'credit' : 'bank'
+  );
+
+  // Detecta se houve mudanças no formulário ou nos estados externos
+  const { isDirty } = form.formState;
+  const hasChanges =
+    isDirty ||
+    launchType !== originalLaunchType ||
+    destinationType !== originalDestinationType;
+
+  // Função utilitária para calcular o mês da fatura baseado na data da transação e dia de fechamento
   const calculateInvoiceMonth = (transactionDate: string, closingDay: number): string => {
     const purchaseDate = new Date(transactionDate);
     let invoiceMonth = purchaseDate.getMonth() + 1; // 1-12
@@ -1310,8 +1329,15 @@ export default function TransactionModal({
                       : 'Excluir'}
                   </Button>
                 )}
-                <Button type="submit" disabled={createTransactionMutation.isPending}>
-                  {createTransactionMutation.isPending
+                <Button
+                  type="submit"
+                  disabled={
+                    createTransactionMutation.isPending ||
+                    updateTransactionMutation.isPending ||
+                    (transaction && !hasChanges)
+                  }
+                >
+                  {createTransactionMutation.isPending || updateTransactionMutation.isPending
                     ? transaction
                       ? 'Salvando...'
                       : 'Criando...'
