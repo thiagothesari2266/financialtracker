@@ -9,12 +9,31 @@ import type { Account } from '@shared/schema';
 import { AccountCard } from './AccountCard';
 import { useQuery } from '@tanstack/react-query';
 
+interface AccountLimits {
+  limits: { personal: number; business: number };
+  current: { personal: number; business: number };
+  canCreate: { personal: boolean; business: boolean };
+}
+
 export default function AccountSelector() {
   const [, setLocation] = useLocation();
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const { accounts, setCurrentAccount, isLoading } = useAccount();
   const deleteAccount = useDeleteAccount();
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+
+  // Buscar limites do usuário
+  const { data: accountLimits } = useQuery<AccountLimits>({
+    queryKey: ['/api/accounts/limits'],
+    queryFn: async () => {
+      const res = await fetch('/api/accounts/limits');
+      if (!res.ok) throw new Error('Falha ao carregar limites');
+      return res.json();
+    },
+  });
+
+  // Verificar se pode criar algum tipo de conta
+  const canCreateAny = accountLimits?.canCreate?.personal || accountLimits?.canCreate?.business;
 
   const handleSelectAccount = (account: Account) => {
     setCurrentAccount(account);
@@ -92,11 +111,20 @@ export default function AccountSelector() {
           </div>
         </div>
 
-        <div className="flex justify-center mt-8">
-          <Button onClick={handleCreateAccount} className="bg-primary text-white hover:bg-blue-600">
+        <div className="flex flex-col items-center mt-8 gap-2">
+          <Button
+            onClick={handleCreateAccount}
+            disabled={!canCreateAny}
+            className="bg-primary text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Nova Conta
           </Button>
+          {!canCreateAny && (
+            <p className="text-sm text-slate-500">
+              Você atingiu o limite de contas permitido.
+            </p>
+          )}
         </div>
       </div>
 
@@ -108,6 +136,7 @@ export default function AccountSelector() {
         }}
         account={editingAccount}
         onAccountCreated={handleAccountCreated}
+        accountLimits={accountLimits}
       />
     </div>
   );

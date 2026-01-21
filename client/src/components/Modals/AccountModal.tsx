@@ -31,12 +31,19 @@ const accountSchema = z.object({
   type: z.enum(['personal', 'business']),
 });
 
+interface AccountLimits {
+  limits: { personal: number; business: number };
+  current: { personal: number; business: number };
+  canCreate: { personal: boolean; business: boolean };
+}
+
 interface AccountModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAccountCreated: (account: Account) => void;
   account?: Account | null;
   isEdit?: boolean;
+  accountLimits?: AccountLimits;
 }
 
 export default function AccountModal({
@@ -45,15 +52,28 @@ export default function AccountModal({
   onAccountCreated,
   account,
   isEdit,
+  accountLimits,
 }: AccountModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Determinar qual tipo está disponível para criação
+  const canCreatePersonal = accountLimits?.canCreate?.personal ?? true;
+  const canCreateBusiness = accountLimits?.canCreate?.business ?? true;
+
+  // Determinar o tipo padrão baseado no que está disponível
+  const getDefaultType = (): 'personal' | 'business' => {
+    if (account?.type) return account.type;
+    if (canCreatePersonal) return 'personal';
+    if (canCreateBusiness) return 'business';
+    return 'personal';
+  };
 
   const form = useForm<z.infer<typeof accountSchema>>({
     resolver: zodResolver(accountSchema),
     defaultValues: {
       name: account?.name || '',
-      type: account?.type || 'personal',
+      type: getDefaultType(),
     },
     values: account ? { name: account.name, type: account.type } : undefined,
   });
@@ -63,9 +83,9 @@ export default function AccountModal({
     if (account) {
       form.reset({ name: account.name, type: account.type });
     } else {
-      form.reset({ name: '', type: 'personal' });
+      form.reset({ name: '', type: getDefaultType() });
     }
-  }, [account, form]);
+  }, [account, form, canCreatePersonal, canCreateBusiness]);
 
   const createAccountMutation = useMutation({
     mutationFn: async (data: z.infer<typeof accountSchema>) => {
@@ -133,15 +153,23 @@ export default function AccountModal({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo da Conta</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    disabled={isEdit || !!account}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o tipo" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="personal">Pessoal</SelectItem>
-                      <SelectItem value="business">Empresarial</SelectItem>
+                      <SelectItem value="personal" disabled={!canCreatePersonal && !account}>
+                        Pessoal {!canCreatePersonal && !account && '(limite atingido)'}
+                      </SelectItem>
+                      <SelectItem value="business" disabled={!canCreateBusiness && !account}>
+                        Empresarial {!canCreateBusiness && !account && '(limite atingido)'}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

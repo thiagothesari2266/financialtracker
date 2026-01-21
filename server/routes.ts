@@ -1,6 +1,7 @@
 import type { Express } from 'express';
 import { createServer, type Server } from 'http';
 import { storage } from './storage';
+import { validateAccountOwnership } from './middleware/account-ownership';
 import {
   uploadInvoice,
   uploadMultipleInvoiceImages,
@@ -59,7 +60,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Account routes
   app.get('/api/accounts', async (req, res) => {
     try {
-      const accounts = await storage.getAccounts();
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: 'Não autenticado' });
+      }
+      const accounts = await storage.getAccounts(userId);
       res.json(accounts);
     } catch (error) {
       console.error('[GET /api/accounts]', error);
@@ -67,20 +72,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/accounts/:id', async (req, res) => {
+  // IMPORTANTE: Esta rota DEVE vir ANTES de /api/accounts/:id
+  // senão "limits" será interpretado como um :id
+  app.get('/api/accounts/limits', async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const account = await storage.getAccount(id);
-      if (!account) {
-        return res.status(404).json({ message: 'Account not found' });
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: 'Não autenticado' });
       }
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'Usuário não encontrado' });
+      }
+      const counts = await storage.getUserAccountCounts(userId);
+
+      res.json({
+        limits: {
+          personal: user.maxPersonalAccounts,
+          business: user.maxBusinessAccounts,
+        },
+        current: counts,
+        canCreate: {
+          personal: counts.personal < user.maxPersonalAccounts,
+          business: counts.business < user.maxBusinessAccounts,
+        },
+      });
+    } catch (error) {
+      console.error('[GET /api/accounts/limits]', error);
+      res.status(500).json({ message: 'Failed to fetch account limits' });
+    }
+  });
+
+  app.get('/api/accounts/:id', validateAccountOwnership, async (req, res) => {
+    try {
+      const account = (req as any).account;
       res.json(account);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch account' });
     }
   });
 
-  app.get('/api/accounts/:id/stats', async (req, res) => {
+  app.get('/api/accounts/:id/stats', validateAccountOwnership, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const month = (req.query.month as string) || new Date().toISOString().substring(0, 7);
@@ -94,7 +126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/accounts/:id/monthly-fixed', async (req, res) => {
+  app.get('/api/accounts/:id/monthly-fixed', validateAccountOwnership, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const summary = await storage.getFixedCashflow(id);
@@ -105,7 +137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/accounts/:id/monthly-fixed', async (req, res) => {
+  app.post('/api/accounts/:id/monthly-fixed', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.id);
       const validated = insertFixedCashflowSchema.parse({
@@ -154,7 +186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/accounts/:accountId/debts', async (req, res) => {
+  app.get('/api/accounts/:accountId/debts', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const debts = await storage.getDebts(accountId);
@@ -177,7 +209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/accounts/:accountId/debts', async (req, res) => {
+  app.post('/api/accounts/:accountId/debts', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const validated = insertDebtSchema.parse({
@@ -235,11 +267,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/accounts', async (req, res) => {
     try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: 'Não autenticado' });
+      }
       const validatedData = insertAccountSchema.parse(req.body);
-      const account = await storage.createAccount(validatedData);
+      const account = await storage.createAccount(validatedData, userId);
       res.status(201).json(account);
     } catch (error) {
       console.error('[POST /api/accounts]', error);
+      if (error instanceof Error && error.message.includes('Limite de contas')) {
+        return res.status(403).json({ message: error.message });
+      }
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
@@ -247,7 +286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/accounts/:id', async (req, res) => {
+  app.patch('/api/accounts/:id', validateAccountOwnership, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertAccountSchema.partial().parse(req.body);
@@ -264,19 +303,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/accounts/:id', async (req, res) => {
+  app.delete('/api/accounts/:id', validateAccountOwnership, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteAccount(id);
       res.status(204).send();
     } catch (error) {
       console.error('[DELETE /api/accounts/:id]', error);
-      res.status(500).json({ message: 'Failed to delete account', error: error.message });
+      res.status(500).json({ message: 'Failed to delete account', error: (error as Error).message });
     }
   });
 
   // AI Financial Advisor routes
-  app.get('/api/accounts/:id/financial-summary', async (req, res) => {
+  app.get('/api/accounts/:id/financial-summary', validateAccountOwnership, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const context = await AIFinancialAdvisor.getFinancialContext(id);
@@ -289,6 +328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post(
     '/api/accounts/:id/ai-chat',
+    validateAccountOwnership,
     createRateLimitMiddleware(aiChatRateLimit),
     async (req, res) => {
       try {
@@ -334,7 +374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Category routes
-  app.get('/api/accounts/:accountId/categories', async (req, res) => {
+  app.get('/api/accounts/:accountId/categories', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const categories = await storage.getCategories(accountId);
@@ -344,7 +384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/accounts/:accountId/categories/stats', async (req, res) => {
+  app.get('/api/accounts/:accountId/categories/stats', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const month = (req.query.month as string) || new Date().toISOString().substring(0, 7);
@@ -355,7 +395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/accounts/:accountId/categories', async (req, res) => {
+  app.post('/api/accounts/:accountId/categories', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const validatedData = insertCategorySchema.parse({
@@ -408,7 +448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Transaction routes
-  app.get('/api/accounts/:accountId/transactions', async (req, res) => {
+  app.get('/api/accounts/:accountId/transactions', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
@@ -442,7 +482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/accounts/:accountId/transactions', async (req, res) => {
+  app.post('/api/accounts/:accountId/transactions', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       // Converte campos string para número antes da validação
@@ -576,7 +616,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Credit card routes
-  app.get('/api/accounts/:accountId/credit-cards', async (req, res) => {
+  app.get('/api/accounts/:accountId/credit-cards', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       console.log(
@@ -608,7 +648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/accounts/:accountId/credit-cards', async (req, res) => {
+  app.post('/api/accounts/:accountId/credit-cards', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       console.log('[POST /api/accounts/:accountId/credit-cards] Body recebido:', req.body);
@@ -703,7 +743,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Credit card transaction routes
-  app.get('/api/accounts/:accountId/credit-card-transactions', async (req, res) => {
+  app.get('/api/accounts/:accountId/credit-card-transactions', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const creditCardId = req.query.creditCardId
@@ -715,7 +755,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to fetch credit card transactions' });
     }
   });
-  app.post('/api/accounts/:accountId/credit-card-transactions', async (req, res) => {
+  app.post('/api/accounts/:accountId/credit-card-transactions', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const validatedData = insertCreditCardTransactionSchema.parse({
@@ -762,7 +802,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bank account routes
-  app.get('/api/accounts/:accountId/bank-accounts', async (req, res) => {
+  app.get('/api/accounts/:accountId/bank-accounts', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const bankAccounts = await storage.getBankAccounts(accountId);
@@ -785,7 +825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/accounts/:accountId/bank-accounts', async (req, res) => {
+  app.post('/api/accounts/:accountId/bank-accounts', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const validatedData = insertBankAccountSchema.parse({
@@ -829,7 +869,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   // Listar faturas de cartão de crédito
-  app.get('/api/accounts/:accountId/credit-card-invoices', async (req, res) => {
+  app.get('/api/accounts/:accountId/credit-card-invoices', validateAccountOwnership, async (req, res) => {
     const accountId = Number(req.params.accountId);
     if (!accountId) return res.status(400).json({ error: 'accountId obrigatório' });
     try {
@@ -843,7 +883,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Invoice payment routes
-  app.get('/api/accounts/:accountId/invoice-payments', async (req, res) => {
+  app.get('/api/accounts/:accountId/invoice-payments', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const invoicePayments = await storage.getInvoicePayments(accountId);
@@ -854,7 +894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/accounts/:accountId/invoice-payments/pending', async (req, res) => {
+  app.get('/api/accounts/:accountId/invoice-payments/pending', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const pendingInvoices = await storage.getPendingInvoicePayments(accountId);
@@ -865,7 +905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/accounts/:accountId/invoice-payments', async (req, res) => {
+  app.post('/api/accounts/:accountId/invoice-payments', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const invoicePaymentData = insertInvoicePaymentSchema.parse({
@@ -885,7 +925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/accounts/:accountId/invoice-payments/process-overdue', async (req, res) => {
+  app.post('/api/accounts/:accountId/invoice-payments/process-overdue', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const processedInvoices = await storage.processOverdueInvoices(accountId);
@@ -948,7 +988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint para buscar transações antigas com "Fatura" na descrição
-  app.get('/api/accounts/:id/legacy-invoice-transactions', async (req, res) => {
+  app.get('/api/accounts/:id/legacy-invoice-transactions', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.id);
       const legacyTransactions = await storage.getLegacyInvoiceTransactions(accountId);
@@ -960,7 +1000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint para deletar transações antigas de fatura em lote
-  app.delete('/api/accounts/:id/legacy-invoice-transactions', async (req, res) => {
+  app.delete('/api/accounts/:id/legacy-invoice-transactions', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.id);
       const result = await storage.deleteLegacyInvoiceTransactions(accountId);
@@ -975,7 +1015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Project routes
-  app.get('/api/accounts/:accountId/projects', async (req, res) => {
+  app.get('/api/accounts/:accountId/projects', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const projects = await storage.getProjects(accountId);
@@ -1012,7 +1052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/accounts/:accountId/projects', async (req, res) => {
+  app.post('/api/accounts/:accountId/projects', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const validatedData = insertProjectSchema.parse({ ...req.body, accountId });
@@ -1056,7 +1096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Cost Center routes
-  app.get('/api/accounts/:accountId/cost-centers', async (req, res) => {
+  app.get('/api/accounts/:accountId/cost-centers', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const costCenters = await storage.getCostCenters(accountId);
@@ -1093,7 +1133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/accounts/:accountId/cost-centers', async (req, res) => {
+  app.post('/api/accounts/:accountId/cost-centers', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const validatedData = insertCostCenterSchema.parse({ ...req.body, accountId });
@@ -1137,7 +1177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Client routes
-  app.get('/api/accounts/:accountId/clients', async (req, res) => {
+  app.get('/api/accounts/:accountId/clients', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const clients = await storage.getClients(accountId);
@@ -1174,7 +1214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/accounts/:accountId/clients', async (req, res) => {
+  app.post('/api/accounts/:accountId/clients', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
       const validatedData = insertClientSchema.parse({ ...req.body, accountId });
@@ -1218,17 +1258,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete all transactions route
-  app.delete('/api/accounts/:accountId/transactions/all', async (req, res) => {
+  app.delete('/api/accounts/:accountId/transactions/all', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
 
-      // Validar se a conta existe
-      const account = await storage.getAccount(accountId);
-      if (!account) {
-        return res.status(404).json({ message: 'Account not found' });
-      }
-
-      // Deletar todas as transações
+      // Deletar todas as transações (validação de propriedade já feita pelo middleware)
       const result = await storage.deleteAllTransactions(accountId);
 
       console.log(

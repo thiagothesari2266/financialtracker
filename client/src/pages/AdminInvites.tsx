@@ -14,6 +14,8 @@ export default function AdminInvites() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
+  const [maxPersonalAccounts, setMaxPersonalAccounts] = useState(1);
+  const [maxBusinessAccounts, setMaxBusinessAccounts] = useState(0);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   const invitesQuery = useQuery<Invite[]>({
@@ -26,21 +28,23 @@ export default function AdminInvites() {
   });
 
   const createInviteMutation = useMutation({
-    mutationFn: async (email: string) => {
+    mutationFn: async (data: { email: string; maxPersonalAccounts: number; maxBusinessAccounts: number }) => {
       const res = await fetch('/api/admin/invites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(data),
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Falha ao criar convite');
+        const responseData = await res.json();
+        throw new Error(responseData.message || 'Falha ao criar convite');
       }
       return res.json();
     },
     onSuccess: (data: { emailSent?: boolean; emailError?: string }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/invites'] });
       setEmail('');
+      setMaxPersonalAccounts(1);
+      setMaxBusinessAccounts(0);
 
       if (data.emailSent) {
         toast({
@@ -79,7 +83,11 @@ export default function AdminInvites() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
-    createInviteMutation.mutate(email.trim());
+    createInviteMutation.mutate({
+      email: email.trim(),
+      maxPersonalAccounts,
+      maxBusinessAccounts,
+    });
   };
 
   const copyInviteLink = async (token: string) => {
@@ -147,21 +155,49 @@ export default function AdminInvites() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="flex gap-3">
-                <div className="flex-1">
-                  <Label htmlFor="email" className="sr-only">
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="email@exemplo.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <Label htmlFor="email" className="sr-only">
+                      Email
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="email@exemplo.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
-                <Button type="submit" disabled={createInviteMutation.isPending}>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <Label htmlFor="maxPersonal" className="text-sm text-slate-600">
+                      Contas Pessoais
+                    </Label>
+                    <Input
+                      id="maxPersonal"
+                      type="number"
+                      min={0}
+                      value={maxPersonalAccounts}
+                      onChange={(e) => setMaxPersonalAccounts(parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label htmlFor="maxBusiness" className="text-sm text-slate-600">
+                      Contas Empresariais
+                    </Label>
+                    <Input
+                      id="maxBusiness"
+                      type="number"
+                      min={0}
+                      value={maxBusinessAccounts}
+                      onChange={(e) => setMaxBusinessAccounts(parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                </div>
+                <Button type="submit" disabled={createInviteMutation.isPending} className="w-full">
                   <Mail className="w-4 h-4 mr-2" />
                   {createInviteMutation.isPending ? 'Criando...' : 'Criar Convite'}
                 </Button>
@@ -198,6 +234,9 @@ export default function AdminInvites() {
                           {invite.status === 'pending' && (
                             <> | Expira em {formatDate(invite.expiresAt)}</>
                           )}
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          Limites: {invite.maxPersonalAccounts} pessoal, {invite.maxBusinessAccounts} empresarial
                         </div>
                       </div>
                       <div className="flex items-center gap-3">

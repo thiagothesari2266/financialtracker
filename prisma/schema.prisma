@@ -54,27 +54,32 @@ enum InviteStatus {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  role         UserRole @default(user)
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id                  Int      @id @default(autoincrement())
+  email               String   @unique
+  passwordHash        String   @map("password_hash")
+  role                UserRole @default(user)
+  maxPersonalAccounts Int      @default(1) @map("max_personal_accounts")
+  maxBusinessAccounts Int      @default(0) @map("max_business_accounts")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
-  invitesSent  Invite[] @relation("InviteCreator")
+  invitesSent Invite[]  @relation("InviteCreator")
+  accounts    Account[]
 
   @@map("users")
 }
 
 model Invite {
-  id          Int          @id @default(autoincrement())
-  email       String
-  token       String       @unique
-  status      InviteStatus @default(pending)
-  createdById Int          @map("created_by_id")
-  expiresAt   DateTime     @map("expires_at")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  acceptedAt  DateTime?    @map("accepted_at")
+  id                  Int          @id @default(autoincrement())
+  email               String
+  token               String       @unique
+  status              InviteStatus @default(pending)
+  createdById         Int          @map("created_by_id")
+  maxPersonalAccounts Int          @default(1) @map("max_personal_accounts")
+  maxBusinessAccounts Int          @default(0) @map("max_business_accounts")
+  expiresAt           DateTime     @map("expires_at")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  acceptedAt          DateTime?    @map("accepted_at")
 
   createdBy User @relation("InviteCreator", fields: [createdById], references: [id])
 
@@ -82,23 +87,25 @@ model Invite {
 }
 
 model Account {
-  id         Int          @id @default(autoincrement())
-  name       String
-  type       AccountType
-  createdAt  DateTime     @default(now()) @map("created_at")
+  id        Int         @id @default(autoincrement())
+  name      String
+  type      AccountType
+  userId    Int         @map("user_id")
+  createdAt DateTime    @default(now()) @map("created_at")
 
-  categories          Category[]
-  transactions        Transaction[]
-  creditCards         CreditCard[]
+  user                   User                    @relation(fields: [userId], references: [id])
+  categories             Category[]
+  transactions           Transaction[]
+  creditCards            CreditCard[]
   creditCardTransactions CreditCardTransaction[]
-  bankAccounts        BankAccount[]
-  invoicePayments     InvoicePayment[]
-  invoiceImports      InvoiceImport[]
-  projects            Project[]
-  costCenters         CostCenter[]
-  clients             Client[]
-  fixedCashflows     FixedCashflow[]
-  debts              Debt[]
+  bankAccounts           BankAccount[]
+  invoicePayments        InvoicePayment[]
+  invoiceImports         InvoiceImport[]
+  projects               Project[]
+  costCenters            CostCenter[]
+  clients                Client[]
+  fixedCashflows         FixedCashflow[]
+  debts                  Debt[]
 
   @@map("accounts")
 }
