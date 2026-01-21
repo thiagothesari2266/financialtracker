@@ -40,14 +40,34 @@
       "mcp__playwright__browser_wait_for",
       "mcp__playwright__browser_click",
       "mcp__playwright__browser_snapshot",
-      "Bash(npx prisma db push:*)",
       "Bash(psql:*)",
       "Bash(PGPASSWORD=\"tmttx22ID\" psql:*)",
       "Bash(npx prisma generate:*)",
       "mcp__playwright__browser_type",
-      "Bash(git remote set-url:*)"
+      "Bash(git remote set-url:*)",
+      "Bash(timeout 30 ssh:*)",
+      "Bash(ping:*)",
+      "mcp__playwright__browser_fill_form",
+      "mcp__playwright__browser_network_requests",
+      "mcp__playwright__browser_evaluate",
+      "mcp__ssh__ssh_read_file",
+      "mcp__ssh__ssh_edit_file",
+      "Bash(PGPASSWORD=tmttx22ID psql:*)",
+      "mcp__ssh__ssh_disconnect",
+      "mcp__playwright__browser_run_code",
+      "Bash(PGPASSWORD=\"$DB_PASSWORD\" psql:*)",
+      "Bash(xargs:*)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(npx tsc:*)"
     ],
-    "deny": []
+    "deny": [
+      "Bash(npx prisma db push --accept-data-loss:*)",
+      "Bash(npx prisma db push --force-reset:*)",
+      "Bash(npx prisma migrate reset:*)",
+      "Bash(*--accept-data-loss*)",
+      "Bash(*--force-reset*)"
+    ]
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [

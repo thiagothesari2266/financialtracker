@@ -69,9 +69,9 @@ export default function AccountSelector() {
     <div className="min-h-screen w-full bg-slate-50 py-6 sm:py-8 lg:py-12">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8 sm:mb-10 lg:mb-12">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 mb-3 sm:mb-4">
-            FinanceManager
-          </h1>
+          <div className="flex justify-center mb-4">
+            <img src="/logo.png" alt="Nexfin" className="h-12 sm:h-14 lg:h-16 w-auto" />
+          </div>
           <p className="text-base sm:text-lg lg:text-xl text-slate-600">
             Selecione ou crie uma conta para continuar
           </p>

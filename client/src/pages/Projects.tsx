@@ -25,6 +25,7 @@ import {
 import type { ProjectWithClient } from '@shared/schema';
 import { AppShell } from '@/components/Layout/AppShell';
 import { EmptyState } from '@/components/ui/empty-state';
+import { formatCurrency } from '@/lib/utils';
 
 export default function Projects() {
   const { currentAccount } = useAccount();
@@ -95,14 +96,6 @@ export default function Projects() {
         });
       }
     }
-  };
-
-  const formatCurrency = (amount?: string) => {
-    if (!amount) return 'R$ 0,00';
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(parseFloat(amount));
   };
 
   const formatDate = (dateString?: string) => {

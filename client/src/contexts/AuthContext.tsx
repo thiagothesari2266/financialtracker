@@ -6,7 +6,7 @@ import { getQueryFn } from '@/lib/queryClient';
 interface AuthContextValue {
   user: AuthenticatedUser | null;
   isLoading: boolean;
-  login: (credentials: LoginInput) => Promise<void>;
+  login: (credentials: LoginInput) => Promise<AuthenticatedUser>;
   register: (data: InsertUser) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const login = useCallback(
-    async (credentials: LoginInput) => {
+    async (credentials: LoginInput): Promise<AuthenticatedUser> => {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,8 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify(credentials),
       });
       await parseResponse(res);
+      const userData: AuthenticatedUser = await res.json();
       resetAppQueries();
       await refreshSession();
+      return userData;
     },
     [refreshSession, resetAppQueries]
   );

@@ -102,7 +102,7 @@ export function AppShell({ children }: AppShellProps) {
         <div className="flex min-h-screen flex-col bg-background">
           <div className="sticky top-0 z-10 flex h-12 items-center gap-2 border-b bg-background px-4 md:hidden">
             <SidebarTrigger />
-            <span className="text-sm font-medium">Nexfin</span>
+            <img src="/logo.png" alt="Nexfin" className="h-6 w-auto" />
           </div>
           <div className="flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-10">
@@ -139,9 +139,7 @@ function AppSidebar({ accountType }: { accountType: 'personal' | 'business' }) {
       <Sidebar collapsible="icon">
         <SidebarHeader className="space-y-3">
           <div className="px-3 pt-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-              Nexfin
-            </div>
+            <img src="/logo.png" alt="Nexfin" className="h-7 w-auto" />
           </div>
           <AccountSwitcher />
         </SidebarHeader>

@@ -29,6 +29,7 @@ import {
 } from 'recharts';
 import { AppShell } from '@/components/Layout/AppShell';
 import { SummaryCard } from '@/components/ui/summary-card';
+import { formatCurrency } from '@/lib/utils';
 
 export default function Reports() {
   const { currentAccount } = useAccount();
@@ -67,13 +68,6 @@ export default function Reports() {
       </div>
     );
   }
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
 
   // Prepare chart data
   const expensesByCategory = categoryStats

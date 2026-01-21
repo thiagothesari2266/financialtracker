@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { CreditCard } from '@shared/schema';
+import { formatCurrency } from '@/lib/utils';
 
 export default function CreditCards() {
   const { currentAccount } = useAccount();
@@ -15,20 +16,6 @@ export default function CreditCards() {
     queryKey: ['/api/accounts', currentAccount?.id, 'credit-cards'],
     enabled: !!currentAccount,
   });
-
-  const formatCurrency = (value: string | number) => {
-    const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    if (isNaN(numValue) || numValue === null || numValue === undefined) {
-      return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      }).format(0);
-    }
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(numValue);
-  };
 
   const formatDueDate = (dueDate: number) => {
     if (!dueDate || isNaN(dueDate) || dueDate < 1 || dueDate > 31) return '--/--';

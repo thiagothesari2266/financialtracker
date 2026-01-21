@@ -43,7 +43,7 @@ import TransactionModal from '@/components/Modals/TransactionModal';
 import InvoiceTransactionModal from '@/components/Modals/InvoiceTransactionModal';
 import { SummaryCard } from '@/components/ui/summary-card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import type { TransactionWithCategory } from '@shared/schema';
 
 type ViewType = 'month' | 'week' | 'day';
@@ -203,13 +203,6 @@ export default function Transactions() {
     (sum, t) => sum + (t.type === 'income' ? parseFloat(t.amount) : -parseFloat(t.amount)),
     0
   );
-
-  const formatCurrency = (value: string | number) => {
-    const numeric = typeof value === 'number' ? value : parseFloat(value);
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-      Number.isFinite(numeric) ? numeric : 0
-    );
-  };
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';

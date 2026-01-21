@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAccount } from '@/contexts/AccountContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatCurrency } from '@/lib/utils';
 
 export default function TopCategories() {
   const { currentAccount } = useAccount();
@@ -14,20 +15,6 @@ export default function TopCategories() {
   const safeParseFloat = (value: any): number => {
     const parsed = parseFloat(value);
     return isNaN(parsed) ? 0 : parsed;
-  };
-
-  const formatCurrency = (value: string | number) => {
-    const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    if (isNaN(numValue) || numValue === null || numValue === undefined) {
-      return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      }).format(0);
-    }
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(numValue);
   };
 
   // Get top 5 categories by spending

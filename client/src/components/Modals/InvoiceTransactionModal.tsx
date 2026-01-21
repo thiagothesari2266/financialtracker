@@ -12,6 +12,7 @@ import { useAccount } from '@/contexts/AccountContext';
 import { useCreditCards } from '@/hooks/useCreditCards';
 import type { TransactionWithCategory } from '@shared/schema';
 import { DatePicker } from '@/components/ui/date-picker';
+import { formatCurrency } from '@/lib/utils';
 
 interface InvoiceTransactionModalProps {
   isOpen: boolean;
@@ -176,12 +177,8 @@ export default function InvoiceTransactionModal({
     }
   };
 
-  const formatCurrency = (amount: string) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(Math.abs(parseFloat(amount))); // Math.abs para mostrar valor positivo
-  };
+  // Wrapper para mostrar valor absoluto
+  const formatCurrencyAbs = (amount: string) => formatCurrency(Math.abs(parseFloat(amount)));
 
   const _formatDate = (dateString: string) => {
     return format(parse(dateString, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy');
@@ -240,7 +237,7 @@ export default function InvoiceTransactionModal({
               </div>
               <div>
                 <span className="text-slate-600">Valor:</span>
-                <p className="font-bold text-red-600">{formatCurrency(transaction.amount)}</p>
+                <p className="font-bold text-red-600">{formatCurrencyAbs(transaction.amount)}</p>
               </div>
               <div>
                 <span className="text-slate-600">Período:</span>

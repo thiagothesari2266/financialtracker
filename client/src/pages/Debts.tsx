@@ -18,6 +18,7 @@ import { DebtModal, type DebtFormValues } from '@/components/Modals/DebtModal';
 import { useToast } from '@/hooks/use-toast';
 import { useCreateDebt, useDebts, useDeleteDebt, useUpdateDebt } from '@/hooks/useDebts';
 import { EmptyState } from '@/components/ui/empty-state';
+import { formatCurrency } from '@/lib/utils';
 
 const toNumber = (value: string): number => {
   const normalized = value.replace(/,/g, '.');
@@ -29,11 +30,6 @@ const getMonthlyRate = (debt: Debt): number => {
   const baseRate = toNumber(debt.interestRate) / 100;
   if (baseRate <= 0) return 0;
   return debt.ratePeriod === 'yearly' ? baseRate / 12 : baseRate;
-};
-
-const formatCurrency = (value: number | string): string => {
-  const numeric = typeof value === 'number' ? value : toNumber(value);
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(numeric);
 };
 
 const formatPercent = (value: string, period: DebtRatePeriod): string => {

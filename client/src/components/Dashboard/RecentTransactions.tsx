@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CreditCard, ArrowUp, ArrowDown } from 'lucide-react';
 import type { TransactionWithCategory } from '@shared/schema';
 import { getCategoryIcon, categoryColors } from '@/lib/categoryIcons';
+import { formatCurrency } from '@/lib/utils';
 
 export default function RecentTransactions() {
   const { currentAccount } = useAccount();
@@ -14,20 +15,6 @@ export default function RecentTransactions() {
     queryKey: ['/api/accounts', currentAccount?.id, 'transactions', { limit: 5 }],
     enabled: !!currentAccount,
   });
-
-  const formatCurrency = (value: string | number) => {
-    const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    if (isNaN(numValue) || numValue === null || numValue === undefined) {
-      return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      }).format(0);
-    }
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(numValue);
-  };
 
   const formatDate = (date: string) => {
     if (!date) return 'Data inválida';

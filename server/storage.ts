@@ -14,6 +14,7 @@ import type {
   Client as PrismaClientEntity,
   Debt as PrismaDebt,
   User as PrismaUser,
+  Invite as PrismaInvite,
 } from '@prisma/client';
 import { prisma } from './db';
 import type {
@@ -51,6 +52,7 @@ import type {
   MonthlyFixedItem,
   Debt,
   InsertDebt,
+  Invite,
 } from '@shared/schema';
 
 const DATE_ONLY_LENGTH = 10;
@@ -310,12 +312,24 @@ const mapClient = (client: PrismaClientEntity): Client => ({
 const mapUser = (user: PrismaUser): AuthenticatedUser => ({
   id: user.id,
   email: user.email,
+  role: user.role,
   createdAt: ensureDateTimeString(user.createdAt) ?? new Date().toISOString(),
 });
 
 const mapUserWithPassword = (user: PrismaUser): AuthenticatedUser & { passwordHash: string } => ({
   ...mapUser(user),
   passwordHash: user.passwordHash,
+});
+
+const mapInvite = (invite: PrismaInvite): Invite => ({
+  id: invite.id,
+  email: invite.email,
+  token: invite.token,
+  status: invite.status,
+  createdById: invite.createdById,
+  expiresAt: ensureDateTimeString(invite.expiresAt) ?? '',
+  createdAt: ensureDateTimeString(invite.createdAt) ?? '',
+  acceptedAt: ensureDateTimeString(invite.acceptedAt),
 });
 
 const sumTransactions = (transactions: Transaction[], type: 'income' | 'expense'): number => {
@@ -2252,6 +2266,74 @@ export class DatabaseStorage implements IStorage {
   ): Promise<(AuthenticatedUser & { passwordHash: string }) | undefined> {
     const user = await prisma.user.findUnique({ where: { email } });
     return user ? mapUserWithPassword(user) : undefined;
+  }
+
+  // Invite methods
+  async createInvite(email: string, createdById: number): Promise<Invite> {
+    const token = randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // Expira em 7 dias
+
+    const invite = await prisma.invite.create({
+      data: {
+        email: email.trim().toLowerCase(),
+        token,
+        createdById,
+        expiresAt,
+      },
+    });
+
+    return mapInvite(invite);
+  }
+
+  async getInvites(): Promise<Invite[]> {
+    const invites = await prisma.invite.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    return invites.map(mapInvite);
+  }
+
+  async getInviteByToken(token: string): Promise<Invite | undefined> {
+    const invite = await prisma.invite.findUnique({ where: { token } });
+    return invite ? mapInvite(invite) : undefined;
+  }
+
+  async getInviteByEmail(email: string): Promise<Invite | undefined> {
+    const invite = await prisma.invite.findFirst({
+      where: { email: email.trim().toLowerCase(), status: 'pending' },
+    });
+    return invite ? mapInvite(invite) : undefined;
+  }
+
+  async acceptInvite(token: string): Promise<Invite | undefined> {
+    const invite = await prisma.invite.update({
+      where: { token },
+      data: {
+        status: 'accepted',
+        acceptedAt: new Date(),
+      },
+    });
+    return mapInvite(invite);
+  }
+
+  async deleteInvite(id: number): Promise<void> {
+    await prisma.invite.delete({ where: { id } });
+  }
+
+  async createUserWithRole(
+    email: string,
+    password: string,
+    role: 'admin' | 'user' = 'user'
+  ): Promise<AuthenticatedUser> {
+    const passwordHash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
+    const user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        role,
+      },
+    });
+    return mapUser(user);
   }
 }
 

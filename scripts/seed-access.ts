@@ -6,9 +6,16 @@ const PASSWORD_SALT_ROUNDS = 10;
 
 const DEFAULT_USERS = [
   {
+    label: 'Administrador',
+    email: 'admin@nexfin.com.br',
+    password: 'tmttx22ID@22',
+    role: 'admin' as const,
+  },
+  {
     label: 'Usuario pessoal',
     email: 'thiagothesari@gmail.com',
     password: 'tmttx22ID',
+    role: 'user' as const,
   },
 ];
 
@@ -30,7 +37,11 @@ interface SeedResult {
   note?: string;
 }
 
-async function upsertUser(email: string, password: string): Promise<SeedResult> {
+async function upsertUser(
+  email: string,
+  password: string,
+  role: 'admin' | 'user' = 'user'
+): Promise<SeedResult> {
   const normalizedEmail = email.trim().toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
@@ -48,6 +59,7 @@ async function upsertUser(email: string, password: string): Promise<SeedResult> 
     data: {
       email: normalizedEmail,
       passwordHash,
+      role,
     },
   });
 
@@ -65,7 +77,7 @@ async function main() {
   for (const user of DEFAULT_USERS) {
     const password =
       user.password && user.password.length >= 8 ? user.password : generatePassword();
-    const result = await upsertUser(user.email, password);
+    const result = await upsertUser(user.email, password, user.role ?? 'user');
     results.push(result);
   }
 

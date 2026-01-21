@@ -30,6 +30,7 @@ import TransactionModal from '@/components/Modals/TransactionModal';
 import { useLocation } from 'wouter';
 import { AppShell } from '@/components/Layout/AppShell';
 import { EmptyState } from '@/components/ui/empty-state';
+import { formatCurrency } from '@/lib/utils';
 
 export default function CreditCardInvoice() {
   const { currentAccount } = useAccount();
@@ -69,13 +70,8 @@ export default function CreditCardInvoice() {
       (inv: any) => inv.creditCardId === Number(creditCardId) && inv.month === month
     );
   }, [creditCardId, month, invoices]);
-  // Funções auxiliares de formatação
-  const formatCurrency = (amount: string) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(Math.abs(parseFloat(amount))); // Math.abs para mostrar valores sempre positivos
-  };
+  // Função auxiliar para formatar moeda com valor absoluto (específica desta página)
+  const formatCurrencyAbs = (amount: string) => formatCurrency(Math.abs(parseFloat(amount)));
 
   const formatMonth = (monthStr: string) => {
     const [year, month] = monthStr.split('-');
@@ -291,7 +287,7 @@ export default function CreditCardInvoice() {
   const pageTitle = creditCard ? `Fatura - ${creditCard.name}` : 'Faturas';
   const pageDescription =
     creditCard && invoice
-      ? `${formatMonth(invoice.month)} • ${formatCurrency(invoice.total)}`
+      ? `${formatMonth(invoice.month)} • ${formatCurrencyAbs(invoice.total)}`
       : 'Selecione um cartão e mês para visualizar a fatura.';
 
   const pageActions =
@@ -393,7 +389,7 @@ export default function CreditCardInvoice() {
               <div>
                 <p className="text-sm text-slate-600">Total da Fatura</p>
                 <p className="text-lg font-semibold text-red-600">
-                  {formatCurrency(invoice.total)}
+                  {formatCurrencyAbs(invoice.total)}
                 </p>
               </div>
               <div>
@@ -513,7 +509,7 @@ export default function CreditCardInvoice() {
                     <div className="flex items-center gap-3">
                       <div className="text-right">
                         <p className="font-semibold text-red-600">
-                          {formatCurrency(transaction.amount)}
+                          {formatCurrencyAbs(transaction.amount)}
                         </p>
                         {transaction.installments > 1 && (
                           <Badge variant="outline" className="mt-1 text-xs">

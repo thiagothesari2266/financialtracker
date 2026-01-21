@@ -4,6 +4,7 @@ import { useAccount } from '@/contexts/AccountContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTransactions } from '@/hooks/useTransactions';
+import { formatCurrency } from '@/lib/utils';
 
 interface MetricsCardsProps {
   currentMonth: string;
@@ -23,12 +24,6 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
     endDate: monthEnd,
     enabled: !!currentAccount,
   });
-
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value || 0);
 
   const monthlyIncome = useMemo(
     () =>

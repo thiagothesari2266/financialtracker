@@ -22,6 +22,7 @@ import { CheckCircle, AlertTriangle, Edit3, Trash2, Calendar, DollarSign, Tag } 
 import type { CreditCard } from '@shared/schema';
 import { DatePicker } from '@/components/ui/date-picker';
 import { format, parse } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
 
 interface ExtractedTransaction {
   date: string;
@@ -344,13 +345,6 @@ export default function TransactionReviewModal({
   // Helper function to remove accents
   const removeAccents = (str: string): string => {
     return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
   };
 
   const formatDate = (dateString: string) => {

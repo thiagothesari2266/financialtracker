@@ -8,6 +8,7 @@ import { Calendar, CreditCard as CreditCardIcon, Eye, X, Edit } from 'lucide-rea
 import { useCreditCardInvoices } from '@/hooks/useCreditCards';
 import TransactionModal from './TransactionModal';
 import type { CreditCard } from '@shared/schema';
+import { formatCurrency } from '@/lib/utils';
 
 interface CreditCardInvoicesModalProps {
   isOpen: boolean;
@@ -52,12 +53,8 @@ function CreditCardInvoicesModal({
       const dateB = new Date(b.month + '-01');
       return dateA.getTime() - dateB.getTime();
     });
-  const formatCurrency = (amount: string) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(Math.abs(parseFloat(amount))); // Math.abs para mostrar valores sempre positivos
-  };
+  // Wrapper para mostrar valor absoluto
+  const formatCurrencyAbs = (amount: string) => formatCurrency(Math.abs(parseFloat(amount)));
 
   const formatMonth = (monthStr: string) => {
     const [year, month] = monthStr.split('-');
@@ -185,7 +182,7 @@ function CreditCardInvoicesModal({
                           <p
                             className={`font-semibold text-lg ${isOverdue ? 'text-red-700' : 'text-red-600'}`}
                           >
-                            {formatCurrency(invoice.total)}
+                            {formatCurrencyAbs(invoice.total)}
                           </p>
                           {isOverdue && (
                             <p className="text-xs text-red-600 font-medium">
@@ -242,7 +239,7 @@ function CreditCardInvoicesModal({
                                 <div className="flex items-center gap-2">
                                   <div className="text-right">
                                     <p className="text-sm font-semibold text-red-600">
-                                      {formatCurrency(transaction.amount)}
+                                      {formatCurrencyAbs(transaction.amount)}
                                     </p>
                                     {transaction.installments > 1 && (
                                       <Badge variant="outline" className="text-xs">

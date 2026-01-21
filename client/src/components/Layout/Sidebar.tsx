@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'wouter';
 import { useAccount } from '@/contexts/AccountContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { AccountSwitcher } from './AccountSwitcher';
 import { cn } from '@/lib/utils';
 import {
@@ -13,6 +14,7 @@ import {
   Building2,
   Settings2,
   Repeat,
+  Users,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -37,8 +39,11 @@ const navItems = [
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const [location] = useLocation();
   const { currentAccount } = useAccount();
+  const { user } = useAuth();
 
   if (!currentAccount) return null;
+
+  const isAdmin = user?.role === 'admin';
 
   return (
     <>
@@ -57,9 +62,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       >
         <div className="flex h-full flex-col p-4">
           <div className="mb-4">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
-              Nexfin
-            </p>
+            <img src="/logo.png" alt="Nexfin" className="h-8 w-auto" />
           </div>
           <div className="mb-4">
             <AccountSwitcher />
@@ -85,6 +88,24 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 </Link>
               );
             })}
+            {isAdmin && (
+              <>
+                <div className="my-2 border-t border-sidebar-border" />
+                <Link
+                  href="/admin/invites"
+                  className={cn(
+                    'flex items-center rounded-lg px-3 py-2 text-sm transition-colors',
+                    location === '/admin/invites'
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  )}
+                  onClick={onClose}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Gerenciar Convites
+                </Link>
+              </>
+            )}
           </nav>
           <div className="mt-4 rounded-lg border border-sidebar-border bg-muted/40 p-3 text-xs text-muted-foreground">
             Layout compacto ativo para {currentAccount.name}.

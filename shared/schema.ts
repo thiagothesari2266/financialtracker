@@ -15,6 +15,12 @@ export type InvoicePaymentStatus = z.infer<typeof invoicePaymentStatusEnum>;
 export const invoiceImportStatusEnum = z.enum(['processing', 'completed', 'failed']);
 export type InvoiceImportStatus = z.infer<typeof invoiceImportStatusEnum>;
 
+export const userRoleEnum = z.enum(['admin', 'user']);
+export type UserRole = z.infer<typeof userRoleEnum>;
+
+export const inviteStatusEnum = z.enum(['pending', 'accepted', 'expired']);
+export type InviteStatus = z.infer<typeof inviteStatusEnum>;
+
 export const projectStatusEnum = z.enum([
   'planning',
   'active',
@@ -30,11 +36,23 @@ export const insertUserSchema = z.object({
 });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
+export const registerWithInviteSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  inviteToken: z.string().min(1),
+});
+export type RegisterWithInvite = z.infer<typeof registerWithInviteSchema>;
+
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
 export type LoginInput = z.infer<typeof loginSchema>;
+
+export const createInviteSchema = z.object({
+  email: z.string().email(),
+});
+export type CreateInvite = z.infer<typeof createInviteSchema>;
 
 export const insertAccountSchema = z.object({
   name: z.string().min(1),
@@ -192,7 +210,19 @@ export type InsertClient = z.infer<typeof insertClientSchema>;
 export interface AuthenticatedUser {
   id: number;
   email: string;
+  role: UserRole;
   createdAt: string;
+}
+
+export interface Invite {
+  id: number;
+  email: string;
+  token: string;
+  status: InviteStatus;
+  createdById: number;
+  expiresAt: string;
+  createdAt: string;
+  acceptedAt: string | null;
 }
 
 export interface Account {

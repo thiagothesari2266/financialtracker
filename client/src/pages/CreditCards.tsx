@@ -18,7 +18,7 @@ import { useProcessOverdueInvoices } from '@/hooks/useProcessInvoices';
 import { useToast } from '@/hooks/use-toast';
 import { SummaryCard } from '@/components/ui/summary-card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 
 export default function CreditCards() {
   const { currentAccount } = useAccount();
@@ -48,13 +48,6 @@ export default function CreditCards() {
       </div>
     );
   }
-  const formatCurrency = (amount: string | number) => {
-    const value = typeof amount === 'number' ? amount : parseFloat(amount);
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(Number.isFinite(value) ? value : 0);
-  };
 
   // Função para calcular o mês da fatura atual baseado na data atual e dia de fechamento
   const getCurrentInvoiceMonth = (closingDay: number): string => {

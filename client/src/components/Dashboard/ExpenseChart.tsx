@@ -3,6 +3,7 @@ import { useAccount } from '@/contexts/AccountContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { formatCurrency } from '@/lib/utils';
 
 interface ExpenseChartProps {
   currentMonth: string;
@@ -28,20 +29,6 @@ export default function ExpenseChart({ currentMonth }: ExpenseChartProps) {
       value: safeParseFloat(stat.total),
       color: stat.color || '#64748b',
     }));
-
-  const formatCurrency = (value: string | number) => {
-    const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    if (isNaN(numValue) || numValue === null || numValue === undefined) {
-      return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      }).format(0);
-    }
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(numValue);
-  };
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
