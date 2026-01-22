@@ -3,12 +3,21 @@ import { useAccount } from '@/contexts/AccountContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
 
-export default function TopCategories() {
+interface TopCategoriesProps {
+  currentMonth: string;
+}
+
+export default function TopCategories({ currentMonth }: TopCategoriesProps) {
   const { currentAccount } = useAccount();
-  const currentMonth = new Date().toISOString().substring(0, 7);
 
   const { data: categoryStats = [], isLoading } = useQuery({
     queryKey: ['/api/accounts', currentAccount?.id, 'categories', 'stats', { month: currentMonth }],
+    queryFn: async () => {
+      if (!currentAccount?.id) return [];
+      const response = await fetch(`/api/accounts/${currentAccount.id}/categories/stats?month=${currentMonth}`);
+      if (!response.ok) throw new Error('Erro ao buscar estatísticas de categorias');
+      return response.json();
+    },
     enabled: !!currentAccount,
   });
 

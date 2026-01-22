@@ -14,6 +14,12 @@ export default function ExpenseChart({ currentMonth }: ExpenseChartProps) {
 
   const { data: categoryStats = [], isLoading } = useQuery({
     queryKey: ['/api/accounts', currentAccount?.id, 'categories', 'stats', { month: currentMonth }],
+    queryFn: async () => {
+      if (!currentAccount?.id) return [];
+      const response = await fetch(`/api/accounts/${currentAccount.id}/categories/stats?month=${currentMonth}`);
+      if (!response.ok) throw new Error('Erro ao buscar estatísticas de categorias');
+      return response.json();
+    },
     enabled: !!currentAccount,
   });
 

@@ -527,8 +527,7 @@ export default function Transactions() {
               <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-600" />
               <p className="text-sm font-medium text-red-800">
                 Você tem {overdueFromPreviousPeriods.length} conta
-                {overdueFromPreviousPeriods.length > 1 ? 's' : ''} em atraso totalizando{' '}
-                {formatCurrency(overdueTotal)}
+                {overdueFromPreviousPeriods.length > 1 ? 's' : ''} em atraso
               </p>
             </div>
           )}

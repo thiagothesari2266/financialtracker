@@ -1,21 +1,17 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useAccount } from '@/contexts/AccountContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { CreditCard } from '@shared/schema';
 import { formatCurrency } from '@/lib/utils';
+import { useCreditCards } from '@/hooks/useCreditCards';
 
 export default function CreditCards() {
   const { currentAccount } = useAccount();
   const [, setIsAddModalOpen] = useState(false);
 
-  const { data: creditCards = [], isLoading } = useQuery<CreditCard[]>({
-    queryKey: ['/api/accounts', currentAccount?.id, 'credit-cards'],
-    enabled: !!currentAccount,
-  });
+  const { data: creditCards = [], isLoading } = useCreditCards(currentAccount?.id || 0);
 
   const formatDueDate = (dueDate: number) => {
     if (!dueDate || isNaN(dueDate) || dueDate < 1 || dueDate > 31) return '--/--';

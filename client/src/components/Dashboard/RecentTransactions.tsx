@@ -1,20 +1,30 @@
-import { useQuery } from '@tanstack/react-query';
 import { useAccount } from '@/contexts/AccountContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreditCard, ArrowUp, ArrowDown } from 'lucide-react';
-import type { TransactionWithCategory } from '@shared/schema';
 import { getCategoryIcon, categoryColors } from '@/lib/categoryIcons';
 import { formatCurrency } from '@/lib/utils';
+import { format, endOfMonth, parse } from 'date-fns';
+import { useTransactions } from '@/hooks/useTransactions';
 
-export default function RecentTransactions() {
+interface RecentTransactionsProps {
+  currentMonth: string;
+}
+
+export default function RecentTransactions({ currentMonth }: RecentTransactionsProps) {
   const { currentAccount } = useAccount();
 
-  const { data: transactions = [], isLoading } = useQuery<TransactionWithCategory[]>({
-    queryKey: ['/api/accounts', currentAccount?.id, 'transactions', { limit: 5 }],
-    enabled: !!currentAccount,
-  });
+  const monthStart = `${currentMonth}-01`;
+  const monthEnd = format(endOfMonth(parse(monthStart, 'yyyy-MM-dd', new Date())), 'yyyy-MM-dd');
+
+  const { data: allTransactions = [], isLoading } = useTransactions(
+    currentAccount?.id || 0,
+    { startDate: monthStart, endDate: monthEnd, enabled: !!currentAccount }
+  );
+
+  // Pegar apenas as 5 mais recentes (já vem ordenado por data desc)
+  const transactions = allTransactions.slice(0, 5);
 
   const formatDate = (date: string) => {
     if (!date) return 'Data inválida';

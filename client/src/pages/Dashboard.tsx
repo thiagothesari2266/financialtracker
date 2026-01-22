@@ -110,11 +110,11 @@ export default function Dashboard() {
             <div className="xl:col-span-2">
               <ExpenseChart currentMonth={currentMonth} />
             </div>
-            <TopCategories />
+            <TopCategories currentMonth={currentMonth} />
           </div>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <RecentTransactions />
+            <RecentTransactions currentMonth={currentMonth} />
             <CreditCards />
           </div>
         </div>
