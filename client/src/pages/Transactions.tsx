@@ -35,7 +35,11 @@ import {
   Filter,
   Plus,
   Search,
+  Target,
   Trash2,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -193,12 +197,6 @@ export default function Transactions() {
   const totalExpensePeriodo = transactions
     .filter((t) => t.type === 'expense')
     .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-  const saldoAcumuladoPeriodo = transactions
-    .filter((t) => t.paid)
-    .reduce(
-      (sum, t) => sum + (t.type === 'income' ? parseFloat(t.amount) : -parseFloat(t.amount)),
-      0
-    );
   const previsaoAcumulada = allTransactionsUntilPeriod.reduce(
     (sum, t) => sum + (t.type === 'income' ? parseFloat(t.amount) : -parseFloat(t.amount)),
     0
@@ -440,31 +438,31 @@ export default function Transactions() {
     label: string;
     value: string;
     tone: 'default' | 'positive' | 'negative';
+    icon: React.ReactNode;
   }[] = [
     {
       label: 'Saldo Atual',
       value: formatCurrency(saldoAtual),
       tone: saldoAtual < 0 ? 'negative' : 'positive',
+      icon: <Wallet className="h-5 w-5 text-muted-foreground" />,
     },
     {
       label: `Entradas ${getPeriodLabel()}`,
       value: formatCurrency(totalIncomePeriodo),
       tone: 'positive',
+      icon: <TrendingUp className="h-5 w-5 text-green-600" />,
     },
     {
       label: `Saídas ${getPeriodLabel()}`,
       value: formatCurrency(totalExpensePeriodo),
       tone: 'negative',
-    },
-    {
-      label: `Saldo pago ${getPeriodLabel()}`,
-      value: formatCurrency(saldoAcumuladoPeriodo),
-      tone: saldoAcumuladoPeriodo < 0 ? 'negative' : 'default',
+      icon: <TrendingDown className="h-5 w-5 text-red-600" />,
     },
     {
       label: `Previsão ${getPrevisaoLabel()}`,
       value: formatCurrency(previsaoAcumulada),
       tone: previsaoAcumulada < 0 ? 'negative' : 'default',
+      icon: <Target className="h-5 w-5 text-muted-foreground" />,
     },
   ];
 
@@ -523,13 +521,14 @@ export default function Transactions() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <div className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-4">
             {summaryCards.map((item) => (
               <SummaryCard
                 key={item.label}
                 label={item.label}
                 value={item.value}
                 tone={item.tone as any}
+                icon={item.icon}
               />
             ))}
           </div>

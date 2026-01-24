@@ -9,3 +9,10 @@ CLAUDE.md
 .mcp.json
 mcp-ssh/build
 mcp-ssh/node_modules
+
+# Claude Code local settings
+.claude/settings.local.json
+.claude/commands/
+
+# Windows artifacts
+nul
