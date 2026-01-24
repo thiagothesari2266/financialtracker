@@ -204,6 +204,13 @@ export default function Transactions() {
     0
   );
 
+  const saldoAtual = allTransactionsUntilPeriod
+    .filter((t) => t.paid)
+    .reduce(
+      (sum, t) => sum + (t.type === 'income' ? parseFloat(t.amount) : -parseFloat(t.amount)),
+      0
+    );
+
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
     const parsed = parse(dateString, 'yyyy-MM-dd', new Date());
@@ -435,6 +442,11 @@ export default function Transactions() {
     tone: 'default' | 'positive' | 'negative';
   }[] = [
     {
+      label: 'Saldo Atual',
+      value: formatCurrency(saldoAtual),
+      tone: saldoAtual < 0 ? 'negative' : 'positive',
+    },
+    {
       label: `Entradas ${getPeriodLabel()}`,
       value: formatCurrency(totalIncomePeriodo),
       tone: 'positive',
@@ -511,7 +523,7 @@ export default function Transactions() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 pt-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {summaryCards.map((item) => (
               <SummaryCard
                 key={item.label}
