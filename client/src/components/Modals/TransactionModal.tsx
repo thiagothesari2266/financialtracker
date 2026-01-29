@@ -405,6 +405,8 @@ export default function TransactionModal({
       amount: data.amount,
       bankAccountId: data.bankAccountId ? Number(data.bankAccountId) : undefined,
       installments: data.installments ? Number(data.installments) : undefined,
+      // Inclui status de pago apenas se for edição
+      ...(transaction && { paid: localPaid }),
     };
 
     // Para recorrentes, preserva recurrenceGroupId existente ao enviar edições
@@ -843,19 +845,9 @@ export default function TransactionModal({
     setLocalPaid(!!transaction?.paid);
   }, [transaction]);
 
-  // Handler para alternar status de pago
+  // Handler para alternar status de pago (apenas atualiza estado local, salva junto com o formulário)
   const handleTogglePaid = (checked: boolean | 'indeterminate') => {
-    if (!transaction?.id) return;
-    setLocalPaid(Boolean(checked)); // Atualiza visual imediatamente
-    updateTransactionMutation.mutate({
-      id: transaction.id,
-      data: {
-        paid: Boolean(checked),
-        editScope: 'single', // Sempre atualiza apenas esta transação
-        // Enviar a data da ocorrência sendo marcada como paga (para criar exceção)
-        exceptionForDate: transaction.virtualDate || transaction.date?.split('T')[0],
-      },
-    });
+    setLocalPaid(Boolean(checked));
   }; // Estado para tipo de destino
   const [destinationType, setDestinationType] = useState<'bank' | 'credit'>(
     transaction && transaction.creditCardId ? 'credit' : 'bank'
@@ -866,10 +858,12 @@ export default function TransactionModal({
 
   // Detecta se houve mudanças no formulário ou nos estados externos
   const { isDirty } = form.formState;
+  const paidChanged = transaction ? localPaid !== !!transaction.paid : false;
   const hasChanges =
     isDirty ||
     launchType !== originalLaunchType ||
-    destinationType !== originalDestinationType;
+    destinationType !== originalDestinationType ||
+    paidChanged;
 
   // Função utilitária para calcular o mês da fatura baseado na data da transação e dia de fechamento
   const calculateInvoiceMonth = (transactionDate: string, closingDay: number): string => {
