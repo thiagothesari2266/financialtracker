@@ -25,6 +25,26 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
     enabled: !!currentAccount,
   });
 
+  // Busca todas as transações desde o início até o fim do mês para calcular saldo acumulado
+  const { data: allTransactionsUntilMonth = [] } = useTransactions(currentAccount?.id || 0, {
+    startDate: '1900-01-01',
+    endDate: monthEnd,
+    enabled: !!currentAccount,
+  });
+
+  // Saldo atual: soma de todas as transações PAGAS até o fim do mês
+  const currentBalance = useMemo(
+    () =>
+      allTransactionsUntilMonth
+        .filter((tx) => tx.paid)
+        .reduce(
+          (acc, tx) =>
+            acc + (tx.type === 'income' ? parseFloat(tx.amount) || 0 : -(parseFloat(tx.amount) || 0)),
+          0
+        ),
+    [allTransactionsUntilMonth]
+  );
+
   const monthlyIncome = useMemo(
     () =>
       transactions
@@ -70,11 +90,11 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
   const metrics = [
     {
       title: 'Saldo Atual',
-      value: formatCurrency(monthlyNet),
+      value: formatCurrency(currentBalance),
       icon: 'fas fa-wallet',
       bgColor: 'bg-blue-100',
       iconColor: 'text-primary',
-      isNegative: monthlyNet < 0,
+      isNegative: currentBalance < 0,
     },
     {
       title: 'Receitas',
