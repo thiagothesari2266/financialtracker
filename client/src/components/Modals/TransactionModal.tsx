@@ -40,6 +40,8 @@ import {
 } from '@/hooks/useCreditCards';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DatePicker } from '@/components/ui/date-picker';
+import { CheckCircle2, Clock } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 // Adiciona ao schema
 const transactionSchema = z.object({
@@ -934,14 +936,49 @@ export default function TransactionModal({
               {transaction ? 'Editar Transação' : 'Nova Transação'}
             </DialogTitle>
           </DialogHeader>
-          {/* Checkbox de pago */}
+          {/* Status de pagamento */}
           {transaction && transaction.id && (
-            <div className="flex items-center gap-2 mb-2">
-              <Checkbox checked={localPaid} onCheckedChange={handleTogglePaid} id="paid-checkbox" />
-              <label htmlFor="paid-checkbox" className="text-sm select-none cursor-pointer">
-                {localPaid ? 'Pago' : 'Marcar como pago'}
-              </label>
-            </div>
+            <button
+              type="button"
+              onClick={() => handleTogglePaid(!localPaid)}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all duration-200 w-full',
+                localPaid
+                  ? 'bg-green-50 border-green-200 hover:bg-green-100 hover:border-green-300'
+                  : 'bg-amber-50 border-amber-200 hover:bg-amber-100 hover:border-amber-300'
+              )}
+            >
+              <div
+                className={cn(
+                  'flex items-center justify-center w-8 h-8 rounded-full transition-colors',
+                  localPaid ? 'bg-green-500' : 'bg-amber-500'
+                )}
+              >
+                {localPaid ? (
+                  <CheckCircle2 className="w-5 h-5 text-white" />
+                ) : (
+                  <Clock className="w-5 h-5 text-white" />
+                )}
+              </div>
+              <div className="flex flex-col items-start">
+                <span
+                  className={cn(
+                    'text-sm font-semibold',
+                    localPaid ? 'text-green-700' : 'text-amber-700'
+                  )}
+                >
+                  {localPaid ? 'Pago' : 'Pendente'}
+                </span>
+                <span
+                  className={cn(
+                    'text-xs',
+                    localPaid ? 'text-green-600' : 'text-amber-600'
+                  )}
+                >
+                  {localPaid ? 'Clique para marcar como pendente' : 'Clique para marcar como pago'}
+                </span>
+              </div>
+            </button>
           )}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
