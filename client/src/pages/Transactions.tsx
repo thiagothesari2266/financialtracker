@@ -3,6 +3,8 @@ import { addMonths, endOfMonth, format, parse, startOfMonth, subMonths } from 'd
 import { ptBR } from 'date-fns/locale';
 import { useAccount } from '@/contexts/AccountContext';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useBankAccounts } from '@/hooks/useBankAccounts';
+import { useCreditCards } from '@/hooks/useCreditCards';
 import { AppShell } from '@/components/Layout/AppShell';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -56,6 +58,9 @@ export default function Transactions() {
   const { currentAccount } = useAccount();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const { data: bankAccounts = [] } = useBankAccounts(currentAccount?.id ?? 0);
+  const { data: creditCards = [] } = useCreditCards(currentAccount?.id ?? 0);
 
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isInvoiceTransactionModalOpen, setIsInvoiceTransactionModalOpen] = useState(false);
@@ -240,6 +245,19 @@ export default function Transactions() {
     today.setHours(0, 0, 0, 0);
     transactionDate.setHours(0, 0, 0, 0);
     return transactionDate < today;
+  };
+
+  // Retorna o nome da conta bancária ou cartão de crédito
+  const getAccountName = (transaction: TransactionWithCategory): string | null => {
+    if (transaction.creditCardId) {
+      const card = creditCards.find((c) => c.id === transaction.creditCardId);
+      return card ? card.name : null;
+    }
+    if (transaction.bankAccountId) {
+      const account = bankAccounts.find((a) => a.id === transaction.bankAccountId);
+      return account ? account.name : null;
+    }
+    return null;
   };
 
   const overdueFromPreviousPeriods = useMemo(() => {
@@ -624,7 +642,12 @@ export default function Transactions() {
                             </div>
                           </div>
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>{transaction.paymentMethod || 'Método não informado'}</span>
+                            <span className="flex items-center gap-1">
+                              {transaction.creditCardId && (
+                                <CreditCard className="h-3 w-3" />
+                              )}
+                              {getAccountName(transaction) || 'Conta não informada'}
+                            </span>
                             <div className="flex items-center gap-2">
                               {transaction.paid ? (
                                 <div
@@ -671,7 +694,7 @@ export default function Transactions() {
                           <TableHead>Descrição</TableHead>
                           <TableHead>Categoria</TableHead>
                           <TableHead>Data</TableHead>
-                          <TableHead>Método</TableHead>
+                          <TableHead>Conta</TableHead>
                           <TableHead className="text-right">Valor</TableHead>
                           <TableHead className="text-center">Status</TableHead>
                         </TableRow>
@@ -733,7 +756,12 @@ export default function Transactions() {
                               </div>
                             </TableCell>
                             <TableCell className="text-muted-foreground">
-                              {transaction.paymentMethod || '-'}
+                              <div className="flex items-center gap-1.5">
+                                {transaction.creditCardId && (
+                                  <CreditCard className="h-3.5 w-3.5" />
+                                )}
+                                {getAccountName(transaction) || '-'}
+                              </div>
                             </TableCell>
                             <TableCell className="text-right font-semibold">
                               <span

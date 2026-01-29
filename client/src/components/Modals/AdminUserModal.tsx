@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Form,
@@ -76,14 +75,9 @@ export default function AdminUserModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-lg font-semibold text-slate-900">
-              Editar Usuário
-            </DialogTitle>
-            <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+          <DialogTitle className="text-lg font-semibold text-slate-900">
+            Editar Usuário
+          </DialogTitle>
         </DialogHeader>
 
         <div className="mb-4 p-3 bg-slate-50 rounded-lg">
