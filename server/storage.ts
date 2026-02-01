@@ -95,19 +95,21 @@ const parseDateInput = (value: string): Date => {
 };
 
 const addMonthsPreserveDay = (date: Date, months: number): Date => {
-  const originalDay = date.getDate();
+  // Usa métodos UTC para evitar problemas de timezone
+  // As datas no banco são armazenadas como UTC (T00:00:00.000Z)
+  const originalDay = date.getUTCDate();
   const newDate = new Date(date);
 
   // Primeiro, define o dia para 1 para evitar overflow ao mudar o mês
   // (ex: 31 de Janeiro + 1 mês sem isso viraria 3 de Março)
-  newDate.setDate(1);
-  newDate.setMonth(newDate.getMonth() + months);
+  newDate.setUTCDate(1);
+  newDate.setUTCMonth(newDate.getUTCMonth() + months);
 
-  // Calcula o último dia do mês de destino
-  const lastDayOfMonth = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0).getDate();
+  // Calcula o último dia do mês de destino usando UTC
+  const lastDayOfMonth = new Date(Date.UTC(newDate.getUTCFullYear(), newDate.getUTCMonth() + 1, 0)).getUTCDate();
 
   // Define o dia como o mínimo entre o dia original e o último dia do mês
-  newDate.setDate(Math.min(originalDay, lastDayOfMonth));
+  newDate.setUTCDate(Math.min(originalDay, lastDayOfMonth));
 
   return newDate;
 };
