@@ -10,13 +10,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { DollarSign, Repeat, TrendingUp, Trash2, Plus, Pencil } from 'lucide-react';
+import { DollarSign, Repeat, TrendingUp, Trash2, Plus, Pencil, FileDown } from 'lucide-react';
 import type { InsertFixedCashflow, MonthlyFixedItem, MonthlyFixedSummary } from '@shared/schema';
 import { Button } from '@/components/ui/button';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { FixedCashflowModal } from '@/components/Modals/FixedCashflowModal';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function MonthlyFixed() {
   const { currentAccount } = useAccount();
@@ -151,6 +153,135 @@ export default function MonthlyFixed() {
     );
   };
 
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(33, 33, 33);
+    doc.text('Fixos Mensais', pageWidth / 2, 20, { align: 'center' });
+
+    // Account name
+    if (currentAccount?.name) {
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Conta: ${currentAccount.name}`, pageWidth / 2, 28, { align: 'center' });
+    }
+
+    // Date
+    doc.setFontSize(10);
+    doc.setTextColor(128, 128, 128);
+    const today = new Date().toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric'
+    });
+    doc.text(`Gerado em: ${today}`, pageWidth / 2, 35, { align: 'center' });
+
+    let yPos = 45;
+
+    // Summary section
+    doc.setFontSize(12);
+    doc.setTextColor(33, 33, 33);
+    doc.text('Resumo', 14, yPos);
+    yPos += 8;
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [['', 'Valor']],
+      body: [
+        ['Entradas Fixas', formatCurrency(summary.totals.income)],
+        ['Saídas Fixas', formatCurrency(summary.totals.expenses)],
+        ['Saldo Estimado', formatCurrency(summary.totals.net)],
+      ],
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246], textColor: 255 },
+      styles: { fontSize: 10, cellPadding: 4 },
+      columnStyles: {
+        0: { fontStyle: 'bold' },
+        1: { halign: 'right' },
+      },
+      margin: { left: 14, right: 14 },
+    });
+
+    yPos = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
+
+    // Income table
+    if (summary.income.length > 0) {
+      doc.setFontSize(12);
+      doc.setTextColor(33, 33, 33);
+      doc.text('Entradas Fixas', 14, yPos);
+      yPos += 8;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Descrição', 'Vencimento', 'Valor']],
+        body: summary.income.map((item) => [
+          item.description,
+          item.dueDay ? `Dia ${item.dueDay}` : '-',
+          formatCurrency(item.amount),
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [34, 197, 94], textColor: 255 },
+        styles: { fontSize: 10, cellPadding: 4 },
+        columnStyles: {
+          1: { halign: 'center' },
+          2: { halign: 'right', textColor: [34, 197, 94] },
+        },
+        margin: { left: 14, right: 14 },
+      });
+
+      yPos = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
+    }
+
+    // Expenses table
+    if (summary.expenses.length > 0) {
+      doc.setFontSize(12);
+      doc.setTextColor(33, 33, 33);
+      doc.text('Saídas Fixas', 14, yPos);
+      yPos += 8;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Descrição', 'Vencimento', 'Valor']],
+        body: summary.expenses.map((item) => [
+          item.description,
+          item.dueDay ? `Dia ${item.dueDay}` : '-',
+          formatCurrency(item.amount),
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [239, 68, 68], textColor: 255 },
+        styles: { fontSize: 10, cellPadding: 4 },
+        columnStyles: {
+          1: { halign: 'center' },
+          2: { halign: 'right', textColor: [239, 68, 68] },
+        },
+        margin: { left: 14, right: 14 },
+      });
+    }
+
+    // Footer
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text(
+        `Página ${i} de ${pageCount}`,
+        pageWidth / 2,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: 'center' }
+      );
+    }
+
+    // Download
+    const fileName = `fixos-mensais-${currentAccount?.name?.toLowerCase().replace(/\s+/g, '-') || 'conta'}-${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+
+    toast({ title: 'PDF exportado', description: 'O arquivo foi baixado com sucesso.' });
+  };
+
   const summary: MonthlyFixedSummary = monthlyFixed ?? {
     income: [],
     expenses: [],
@@ -167,16 +298,27 @@ export default function MonthlyFixed() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Fixos mensais</h1>
-          <Button
-            onClick={() => {
-              setEditingItem(null);
-              setIsModalOpen(true);
-            }}
-            size="sm"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Novo fixo
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportToPDF}
+              disabled={isLoading || (summary.income.length === 0 && summary.expenses.length === 0)}
+            >
+              <FileDown className="mr-2 h-4 w-4" />
+              Exportar PDF
+            </Button>
+            <Button
+              onClick={() => {
+                setEditingItem(null);
+                setIsModalOpen(true);
+              }}
+              size="sm"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Novo fixo
+            </Button>
+          </div>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <SummaryCard
