@@ -413,7 +413,7 @@ export interface IStorage {
   deleteCreditCardTransaction(id: number): Promise<void>;
 
   createBankAccount(bankAccount: InsertBankAccount): Promise<BankAccount>;
-  getBankAccounts(accountId: number): Promise<BankAccount[]>;
+  getBankAccounts(accountId: number, userId: number): Promise<BankAccount[]>;
   getBankAccount(id: number): Promise<BankAccount | undefined>;
   updateBankAccount(
     id: number,
@@ -1609,10 +1609,21 @@ export class DatabaseStorage implements IStorage {
     return mapBankAccount(created);
   }
 
-  async getBankAccounts(accountId: number): Promise<BankAccount[]> {
+  async getBankAccounts(accountId: number, userId: number): Promise<BankAccount[]> {
+    // Buscar todos os accountIds do mesmo usuário
+    const userAccounts = await prisma.account.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+    const userAccountIds = userAccounts.map(a => a.id);
+
+    // Buscar contas bancárias: próprias OU compartilhadas do mesmo usuário
     const accounts = await prisma.bankAccount.findMany({
       where: {
-        OR: [{ accountId }, { shared: true }],
+        OR: [
+          { accountId },
+          { shared: true, accountId: { in: userAccountIds } },
+        ],
       },
       orderBy: { name: 'asc' },
     });

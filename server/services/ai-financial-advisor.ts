@@ -76,7 +76,7 @@ FORMATO:
 - Termine com 1 sugestão prática quando apropriado`;
 
 export class AIFinancialAdvisor {
-  static async getFinancialContext(accountId: number): Promise<FinancialContext> {
+  static async getFinancialContext(accountId: number, userId: number): Promise<FinancialContext> {
     try {
       console.log(`[AIFinancialAdvisor] Getting context for account ${accountId}`);
       const currentMonth = new Date().toISOString().substring(0, 7);
@@ -122,7 +122,7 @@ export class AIFinancialAdvisor {
       const creditCards = await storage.getCreditCards(accountId);
 
       // Buscar contas bancárias
-      const bankAccounts = await storage.getBankAccounts(accountId);
+      const bankAccounts = await storage.getBankAccounts(accountId, userId);
 
       const context: FinancialContext = {
         account: {
@@ -182,6 +182,7 @@ export class AIFinancialAdvisor {
 
   static async analyzeFinances(
     accountId: number,
+    userId: number,
     userMessage: string,
     conversationHistory: Array<{ role: string; content: string }> = []
   ): Promise<string> {
@@ -190,7 +191,7 @@ export class AIFinancialAdvisor {
     }
 
     try {
-      const context = await this.getFinancialContext(accountId);
+      const context = await this.getFinancialContext(accountId, userId);
 
       const contextMessage = `
 DADOS FINANCEIROS:

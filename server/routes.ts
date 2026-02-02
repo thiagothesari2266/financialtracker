@@ -318,7 +318,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/accounts/:id/financial-summary', validateAccountOwnership, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const context = await AIFinancialAdvisor.getFinancialContext(id);
+      const userId = req.session.userId!;
+      const context = await AIFinancialAdvisor.getFinancialContext(id, userId);
       res.json(context);
     } catch (error) {
       console.error('[GET /api/accounts/:id/financial-summary]', error);
@@ -360,8 +361,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `[AI Chat] Account ${id}: "${sanitizedMessage.substring(0, 50)}${sanitizedMessage.length > 50 ? '...' : ''}"`
         );
 
+        const userId = req.session.userId!;
         const response = await AIFinancialAdvisor.analyzeFinances(
           id,
+          userId,
           sanitizedMessage,
           conversationHistory
         );
@@ -805,7 +808,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/accounts/:accountId/bank-accounts', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
-      const bankAccounts = await storage.getBankAccounts(accountId);
+      const userId = req.session.userId!;
+      const bankAccounts = await storage.getBankAccounts(accountId, userId);
       res.json(bankAccounts);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch bank accounts' });
