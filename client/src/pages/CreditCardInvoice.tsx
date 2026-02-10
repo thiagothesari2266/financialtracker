@@ -265,13 +265,15 @@ export default function CreditCardInvoice() {
   const isLoadingData = loadingInvoices || loadingCreditCards;
   const pageTitle = creditCard ? `Fatura - ${creditCard.name}` : 'Faturas';
 
-  const { totalCredits, netTotal } = useMemo(() => {
-    let charges = 0, credits = 0;
+  const invoiceTotal = invoice ? parseFloat(invoice.total) : 0;
+
+  const totalCredits = useMemo(() => {
+    let credits = 0;
     for (const tx of filteredTransactions) {
       const amt = parseFloat(tx.amount);
-      amt < 0 ? (credits += Math.abs(amt)) : (charges += amt);
+      if (amt < 0) credits += Math.abs(amt);
     }
-    return { totalCredits: credits, netTotal: charges - credits };
+    return credits;
   }, [filteredTransactions]);
 
   const transactionCount = filteredTransactions.length;
@@ -391,8 +393,8 @@ export default function CreditCardInvoice() {
         <div className={cn('grid gap-4 pt-2', totalCredits > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
           <SummaryCard
             label="Total da Fatura"
-            value={formatCurrency(netTotal)}
-            tone={netTotal <= 0 ? 'default' : 'negative'}
+            value={formatCurrency(invoiceTotal)}
+            tone={invoiceTotal <= 0 ? 'default' : 'negative'}
             icon={<TrendingDown className="h-5 w-5 text-red-600" />}
           />
           {totalCredits > 0 && (
