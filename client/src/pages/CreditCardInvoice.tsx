@@ -30,7 +30,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import TransactionModal from '@/components/Modals/TransactionModal';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import { AppShell } from '@/components/Layout/AppShell';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SummaryCard } from '@/components/ui/summary-card';
@@ -41,6 +41,7 @@ export default function CreditCardInvoice() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const search = useSearch();
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
@@ -48,8 +49,8 @@ export default function CreditCardInvoice() {
   const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
 
-  // Extrair parâmetros da URL
-  const urlParams = new URLSearchParams(window.location.search);
+  // Extrair parâmetros da URL (reativo via useSearch)
+  const urlParams = new URLSearchParams(search);
   const creditCardId = urlParams.get('creditCardId');
   const month = urlParams.get('month');
 
