@@ -1440,7 +1440,20 @@ export class DatabaseStorage implements IStorage {
       const card = cardMap.get(invoice.creditCardId);
       if (!card) continue;
       const total = Number.parseFloat(invoice.total);
-      if (!Number.isFinite(total) || total <= 0) continue;
+      if (!Number.isFinite(total)) continue;
+      if (total <= 0) {
+        const invoiceId = `${card.id}-${invoice.month}`;
+        if (existingMap.has(invoiceId)) {
+          const txId = existingMap.get(invoiceId)!;
+          await prisma.invoicePayment.updateMany({
+            where: { transactionId: txId },
+            data: { transactionId: null, status: 'pending', paidAt: null },
+          });
+          await prisma.transaction.delete({ where: { id: txId } });
+          existingMap.delete(invoiceId);
+        }
+        continue;
+      }
 
       const invoiceId = `${card.id}-${invoice.month}`;
       usedInvoiceIds.add(invoiceId);

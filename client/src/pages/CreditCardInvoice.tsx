@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Calendar,
   TrendingDown,
+  TrendingUp,
   Hash,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -246,6 +247,16 @@ export default function CreditCardInvoice() {
     setIsTransactionModalOpen(true);
   };
 
+  const handleAddCredit = () => {
+    setSelectedTransaction({
+      creditCardId: Number(creditCardId),
+      type: 'expense',
+      date: new Date().toISOString().split('T')[0],
+      launchType: 'credito',
+    });
+    setIsTransactionModalOpen(true);
+  };
+
   const handleGoBack = () => {
     navigate('/credit-cards');
   };
@@ -254,7 +265,15 @@ export default function CreditCardInvoice() {
   const isLoadingData = loadingInvoices || loadingCreditCards;
   const pageTitle = creditCard ? `Fatura - ${creditCard.name}` : 'Faturas';
 
-  const invoiceTotal = invoice ? formatCurrencyAbs(invoice.total) : 'R$ 0,00';
+  const { totalCredits, netTotal } = useMemo(() => {
+    let charges = 0, credits = 0;
+    for (const tx of filteredTransactions) {
+      const amt = parseFloat(tx.amount);
+      amt < 0 ? (credits += Math.abs(amt)) : (charges += amt);
+    }
+    return { totalCredits: credits, netTotal: charges - credits };
+  }, [filteredTransactions]);
+
   const transactionCount = filteredTransactions.length;
 
   // Header actions: seleção ativa → badge + cancelar + excluir; senão → voltar + nova transação
@@ -286,6 +305,10 @@ export default function CreditCardInvoice() {
         <Button size="sm" onClick={handleAddTransaction}>
           <Plus className="h-4 w-4 mr-2" />
           Nova Transação
+        </Button>
+        <Button size="sm" variant="outline" onClick={handleAddCredit}>
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Crédito
         </Button>
       </div>
     ) : undefined;
@@ -365,13 +388,21 @@ export default function CreditCardInvoice() {
         </Card>
 
         {/* Summary cards */}
-        <div className="grid gap-4 pt-2 sm:grid-cols-2">
+        <div className={cn('grid gap-4 pt-2', totalCredits > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
           <SummaryCard
             label="Total da Fatura"
-            value={invoiceTotal}
-            tone="negative"
+            value={formatCurrency(netTotal)}
+            tone={netTotal <= 0 ? 'default' : 'negative'}
             icon={<TrendingDown className="h-5 w-5 text-red-600" />}
           />
+          {totalCredits > 0 && (
+            <SummaryCard
+              label="Créditos"
+              value={formatCurrency(totalCredits)}
+              tone="positive"
+              icon={<TrendingUp className="h-5 w-5 text-green-600" />}
+            />
+          )}
           <SummaryCard
             label="Transações"
             value={String(transactionCount)}
@@ -434,6 +465,9 @@ export default function CreditCardInvoice() {
                                     {transaction.currentInstallment}/{transaction.installments}
                                   </span>
                                 )}
+                                {transaction.launchType === 'credito' && (
+                                  <span className="rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-xs font-normal">Crédito</span>
+                                )}
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 {transaction.category?.name || 'Sem categoria'}
@@ -441,8 +475,8 @@ export default function CreditCardInvoice() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm font-semibold text-red-600">
-                              {formatCurrencyAbs(transaction.amount)}
+                            <p className={cn('text-sm font-semibold', parseFloat(transaction.amount) < 0 ? 'text-green-600' : 'text-red-600')}>
+                              {parseFloat(transaction.amount) < 0 ? '+ ' : ''}{formatCurrencyAbs(transaction.amount)}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {formatDate(transaction.date)}
@@ -500,6 +534,9 @@ export default function CreditCardInvoice() {
                                   {transaction.currentInstallment}/{transaction.installments}
                                 </span>
                               )}
+                              {transaction.launchType === 'credito' && (
+                                <span className="rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-xs font-normal">Crédito</span>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -514,8 +551,8 @@ export default function CreditCardInvoice() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right font-semibold">
-                            <span className="text-red-600">
-                              {formatCurrencyAbs(transaction.amount)}
+                            <span className={parseFloat(transaction.amount) < 0 ? 'text-green-600' : 'text-red-600'}>
+                              {parseFloat(transaction.amount) < 0 ? '+ ' : ''}{formatCurrencyAbs(transaction.amount)}
                             </span>
                           </TableCell>
                         </TableRow>
