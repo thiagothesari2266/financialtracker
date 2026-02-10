@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, CreditCard, Calendar, DollarSign, RefreshCw, Upload } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import CreditCardModal from '@/components/Modals/CreditCardModal';
-import CreditCardInvoicesModal from '@/components/Modals/CreditCardInvoicesModal';
+import { useLocation } from 'wouter';
 import InvoiceUploadModal from '@/components/Modals/InvoiceUploadModal';
 import {
   useCreditCards,
@@ -23,11 +23,10 @@ import { cn, formatCurrency } from '@/lib/utils';
 export default function CreditCards() {
   const { currentAccount } = useAccount();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [isCreditCardModalOpen, setIsCreditCardModalOpen] = useState(false);
-  const [isInvoicesModalOpen, setIsInvoicesModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<any | null>(null);
-  const [selectedCardForInvoices, setSelectedCardForInvoices] = useState<any | null>(null);
   const [selectedCardForUpload, setSelectedCardForUpload] = useState<any | null>(null);
 
   // Hooks SEM condicional (React exige ordem fixa)
@@ -151,8 +150,8 @@ export default function CreditCards() {
     }
   }
   function handleViewInvoices(card: any) {
-    setSelectedCardForInvoices(card);
-    setIsInvoicesModalOpen(true);
+    const invoiceMonth = getCurrentInvoiceMonth(card.closingDay || 1);
+    navigate(`/credit-card-invoice?creditCardId=${card.id}&month=${invoiceMonth}`);
   }
 
   function handleUploadInvoice(card: any) {
@@ -202,6 +201,38 @@ export default function CreditCards() {
                 Novo cartão
               </Button>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <SummaryCard
+              label="Total das faturas"
+              value={formatCurrency(
+                creditCards.reduce(
+                  (sum, card) => sum + parseFloat(card.currentBalance || '0.00'),
+                  0
+                )
+              )}
+              tone="negative"
+              icon={<DollarSign className="h-6 w-6 text-red-600" />}
+            />
+            <SummaryCard
+              label="Limite total"
+              value={formatCurrency(
+                creditCards.reduce((sum, card) => sum + parseFloat(card.creditLimit || '0.00'), 0)
+              )}
+              icon={<CreditCard className="h-6 w-6 text-blue-600" />}
+            />
+            <SummaryCard
+              label="Limite disponível"
+              value={formatCurrency(
+                creditCards.reduce((sum, card) => sum + parseFloat(card.creditLimit || '0.00'), 0) -
+                  creditCards.reduce(
+                    (sum, card) => sum + parseFloat(card.currentBalance || '0.00'),
+                    0
+                  )
+              )}
+              tone="positive"
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
@@ -336,51 +367,6 @@ export default function CreditCards() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <SummaryCard
-              label="Total das faturas"
-              value={formatCurrency(
-                creditCards.reduce(
-                  (sum, card) => sum + parseFloat(card.currentBalance || '0.00'),
-                  0
-                )
-              )}
-              tone="negative"
-              icon={<DollarSign className="h-6 w-6 text-red-600" />}
-            />
-            <SummaryCard
-              label="Limite total"
-              value={formatCurrency(
-                creditCards.reduce((sum, card) => sum + parseFloat(card.creditLimit || '0.00'), 0)
-              )}
-              icon={<CreditCard className="h-6 w-6 text-blue-600" />}
-            />
-            <SummaryCard
-              label="Limite disponível"
-              value={formatCurrency(
-                creditCards.reduce((sum, card) => sum + parseFloat(card.creditLimit || '0.00'), 0) -
-                  creditCards.reduce(
-                    (sum, card) => sum + parseFloat(card.currentBalance || '0.00'),
-                    0
-                  )
-              )}
-              tone="positive"
-            />
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Transações recentes nos cartões</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <EmptyState
-                icon={<CreditCard className="h-10 w-10 opacity-70" />}
-                title="Nenhuma transação encontrada"
-                description="As movimentações dos cartões aparecerão aqui depois da importação."
-                className="border-none bg-transparent p-0"
-              />
-            </CardContent>
-          </Card>
         </div>
       </AppShell>
 
@@ -394,18 +380,6 @@ export default function CreditCards() {
         onSaved={handleSaveCreditCard}
         creditCard={editingCard}
       />
-
-      {selectedCardForInvoices && (
-        <CreditCardInvoicesModal
-          isOpen={isInvoicesModalOpen}
-          onClose={() => {
-            setIsInvoicesModalOpen(false);
-            setSelectedCardForInvoices(null);
-          }}
-          creditCard={selectedCardForInvoices}
-          accountId={currentAccount.id}
-        />
-      )}
 
       <InvoiceUploadModal
         isOpen={isUploadModalOpen}

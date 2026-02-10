@@ -29,7 +29,6 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   Building2,
   CreditCard,
-  FileSpreadsheet,
   LayoutDashboard,
   LineChart,
   Loader2,
@@ -63,7 +62,6 @@ const primaryNavigation: NavigationItem[] = [
   { title: 'Transações', href: '/transactions', icon: Receipt },
   { title: 'Categorias', href: '/categories', icon: Tags },
   { title: 'Cartões', href: '/credit-cards', icon: CreditCard },
-  { title: 'Faturas', href: '/credit-card-invoice', icon: FileSpreadsheet },
   { title: 'Relatórios', href: '/reports', icon: LineChart },
   { title: 'Painel de Dívidas', href: '/debts', icon: BadgePercent },
   { title: 'Fixos mensais', href: '/monthly-fixed', icon: Repeat },

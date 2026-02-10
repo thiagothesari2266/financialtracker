@@ -27,7 +27,6 @@ const navItems = [
   { label: 'Transações', href: '/transactions', icon: Receipt },
   { label: 'Categorias', href: '/categories', icon: Tags },
   { label: 'Cartões', href: '/credit-cards', icon: CreditCard },
-  { label: 'Faturas', href: '/credit-card-invoice', icon: FileSpreadsheet },
   { label: 'Fixos mensais', href: '/monthly-fixed', icon: Repeat },
   { label: 'Relatórios', href: '/reports', icon: FileSpreadsheet },
   { label: 'Contas Bancárias', href: '/bank-accounts', icon: Landmark },
