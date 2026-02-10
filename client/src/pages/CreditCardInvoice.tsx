@@ -1,36 +1,40 @@
-import { useState, useMemo } from 'react';
+import { type MouseEvent, useState, useMemo } from 'react';
 import { useAccount } from '@/contexts/AccountContext';
 import { useCreditCards, useCreditCardInvoices } from '@/hooks/useCreditCards';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   Plus,
   Search,
   Filter,
   ArrowLeft,
   CreditCard as CreditCardIcon,
-  Edit,
   Trash2,
-  MoreHorizontal,
   ChevronLeft,
   ChevronRight,
+  Calendar,
+  TrendingDown,
+  Hash,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import TransactionModal from '@/components/Modals/TransactionModal';
 import { useLocation } from 'wouter';
 import { AppShell } from '@/components/Layout/AppShell';
 import { EmptyState } from '@/components/ui/empty-state';
-import { formatCurrency } from '@/lib/utils';
+import { SummaryCard } from '@/components/ui/summary-card';
+import { cn, formatCurrency } from '@/lib/utils';
 
 export default function CreditCardInvoice() {
   const { currentAccount } = useAccount();
@@ -41,9 +45,7 @@ export default function CreditCardInvoice() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
 
-  // Estados para seleção em massa
   const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
 
   // Extrair parâmetros da URL
@@ -58,29 +60,25 @@ export default function CreditCardInvoice() {
     currentAccount?.id || 0
   );
 
-  // Buscar o cartão de crédito específico
   const creditCard = useMemo(() => {
     if (!creditCardId || !creditCards.length) return null;
     return creditCards.find((card) => card.id === Number(creditCardId));
   }, [creditCardId, creditCards]);
-  // Buscar a fatura específica
+
   const invoice = useMemo(() => {
     if (!creditCardId || !month || !invoices.length) return null;
     return invoices.find(
       (inv: any) => inv.creditCardId === Number(creditCardId) && inv.month === month
     );
   }, [creditCardId, month, invoices]);
-  // Função auxiliar para formatar moeda com valor absoluto (específica desta página)
+
   const formatCurrencyAbs = (amount: string) => formatCurrency(Math.abs(parseFloat(amount)));
 
   const formatMonth = (monthStr: string) => {
-    const [year, month] = monthStr.split('-');
-    const date = new Date(parseInt(year), parseInt(month) - 1);
+    const [year, m] = monthStr.split('-');
+    const date = new Date(parseInt(year), parseInt(m) - 1);
     return date
-      .toLocaleDateString('pt-BR', {
-        month: 'long',
-        year: 'numeric',
-      })
+      .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
       .replace(/^\w/, (c) => c.toUpperCase());
   };
 
@@ -88,18 +86,16 @@ export default function CreditCardInvoice() {
     return new Date(dateStr).toLocaleDateString('pt-BR');
   };
 
-  // Handlers para navegação de mês
+  // Navegação de mês
   const handlePreviousMonth = () => {
     if (!month) return;
     const [year, monthNum] = month.split('-');
     let newMonth = parseInt(monthNum) - 1;
     let newYear = parseInt(year);
-
     if (newMonth < 1) {
       newMonth = 12;
       newYear -= 1;
     }
-
     const newMonthStr = `${newYear}-${String(newMonth).padStart(2, '0')}`;
     navigate(`/credit-card-invoice?creditCardId=${creditCardId}&month=${newMonthStr}`);
   };
@@ -109,12 +105,10 @@ export default function CreditCardInvoice() {
     const [year, monthNum] = month.split('-');
     let newMonth = parseInt(monthNum) + 1;
     let newYear = parseInt(year);
-
     if (newMonth > 12) {
       newMonth = 1;
       newYear += 1;
     }
-
     const newMonthStr = `${newYear}-${String(newMonth).padStart(2, '0')}`;
     navigate(`/credit-card-invoice?creditCardId=${creditCardId}&month=${newMonthStr}`);
   };
@@ -126,69 +120,43 @@ export default function CreditCardInvoice() {
   };
 
   const handleEditTransaction = (transaction: any) => {
-    if (isSelectionMode) return; // Não abre modal no modo de seleção
-
-    console.log('[CreditCardInvoice] Editando transação:', transaction);
     setSelectedTransaction(transaction);
     setIsTransactionModalOpen(true);
   };
 
-  // Funções para seleção em massa
   const handleSelectTransaction = (
     transactionId: number,
     checked: boolean,
-    event?: React.MouseEvent,
+    event?: MouseEvent,
     index?: number
   ) => {
     const newSelected = new Set(selectedTransactions);
 
-    // Verificar se é uma seleção de intervalo (Shift + click)
     if (event?.shiftKey && lastSelectedIndex !== null && index !== undefined) {
       const startIndex = Math.min(lastSelectedIndex, index);
       const endIndex = Math.max(lastSelectedIndex, index);
-
-      // Selecionar todas as transações no intervalo (incluindo a última clicada)
       for (let i = startIndex; i <= endIndex; i++) {
         if (filteredTransactions[i]) {
           newSelected.add(filteredTransactions[i].id);
         }
       }
-      // Garantir que o item clicado está selecionado
+    } else if (checked) {
       newSelected.add(transactionId);
     } else {
-      // Seleção individual normal
-      if (checked) {
-        newSelected.add(transactionId);
-      } else {
-        newSelected.delete(transactionId);
-      }
+      newSelected.delete(transactionId);
     }
 
     setSelectedTransactions(newSelected);
-
-    // Atualizar o último índice selecionado
-    if (index !== undefined) {
-      setLastSelectedIndex(index);
-    }
+    if (index !== undefined) setLastSelectedIndex(index);
   };
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      const allIds = new Set(filteredTransactions.map((t) => t.id));
-      setSelectedTransactions(allIds);
-    } else {
-      setSelectedTransactions(new Set());
-    }
-  };
-
-  const handleToggleSelectionMode = () => {
-    setIsSelectionMode(!isSelectionMode);
-    setSelectedTransactions(new Set());
-    setLastSelectedIndex(null);
+    setSelectedTransactions(
+      checked ? new Set(filteredTransactions.map((t) => t.id)) : new Set()
+    );
   };
 
   const handleCancelSelection = () => {
-    setIsSelectionMode(false);
     setSelectedTransactions(new Set());
     setLastSelectedIndex(null);
   };
@@ -204,7 +172,6 @@ export default function CreditCardInvoice() {
           if (!response.ok) {
             throw new Error(`Erro ao deletar transação ${id}`);
           }
-          // Verificar se há conteúdo JSON na resposta
           const contentType = response.headers.get('content-type');
           if (contentType && contentType.includes('application/json')) {
             return response.json();
@@ -240,36 +207,35 @@ export default function CreditCardInvoice() {
 
   const handleDeleteSelected = () => {
     if (selectedTransactions.size === 0) return;
-
     const confirmDelete = window.confirm(
       `Tem certeza que deseja excluir ${selectedTransactions.size} transação(ões) selecionada(s)?`
     );
-
     if (confirmDelete) {
       deleteTransactionsMutation.mutate(Array.from(selectedTransactions));
     }
   };
 
-  // Filtrar transações baseado no termo de busca e creditCardId
-  const filteredTransactions =
-    invoice?.transactions?.filter(
+  // Filtrar e ordenar transações
+  const filteredTransactions = useMemo(() => {
+    const transactions = invoice?.transactions?.filter(
       (transaction: any) =>
         transaction.creditCardId === Number(creditCardId) &&
         (transaction?.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           transaction?.category?.name?.toLowerCase().includes(searchTerm.toLowerCase()))
     ) || [];
+    return [...transactions].sort((a: any, b: any) => a.date.localeCompare(b.date));
+  }, [invoice, creditCardId, searchTerm]);
 
   const isAllSelected =
     filteredTransactions.length > 0 &&
-    filteredTransactions.every((t) => selectedTransactions.has(t.id));
-  const _isSomeSelected = selectedTransactions.size > 0;
+    filteredTransactions.every((t: any) => selectedTransactions.has(t.id));
 
   const handleCloseTransactionModal = () => {
     setIsTransactionModalOpen(false);
     setSelectedTransaction(null);
   };
+
   const handleAddTransaction = () => {
-    // Criar uma nova transação com creditCardId pré-definido
     const newTransaction = {
       creditCardId: Number(creditCardId),
       type: 'expense',
@@ -278,6 +244,7 @@ export default function CreditCardInvoice() {
     setSelectedTransaction(newTransaction);
     setIsTransactionModalOpen(true);
   };
+
   const handleGoBack = () => {
     navigate('/credit-cards');
   };
@@ -285,31 +252,37 @@ export default function CreditCardInvoice() {
   const hasInvalidParams = !creditCardId || !month;
   const isLoadingData = loadingInvoices || loadingCreditCards;
   const pageTitle = creditCard ? `Fatura - ${creditCard.name}` : 'Faturas';
-  const pageDescription =
-    creditCard && invoice
-      ? `${formatMonth(invoice.month)} • ${formatCurrencyAbs(invoice.total)}`
-      : 'Selecione um cartão e mês para visualizar a fatura.';
 
-  const pageActions =
-    creditCard && month ? (
+  const invoiceTotal = invoice ? formatCurrencyAbs(invoice.total) : 'R$ 0,00';
+  const transactionCount = filteredTransactions.length;
+
+  // Header actions: seleção ativa → badge + cancelar + excluir; senão → voltar + nova transação
+  const headerActions =
+    selectedTransactions.size > 0 ? (
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="secondary" className="text-xs">
+          {selectedTransactions.size} selecionada(s)
+        </Badge>
+        <Button variant="outline" size="sm" onClick={handleCancelSelection}>
+          Cancelar
+        </Button>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={handleDeleteSelected}
+          disabled={deleteTransactionsMutation.isPending}
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          {deleteTransactionsMutation.isPending ? 'Excluindo...' : 'Excluir'}
+        </Button>
+      </div>
+    ) : creditCard && month ? (
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" onClick={handleGoBack}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar
         </Button>
-        <div className="flex items-center gap-1 rounded-full border bg-card px-2 py-1 text-sm font-medium">
-          <Button variant="ghost" size="icon" onClick={handlePreviousMonth}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="px-2">{formatMonth(month)}</span>
-          <Button variant="ghost" size="icon" onClick={handleNextMonth}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-        <Button variant="outline" size="sm" onClick={handleCurrentMonth}>
-          Hoje
-        </Button>
-        <Button onClick={handleAddTransaction}>
+        <Button size="sm" onClick={handleAddTransaction}>
           <Plus className="h-4 w-4 mr-2" />
           Nova Transação
         </Button>
@@ -336,7 +309,8 @@ export default function CreditCardInvoice() {
       return <EmptyState title="Carregando fatura..." className="border-dashed bg-transparent" />;
     }
 
-    if (!creditCard || !invoice) {
+    // Cartão inválido → beco sem saída
+    if (!creditCard) {
       return (
         <EmptyState
           icon={<CreditCardIcon className="h-12 w-12 text-slate-400" />}
@@ -351,203 +325,204 @@ export default function CreditCardInvoice() {
       );
     }
 
+    // Cartão existe mas fatura pode ser null (mês sem transações) → layout completo com zeros
     return (
       <div className="space-y-6">
-        {isSelectionMode && (
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed bg-muted/50 p-4 text-sm">
-            <Badge variant="secondary">{selectedTransactions.size} selecionada(s)</Badge>
-            <Button variant="outline" size="sm" onClick={handleCancelSelection}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDeleteSelected}
-              disabled={selectedTransactions.size === 0 || deleteTransactionsMutation.isPending}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              {deleteTransactionsMutation.isPending ? 'Excluindo...' : 'Excluir'}
-            </Button>
-          </div>
-        )}
+        {/* Navegação de mês centralizada */}
+        <div className="flex items-center justify-center gap-1 rounded-lg border bg-card/60 px-3 py-2">
+          <Button variant="secondary" size="sm" onClick={handleCurrentMonth}>
+            Hoje
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handlePreviousMonth}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="px-2 text-sm font-medium">{month ? formatMonth(month) : ''}</span>
+          <Button variant="ghost" size="icon" onClick={handleNextMonth}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
 
+        {/* Search/filter em Card */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <CreditCardIcon className="h-5 w-5" />
-              Resumo da Fatura
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              <div>
-                <p className="text-sm text-slate-600">Período</p>
-                <p className="font-semibold">
-                  {formatDate(invoice.periodStart)} - {formatDate(invoice.periodEnd)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-600">Total da Fatura</p>
-                <p className="text-lg font-semibold text-red-600">
-                  {formatCurrencyAbs(invoice.total)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-600">Transações</p>
-                <p className="font-semibold">{invoice.transactions.length}</p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-600">Cartão</p>
-                <p className="font-semibold">{creditCard.brand}</p>
-              </div>
+          <CardContent className="flex flex-col gap-3 pt-4 sm:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por descrição ou categoria"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline">
+                <Filter className="mr-2 h-4 w-4" />
+                Filtros
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        <div className="flex flex-col gap-4 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-slate-400" />
-            <Input
-              placeholder="Buscar transações na fatura..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-              disabled={isSelectionMode}
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="sm:w-auto" disabled={isSelectionMode}>
-              <Filter className="h-4 w-4 mr-2" />
-              Filtros
-            </Button>
-            {!isSelectionMode && filteredTransactions.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="sm:w-auto">
-                    <MoreHorizontal className="h-4 w-4 mr-2" />
-                    Ações
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={handleToggleSelectionMode}>
-                    Selecionar múltiplas
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
+        {/* Summary cards */}
+        <div className="grid gap-4 pt-2 sm:grid-cols-2">
+          <SummaryCard
+            label="Total da Fatura"
+            value={invoiceTotal}
+            tone="negative"
+            icon={<TrendingDown className="h-5 w-5 text-red-600" />}
+          />
+          <SummaryCard
+            label="Transações"
+            value={String(transactionCount)}
+            tone="default"
+            icon={<Hash className="h-5 w-5 text-muted-foreground" />}
+          />
         </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Transações da Fatura</CardTitle>
-            {isSelectionMode && filteredTransactions.length > 0 && (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={isAllSelected}
-                  onCheckedChange={handleSelectAll}
-                  className="border-slate-400"
-                />
-                <span className="text-sm text-slate-600">Selecionar todas</span>
-              </div>
-            )}
-          </CardHeader>
-          <CardContent>
-            {filteredTransactions.length > 0 ? (
-              <div className="space-y-4">
-                {filteredTransactions.map((transaction: any, index: number) => (
-                  <div
-                    key={index}
-                    className={`flex items-center justify-between rounded-lg border border-slate-200 p-4 transition-colors hover:bg-slate-50 ${!isSelectionMode ? 'cursor-pointer' : ''} group ${selectedTransactions.has(transaction.id) ? 'bg-blue-50 border-blue-200' : ''}`}
-                    onClick={() => handleEditTransaction(transaction)}
-                  >
-                    <div className="flex items-center space-x-4">
-                      {isSelectionMode && (
-                        <Checkbox
-                          checked={selectedTransactions.has(transaction.id)}
-                          onCheckedChange={(checked) =>
-                            handleSelectTransaction(
-                              transaction.id,
-                              Boolean(checked),
-                              undefined,
-                              index
-                            )
-                          }
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
-                          onMouseDown={(e) => {
-                            if (e.shiftKey) {
-                              e.stopPropagation();
-                              handleSelectTransaction(transaction.id, true, e as any, index);
-                            }
-                          }}
-                          className="border-slate-400"
-                        />
-                      )}
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
-                        <i
-                          className={`${transaction.category?.icon || 'fas fa-exchange-alt'} text-red-600`}
-                        ></i>
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-slate-900">
-                          <CreditCardIcon className="mr-2 inline h-4 w-4 text-blue-600" />
-                          {transaction.description}
-                          {transaction.installments > 1 && (
-                            <span className="ml-2 text-xs font-normal text-slate-500">
-                              {transaction.currentInstallment}/{transaction.installments}
-                            </span>
-                          )}
-                        </h3>
-                        <p className="text-sm text-slate-600">
-                          {transaction.category?.name || 'Sem categoria'} •{' '}
-                          {formatDate(transaction.date)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <p className="font-semibold text-red-600">
-                          {formatCurrencyAbs(transaction.amount)}
-                        </p>
-                        {transaction.installments > 1 && (
-                          <Badge variant="outline" className="mt-1 text-xs">
-                            Parcelado
-                          </Badge>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="opacity-0 transition-opacity group-hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditTransaction(transaction);
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        {/* Tabela de transações */}
+        <Card className="overflow-hidden">
+          <CardContent className="p-0">
+            {filteredTransactions.length === 0 ? (
+              <EmptyState
+                title="Nenhuma transação encontrada"
+                description={
+                  searchTerm
+                    ? 'Tente ajustar o termo de busca.'
+                    : 'As transações aparecerão aqui assim que forem registradas.'
+                }
+                action={{
+                  label: 'Adicionar Transação',
+                  onClick: handleAddTransaction,
+                  variant: 'secondary',
+                }}
+              />
             ) : (
-              <div className="py-8 text-center">
-                <CreditCardIcon className="mx-auto mb-4 h-12 w-12 text-slate-400" />
-                <p className="font-medium text-slate-600">
-                  {searchTerm ? 'Nenhuma transação encontrada' : 'Nenhuma transação nesta fatura'}
-                </p>
-                <p className="mb-4 text-sm text-slate-500">
-                  {searchTerm
-                    ? 'Tente ajustar o termo de busca'
-                    : 'Adicione transações para começar'}
-                </p>
-                <Button onClick={handleAddTransaction} variant="outline">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Adicionar Transação
-                </Button>
-              </div>
+              <>
+                {/* Mobile view */}
+                <div className="divide-y sm:hidden">
+                  {filteredTransactions.map((transaction: any, index: number) => (
+                    <div
+                      key={transaction.id}
+                      className={cn(
+                        'cursor-pointer px-4 py-3 transition-colors hover:bg-muted/30',
+                        selectedTransactions.has(transaction.id) && 'bg-primary/5'
+                      )}
+                      onClick={() => handleEditTransaction(transaction)}
+                    >
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex flex-1 items-start gap-2">
+                            <Checkbox
+                              checked={selectedTransactions.has(transaction.id)}
+                              onCheckedChange={(checked) =>
+                                handleSelectTransaction(
+                                  transaction.id,
+                                  Boolean(checked),
+                                  undefined,
+                                  index
+                                )
+                              }
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-1"
+                            />
+                            <div>
+                              <div className="flex items-center gap-2 font-semibold">
+                                {transaction.description}
+                                {transaction.installments > 1 && (
+                                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal">
+                                    {transaction.currentInstallment}/{transaction.installments}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {transaction.category?.name || 'Sem categoria'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-red-600">
+                              {formatCurrencyAbs(transaction.amount)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(transaction.date)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop view - Table */}
+                <div className="hidden sm:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">
+                          <Checkbox checked={isAllSelected} onCheckedChange={handleSelectAll} />
+                        </TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead>Categoria</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredTransactions.map((transaction: any, index: number) => (
+                        <TableRow
+                          key={transaction.id}
+                          className="cursor-pointer"
+                          data-state={
+                            selectedTransactions.has(transaction.id) ? 'selected' : undefined
+                          }
+                          onClick={() => handleEditTransaction(transaction)}
+                        >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedTransactions.has(transaction.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectTransaction(
+                                  transaction.id,
+                                  !selectedTransactions.has(transaction.id),
+                                  e as unknown as MouseEvent,
+                                  index
+                                );
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2 font-medium">
+                              {transaction.description}
+                              {transaction.installments > 1 && (
+                                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal">
+                                  {transaction.currentInstallment}/{transaction.installments}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">
+                              {transaction.category?.name || 'Sem categoria'}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Calendar className="h-4 w-4" />
+                              {formatDate(transaction.date)}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            <span className="text-red-600">
+                              {formatCurrencyAbs(transaction.amount)}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -561,7 +536,7 @@ export default function CreditCardInvoice() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold">{pageTitle}</h1>
-            {pageActions}
+            {headerActions}
           </div>
           {renderContent()}
         </div>
