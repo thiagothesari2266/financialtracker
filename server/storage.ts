@@ -114,6 +114,31 @@ const addMonthsPreserveDay = (date: Date, months: number): Date => {
   return newDate;
 };
 
+const calculateInvoiceMonth = (date: Date, closingDay: number): string => {
+  const day = date.getUTCDate();
+  let month = date.getUTCMonth() + 1; // 1-12
+  let year = date.getUTCFullYear();
+
+  if (closingDay >= 25) {
+    if (day <= closingDay) {
+      month += 1;
+    } else {
+      month += 2;
+    }
+  } else {
+    if (day > closingDay) {
+      month += 1;
+    }
+  }
+
+  if (month > 12) {
+    month -= 12;
+    year += 1;
+  }
+
+  return `${year}-${String(month).padStart(2, '0')}`;
+};
+
 const addDays = (date: Date, days: number): Date => {
   const result = new Date(date);
   result.setUTCDate(result.getUTCDate() + days);
@@ -1304,16 +1329,24 @@ export class DatabaseStorage implements IStorage {
       const installmentsGroupId = randomUUID();
       let first: PrismaCreditCardTransaction | undefined;
 
+      const card = await prisma.creditCard.findUnique({
+        where: { id: insertTransaction.creditCardId },
+        select: { closingDay: true },
+      });
+      const closingDay = card?.closingDay ?? 1;
+
       await prisma.$transaction(async (tx) => {
         for (let installment = 1; installment <= installments; installment++) {
           const date = addMonthsPreserveDay(
             parseDateInput(insertTransaction.date),
             installment - 1
           );
+          const invoiceMonth = calculateInvoiceMonth(date, closingDay);
           const created = await tx.creditCardTransaction.create({
             data: {
               ...baseData,
               date,
+              invoiceMonth,
               installments,
               currentInstallment: installment,
               installmentsGroupId,
