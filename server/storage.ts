@@ -965,6 +965,30 @@ export class DatabaseStorage implements IStorage {
       updatedPaid: updated?.paid,
       mappedPaid: updated ? mapTransaction(updated, updated.category)?.paid : 'N/A'
     });
+
+    // Se alterou o status de 'paid' de uma transação de fatura, sincronizar invoicePayment
+    if ('paid' in transactionData && updated.isInvoiceTransaction && updated.creditCardInvoiceId) {
+      const [, invoiceMonth] = updated.creditCardInvoiceId.split(/-(.+)/);
+      if (invoiceMonth && updated.creditCardId) {
+        const newStatus: 'paid' | 'pending' = updated.paid ? 'paid' : 'pending';
+        await prisma.invoicePayment.updateMany({
+          where: {
+            creditCardId: updated.creditCardId,
+            invoiceMonth,
+          },
+          data: {
+            status: newStatus,
+            paidAt: updated.paid ? new Date() : null,
+          },
+        });
+        console.log('[updateTransaction] Synced invoicePayment status', {
+          creditCardId: updated.creditCardId,
+          invoiceMonth,
+          newStatus,
+        });
+      }
+    }
+
     return updated ? mapTransaction(updated, updated.category) : undefined;
   }
 
