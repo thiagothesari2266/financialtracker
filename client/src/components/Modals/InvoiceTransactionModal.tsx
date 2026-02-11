@@ -37,12 +37,29 @@ export default function InvoiceTransactionModal({
   const [paymentDate, setPaymentDate] = useState('');
   const [localPaid, setLocalPaid] = useState<boolean>(false);
 
-  // Resetar estado local apenas quando modal abre
+  // Buscar transação atualizada do cache quando modal abre
   useEffect(() => {
-    if (isOpen && transaction) {
+    if (isOpen && transaction && currentAccount?.id) {
+      // Buscar todas as queries de transações do cache
+      const queries = queryClient.getQueriesData<any>({
+        queryKey: ['/api/accounts', currentAccount.id, 'transactions']
+      });
+
+      // Procurar a transação atual nos dados do cache
+      for (const [, data] of queries) {
+        if (Array.isArray(data)) {
+          const updatedTransaction = data.find((t: any) => t.id === transaction.id);
+          if (updatedTransaction) {
+            setLocalPaid(!!updatedTransaction.paid);
+            return;
+          }
+        }
+      }
+
+      // Fallback: usar transaction prop se não encontrar no cache
       setLocalPaid(!!transaction.paid);
     }
-  }, [isOpen]); // Apenas isOpen - não incluir transaction para evitar resets indesejados
+  }, [isOpen, transaction?.id, currentAccount?.id, queryClient]); // Dependências corretas
 
   // Inicializar estados quando o modal abrir
   useEffect(() => {
