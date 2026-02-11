@@ -947,23 +947,10 @@ export class DatabaseStorage implements IStorage {
         : null;
     }
 
-    console.log('[updateTransaction] DEBUG', {
-      id,
-      transactionData,
-      updatePayload,
-      hasPaid: 'paid' in transactionData,
-      paidValue: transactionData.paid
-    });
-
     const updated = await prisma.transaction.update({
       where: { id },
       data: updatePayload,
       include: { category: true },
-    });
-    console.log('[updateTransaction] AFTER UPDATE', {
-      id,
-      updatedPaid: updated?.paid,
-      mappedPaid: updated ? mapTransaction(updated, updated.category)?.paid : 'N/A'
     });
 
     // Se alterou o status de 'paid' de uma transação de fatura, sincronizar invoicePayment
@@ -1004,11 +991,6 @@ export class DatabaseStorage implements IStorage {
             },
           });
         }
-        console.log('[updateTransaction] Synced invoicePayment status (upsert)', {
-          creditCardId: updated.creditCardId,
-          invoiceMonth,
-          newStatus,
-        });
       }
     }
 
