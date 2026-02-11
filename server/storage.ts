@@ -960,6 +960,11 @@ export class DatabaseStorage implements IStorage {
       data: updatePayload,
       include: { category: true },
     });
+    console.log('[updateTransaction] AFTER UPDATE', {
+      id,
+      updatedPaid: updated?.paid,
+      mappedPaid: updated ? mapTransaction(updated, updated.category)?.paid : 'N/A'
+    });
     return updated ? mapTransaction(updated, updated.category) : undefined;
   }
 
