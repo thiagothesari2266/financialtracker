@@ -969,19 +969,33 @@ export class DatabaseStorage implements IStorage {
     // Se alterou o status de 'paid' de uma transação de fatura, sincronizar invoicePayment
     if ('paid' in transactionData && updated.isInvoiceTransaction && updated.creditCardInvoiceId) {
       const [, invoiceMonth] = updated.creditCardInvoiceId.split(/-(.+)/);
-      if (invoiceMonth && updated.creditCardId) {
+      if (invoiceMonth && updated.creditCardId && updated.accountId) {
         const newStatus: 'paid' | 'pending' = updated.paid ? 'paid' : 'pending';
-        await prisma.invoicePayment.updateMany({
+        // Usar upsert para criar se não existir
+        await prisma.invoicePayment.upsert({
           where: {
-            creditCardId: updated.creditCardId,
-            invoiceMonth,
+            creditCardId_invoiceMonth: {
+              creditCardId: updated.creditCardId,
+              invoiceMonth,
+            },
           },
-          data: {
+          update: {
+            status: newStatus,
+            paidAt: updated.paid ? new Date() : null,
+            transactionId: updated.id,
+          },
+          create: {
+            creditCardId: updated.creditCardId,
+            accountId: updated.accountId,
+            invoiceMonth,
+            totalAmount: updated.amount,
+            dueDate: updated.date,
+            transactionId: updated.id,
             status: newStatus,
             paidAt: updated.paid ? new Date() : null,
           },
         });
-        console.log('[updateTransaction] Synced invoicePayment status', {
+        console.log('[updateTransaction] Synced invoicePayment status (upsert)', {
           creditCardId: updated.creditCardId,
           invoiceMonth,
           newStatus,
