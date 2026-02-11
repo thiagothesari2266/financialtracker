@@ -947,6 +947,14 @@ export class DatabaseStorage implements IStorage {
         : null;
     }
 
+    console.log('[updateTransaction] DEBUG', {
+      id,
+      transactionData,
+      updatePayload,
+      hasPaid: 'paid' in transactionData,
+      paidValue: transactionData.paid
+    });
+
     const updated = await prisma.transaction.update({
       where: { id },
       data: updatePayload,
