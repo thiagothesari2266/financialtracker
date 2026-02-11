@@ -37,11 +37,16 @@ export default function InvoiceTransactionModal({
   const [paymentDate, setPaymentDate] = useState('');
   const [localPaid, setLocalPaid] = useState<boolean>(false);
 
+  // Resetar estado local apenas quando modal abre
+  useEffect(() => {
+    if (isOpen && transaction) {
+      setLocalPaid(!!transaction.paid);
+    }
+  }, [isOpen]); // Apenas isOpen - não incluir transaction para evitar resets indesejados
+
   // Inicializar estados quando o modal abrir
   useEffect(() => {
     if (transaction) {
-      setLocalPaid(!!transaction.paid);
-
       // Calcular data de vencimento baseada no cartão e mês da fatura
       const creditCard = creditCards.find((card) => card.id === transaction.creditCardId);
       if (creditCard && transaction.creditCardInvoiceId) {
@@ -101,7 +106,9 @@ export default function InvoiceTransactionModal({
         title: 'Data de pagamento atualizada!',
         description: 'A data de pagamento da fatura foi alterada com sucesso.',
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
+      queryClient.invalidateQueries({
+        queryKey: ['/api/accounts', currentAccount?.id, 'transactions']
+      });
       onClose();
     },
     onError: () => {
@@ -124,18 +131,54 @@ export default function InvoiceTransactionModal({
       if (!response.ok) throw new Error('Erro ao atualizar status de pagamento');
       return response.json();
     },
+    onMutate: async (variables) => {
+      // Cancelar queries pendentes para evitar race conditions
+      await queryClient.cancelQueries({
+        queryKey: ['/api/accounts', currentAccount?.id, 'transactions']
+      });
+
+      // Snapshot de TODAS as variações da query (com diferentes options)
+      const previousQueries = queryClient.getQueriesData({
+        queryKey: ['/api/accounts', currentAccount?.id, 'transactions']
+      });
+
+      // Optimistic update: atualizar cache imediatamente em todas as queries
+      queryClient.setQueriesData(
+        { queryKey: ['/api/accounts', currentAccount?.id, 'transactions'] },
+        (old: any) => {
+          if (!old) return old;
+          return old.map((t: any) =>
+            t.id === variables.id ? { ...t, paid: variables.paid } : t
+          );
+        }
+      );
+
+      return { previousQueries };
+    },
+    onError: (error, variables, context) => {
+      // Rollback: restaurar estado anterior de CADA variação da query
+      if (context?.previousQueries) {
+        context.previousQueries.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+
+      // Reverter estado local visual
+      setLocalPaid(!variables.paid);
+
+      toast({
+        title: 'Erro ao atualizar',
+        description: 'Não foi possível atualizar o status de pagamento.',
+        variant: 'destructive',
+      });
+    },
     onSuccess: () => {
       toast({
         title: 'Status atualizado!',
         description: 'O status de pagamento da fatura foi alterado com sucesso.',
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
-    },
-    onError: () => {
-      toast({
-        title: 'Erro ao atualizar',
-        description: 'Não foi possível atualizar o status de pagamento.',
-        variant: 'destructive',
+      queryClient.invalidateQueries({
+        queryKey: ['/api/accounts', currentAccount?.id, 'transactions']
       });
     },
   });
