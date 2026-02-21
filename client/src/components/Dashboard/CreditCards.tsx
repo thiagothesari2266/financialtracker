@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useAccount } from '@/contexts/AccountContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, CreditCard } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/utils';
 import { useCreditCards } from '@/hooks/useCreditCards';
@@ -27,87 +26,105 @@ export default function CreditCards() {
     return `${dueDate.toString().padStart(2, '0')}/${finalMonth.toString().padStart(2, '0')}`;
   };
 
-  const getBrandIcon = (brand: string) => {
-    if (!brand) return 'fas fa-credit-card';
-    const brandLower = brand.toLowerCase();
-    if (brandLower.includes('visa')) return 'fab fa-cc-visa';
-    if (brandLower.includes('master')) return 'fab fa-cc-mastercard';
-    if (brandLower.includes('amex') || brandLower.includes('american')) return 'fab fa-cc-amex';
-    return 'fas fa-credit-card';
+  const getLimitPercentage = (card: any) => {
+    const balance = parseFloat(card.currentBalance) || 0;
+    const limit = parseFloat(card.creditLimit) || 1;
+    return Math.min((balance / limit) * 100, 100);
   };
 
   if (isLoading) {
     return (
-      <Card className="bg-white rounded-xl shadow-sm border border-slate-200">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold text-slate-900">
-              Cartões de Crédito
-            </CardTitle>
-            <Skeleton className="h-6 w-16" />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[...Array(2)].map((_, i) => (
-              <Skeleton key={i} className="h-32 w-full rounded-xl" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="bg-card border border-border rounded-[10px] p-4">
+        <div className="flex items-center justify-between mb-4">
+          <Skeleton className="h-5 w-36" />
+          <Skeleton className="h-6 w-20" />
+        </div>
+        <div className="space-y-3">
+          {[...Array(2)].map((_, i) => (
+            <Skeleton key={i} className="h-28 w-full rounded-xl" />
+          ))}
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card className="bg-white rounded-xl shadow-sm border border-slate-200">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-slate-900">Cartões de Crédito</CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-sm text-primary hover:text-blue-600"
-            onClick={() => setIsAddModalOpen(true)}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Adicionar
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {creditCards.length > 0 ? (
-          <div className="space-y-4">
-            {creditCards.map((card, _index) => (
-              <div key={card.id} className="p-0">
+    <div className="bg-card border border-border rounded-[10px] p-4">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold">Cartões de Crédito</h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-sm text-primary"
+          onClick={() => setIsAddModalOpen(true)}
+        >
+          <Plus className="h-4 w-4 mr-1" />
+          Adicionar
+        </Button>
+      </div>
+      {creditCards.length > 0 ? (
+        <div className="space-y-3">
+          {creditCards.map((card) => {
+            const limitPct = getLimitPercentage(card);
+            return (
+              <div
+                key={card.id}
+                className="bg-gradient-to-br from-[#1e293b] to-[#0f172a] rounded-xl p-4 relative overflow-hidden"
+              >
+                {/* Accent lime dot */}
+                <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-primary" />
+
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm opacity-90">{card.name}</span>
-                  <i className={`${getBrandIcon(card.brand)} text-2xl`}></i>
+                  <span className="font-medium text-white text-sm">{card.name}</span>
+                  <span className="text-white/60 text-xs">{card.brand}</span>
                 </div>
-                <div className="flex items-center justify-between">
+
+                <div className="flex items-center justify-between mb-3">
                   <div>
-                    <div className="text-xs opacity-75">Fatura atual</div>
-                    <div className="font-medium">{formatCurrency(card.currentBalance)}</div>
+                    <div className="text-white/60 text-xs">Fatura atual</div>
+                    <div
+                      className="text-white font-semibold tabular-nums"
+                      style={{ fontVariantNumeric: 'tabular-nums' }}
+                    >
+                      {formatCurrency(card.currentBalance)}
+                    </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs opacity-75">Vencimento</div>
-                    <div className="font-medium">{formatDueDate(card?.dueDate)}</div>
+                    <div className="text-white/60 text-xs">Vencimento</div>
+                    <div
+                      className="text-white font-medium text-sm tabular-nums"
+                      style={{ fontVariantNumeric: 'tabular-nums' }}
+                    >
+                      {formatDueDate(card?.dueDate)}
+                    </div>
                   </div>
                 </div>
+
+                {/* Progress bar do limite */}
+                <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${limitPct}%`,
+                      backgroundColor: limitPct > 80 ? 'hsl(var(--destructive))' : 'hsl(var(--primary))',
+                    }}
+                  />
+                </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <i className="fas fa-credit-card text-4xl text-slate-400 mb-4"></i>
-            <p className="text-slate-600">Nenhum cartão cadastrado</p>
-            <p className="text-sm text-slate-500 mt-1">Adicione seu primeiro cartão de crédito</p>
-            <Button className="mt-4" onClick={() => setIsAddModalOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Adicionar Cartão
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <CreditCard className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+          <p className="text-muted-foreground">Nenhum cartão cadastrado</p>
+          <p className="text-sm text-muted-foreground mt-1">Adicione seu primeiro cartão de crédito</p>
+          <Button className="mt-4" size="sm" onClick={() => setIsAddModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Cartão
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }

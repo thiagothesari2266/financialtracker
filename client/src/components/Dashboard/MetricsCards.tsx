@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 import { endOfMonth, format, parse } from 'date-fns';
 import { useAccount } from '@/contexts/AccountContext';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTransactions } from '@/hooks/useTransactions';
 import { formatCurrency } from '@/lib/utils';
+import { Wallet, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
 
 interface MetricsCardsProps {
   currentMonth: string;
@@ -65,23 +65,17 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
-          <Card key={i} className="bg-white rounded-xl shadow-sm border border-slate-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-8 w-32" />
-                </div>
-                <Skeleton className="w-12 h-12 rounded-lg" />
+          <div key={i} className="bg-card border border-border rounded-[10px] p-4">
+            <div className="flex items-center gap-3">
+              <Skeleton className="w-9 h-9 rounded-full" />
+              <div className="space-y-2 flex-1">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-7 w-28" />
               </div>
-              <div className="flex items-center mt-4">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-24 ml-2" />
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ))}
       </div>
     );
@@ -91,68 +85,90 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
     {
       title: 'Saldo Atual',
       value: formatCurrency(currentBalance),
-      icon: 'fas fa-wallet',
-      bgColor: 'bg-blue-100',
+      icon: Wallet,
+      iconBg: 'bg-primary/15',
       iconColor: 'text-primary',
       isNegative: currentBalance < 0,
+      isBalance: true,
+      type: 'balance' as const,
     },
     {
       title: 'Receitas',
       value: formatCurrency(monthlyIncome),
-      icon: 'fas fa-arrow-up',
-      bgColor: 'bg-green-100',
-      iconColor: 'text-green-600',
+      icon: TrendingUp,
+      iconBg: '',
+      iconColor: '',
       isNegative: false,
+      isBalance: false,
+      type: 'income' as const,
     },
     {
       title: 'Despesas',
       value: formatCurrency(monthlyExpenses),
-      icon: 'fas fa-arrow-down',
-      bgColor: 'bg-red-100',
-      iconColor: 'text-red-600',
+      icon: TrendingDown,
+      iconBg: 'bg-destructive/15',
+      iconColor: 'text-destructive',
       isNegative: false,
+      isBalance: false,
+      type: 'expense' as const,
     },
     {
       title: 'Resultado do Mês',
       value: formatCurrency(monthlyNet),
-      icon: 'fas fa-chart-line',
-      bgColor: 'bg-amber-100',
-      iconColor: 'text-amber-600',
+      icon: BarChart3,
+      iconBg: 'bg-primary/15',
+      iconColor: 'text-primary',
       isNegative: monthlyNet < 0,
+      isBalance: false,
+      type: 'net' as const,
     },
   ];
 
+  const getValueColor = (metric: typeof metrics[0]) => {
+    if (metric.type === 'income') return 'text-success';
+    if (metric.type === 'expense') return 'text-destructive';
+    if (metric.isNegative) return 'text-destructive';
+    if (metric.type === 'balance' || metric.type === 'net') {
+      return metric.isNegative ? 'text-destructive' : 'text-success';
+    }
+    return '';
+  };
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-      {metrics.map((metric, index) => (
-        <Card key={index} className="bg-white rounded-xl shadow-sm border border-slate-200">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-600 text-xs sm:text-sm font-medium">{metric.title}</p>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {metrics.map((metric, index) => {
+        const Icon = metric.icon;
+        return (
+          <div
+            key={index}
+            className={`bg-card border border-border rounded-[10px] p-4${
+              metric.isBalance ? ' border-l-[3px] border-l-primary' : ''
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-9 h-9 rounded-full flex items-center justify-center ${metric.iconBg} ${metric.iconColor}`}
+                style={
+                  metric.type === 'income'
+                    ? { backgroundColor: 'hsl(var(--success) / 0.15)', color: 'hsl(var(--success))' }
+                    : undefined
+                }
+              >
+                <Icon className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-muted-foreground font-medium">{metric.title}</p>
                 <p
-                  className={`text-lg sm:text-xl lg:text-2xl font-bold mt-1 ${
-                    metric.isNegative
-                      ? 'text-red-600'
-                      : metric.title === 'Receitas'
-                        ? 'text-green-600'
-                        : metric.title === 'Despesas'
-                          ? 'text-red-600'
-                          : 'text-slate-900'
-                  }`}
+                  className={`text-2xl font-bold tabular-nums ${getValueColor(metric)}`}
+                  style={{ fontVariantNumeric: 'tabular-nums' }}
                 >
                   {metric.value}
                 </p>
               </div>
-              <div
-                className={`w-10 h-10 sm:w-12 sm:h-12 ${metric.bgColor} rounded-lg flex items-center justify-center`}
-              >
-                <i className={`${metric.icon} ${metric.iconColor} text-base sm:text-lg`}></i>
-              </div>
             </div>
-          </CardContent>
-        </Card>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

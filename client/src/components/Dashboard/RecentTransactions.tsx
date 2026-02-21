@@ -1,6 +1,4 @@
 import { useAccount } from '@/contexts/AccountContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreditCard, ArrowUp, ArrowDown } from 'lucide-react';
 import { getCategoryIcon, categoryColors } from '@/lib/categoryIcons';
@@ -60,26 +58,24 @@ export default function RecentTransactions({ currentMonth }: RecentTransactionsP
   };
 
   const getTransactionIconBg = (type: string) => {
-    return type === 'income' ? 'bg-green-100' : 'bg-red-100';
+    return type === 'income' ? 'bg-muted' : 'bg-muted';
   };
 
   if (isLoading) {
     return (
-      <Card className="bg-white rounded-xl shadow-sm border border-slate-200">
-        <CardHeader>
+      <div className="bg-card border border-border rounded-[10px]">
+        <div className="p-4 border-b border-border/50">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold text-slate-900">
-              Transações Recentes
-            </CardTitle>
-            <Skeleton className="h-6 w-16" />
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-4 w-16" />
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        </div>
+        <div className="p-4">
+          <div className="space-y-0">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="flex items-center justify-between py-3">
-                <div className="flex items-center space-x-3">
-                  <Skeleton className="w-10 h-10 rounded-lg" />
+                <div className="flex items-center gap-3">
+                  <Skeleton className="w-9 h-9 rounded-full" />
                   <div className="space-y-1">
                     <Skeleton className="h-4 w-32" />
                     <Skeleton className="h-3 w-24" />
@@ -92,72 +88,71 @@ export default function RecentTransactions({ currentMonth }: RecentTransactionsP
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card className="bg-white rounded-xl shadow-sm border border-slate-200">
-      <CardHeader>
+    <div className="bg-card border border-border rounded-[10px]">
+      <div className="p-4 border-b border-border/50">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-slate-900">
-            Transações Recentes
-          </CardTitle>
-          <Button variant="ghost" size="sm" className="text-sm text-primary hover:text-blue-600">
+          <h3 className="font-semibold">Transações Recentes</h3>
+          <a href="/transactions" className="text-primary text-sm hover:underline">
             Ver todas
-          </Button>
+          </a>
         </div>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="p-4">
         {transactions.length > 0 ? (
-          <div className="space-y-4">
-            {transactions.map((transaction) => (
+          <div>
+            {transactions.map((transaction, idx) => (
               <div
                 key={transaction.id}
-                className="flex items-center justify-between py-3 border-b border-slate-100 last:border-b-0"
+                className={`flex items-center justify-between py-3 hover:bg-muted/30 rounded-lg transition-colors px-1 ${
+                  idx < transactions.length - 1 ? 'border-b border-border/50' : ''
+                }`}
               >
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center gap-3">
                   <div
-                    className={`w-10 h-10 ${getTransactionIconBg(transaction.type)} rounded-lg flex items-center justify-center`}
+                    className={`w-9 h-9 ${getTransactionIconBg(transaction.type)} rounded-full flex items-center justify-center`}
                   >
                     {getTransactionIcon(transaction.category, transaction.type)}
-                  </div>{' '}
-                  <div>
-                    <div className="font-medium text-slate-900">
-                      {' '}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-medium text-sm">
                       {(transaction as any).isInvoiceTransaction && (
-                        <CreditCard className="inline h-4 w-4 text-blue-600 mr-2" />
+                        <CreditCard className="inline h-3.5 w-3.5 text-primary mr-1.5" />
                       )}
                       {transaction.description}
-                    </div>
-                    <div className="text-sm text-slate-500">
-                      {transaction.category?.name || 'Sem categoria'} •{' '}
-                      {transaction.paymentMethod || 'Não especificado'}
-                    </div>
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {transaction.category?.name || 'Sem categoria'}
+                    </span>
                   </div>
-                </div>{' '}
-                <div className="text-right">
-                  <div
-                    className={`font-medium ${
-                      transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                </div>
+                <div className="text-right flex flex-col items-end">
+                  <span
+                    className={`font-semibold tabular-nums text-sm ${
+                      transaction.type === 'income' ? 'text-success' : 'text-destructive'
                     }`}
+                    style={{ fontVariantNumeric: 'tabular-nums' }}
                   >
                     {formatCurrency(transaction.amount)}
-                  </div>
-                  <div className="text-xs text-slate-500">{formatDate(transaction.date)}</div>
+                  </span>
+                  <span className="text-xs text-muted-foreground">{formatDate(transaction.date)}</span>
                 </div>
               </div>
             ))}
           </div>
         ) : (
           <div className="text-center py-8">
-            <i className="fas fa-receipt text-4xl text-slate-400 mb-4"></i>
-            <p className="text-slate-600">Nenhuma transação encontrada</p>
-            <p className="text-sm text-slate-500 mt-1">Adicione sua primeira transação</p>
+            <i className="fas fa-receipt text-4xl text-muted-foreground mb-4"></i>
+            <p className="text-muted-foreground">Nenhuma transação encontrada</p>
+            <p className="text-sm text-muted-foreground mt-1">Adicione sua primeira transação</p>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
