@@ -2,6 +2,7 @@ import { Link, useLocation } from 'wouter';
 import { useAccount } from '@/contexts/AccountContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { AccountSwitcher } from './AccountSwitcher';
+import { Logo } from '@/components/Logo';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -61,7 +62,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       >
         <div className="flex h-full flex-col p-4">
           <div className="mb-4">
-            <img src="/logo.png" alt="Nexfin" className="h-8 w-auto" />
+            <Logo className="h-8 w-auto" />
           </div>
           <div className="mb-4">
             <AccountSwitcher />

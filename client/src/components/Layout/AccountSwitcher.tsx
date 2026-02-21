@@ -23,8 +23,8 @@ const accountTypeLabels: Record<Account['type'], string> = {
 };
 
 const accountTypeBadgeClass: Record<Account['type'], string> = {
-  personal: 'bg-blue-50 text-blue-700 border-blue-100',
-  business: 'bg-slate-900/5 text-slate-900 border-slate-200',
+  personal: 'bg-primary/10 text-primary border-primary/20',
+  business: 'bg-muted text-foreground border-border',
 };
 
 export function AccountSwitcher() {
@@ -56,31 +56,31 @@ export function AccountSwitcher() {
           <Button
             variant="outline"
             size="sm"
-            className="h-12 w-full justify-between gap-3 rounded-lg border-sidebar-border bg-sidebar px-3 text-left font-normal text-sidebar-foreground shadow-none"
+            className="h-10 w-full justify-between gap-2 rounded-lg border-sidebar-border bg-sidebar px-2.5 text-left font-normal text-sidebar-foreground shadow-none"
           >
             {currentAccount ? (
-              <div className="flex flex-1 items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 text-primary">
-                  <CurrentIcon className="h-4 w-4" />
+              <div className="flex flex-1 items-center gap-2.5 min-w-0">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+                  <CurrentIcon className="h-3.5 w-3.5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold leading-tight">
+                  <p className="truncate text-sm font-medium leading-tight">
                     {currentAccount.name}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground/80">
+                  <p className="truncate text-xs text-muted-foreground">
                     {accountTypeLabels[currentAccount.type]}
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="flex flex-1 items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                  <User2 className="h-4 w-4" />
+              <div className="flex flex-1 items-center gap-2.5 min-w-0">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                  <User2 className="h-3.5 w-3.5" />
                 </div>
                 <span className="text-sm font-medium">Selecionar conta</span>
               </div>
             )}
-            <ChevronsUpDown className="h-4 w-4 flex-shrink-0 opacity-60" />
+            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[300px] p-0" align="start">

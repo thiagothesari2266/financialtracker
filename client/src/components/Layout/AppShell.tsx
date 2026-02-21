@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
+import { Logo } from '@/components/Logo';
 import {
   Sidebar,
   SidebarContent,
@@ -14,6 +15,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
+  SidebarSeparator,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
@@ -98,9 +100,9 @@ export function AppShell({ children }: AppShellProps) {
       <AppSidebar accountType={currentAccount.type} />
       <SidebarInset>
         <div className="flex min-h-screen flex-col bg-background">
-          <div className="sticky top-0 z-10 flex h-12 items-center gap-2 border-b bg-background px-4 md:hidden">
+          <div className="sticky top-0 z-10 flex h-12 items-center gap-2 border-b bg-background/80 backdrop-blur-sm px-4 md:hidden">
             <SidebarTrigger />
-            <img src="/logo.png" alt="Nexfin" className="h-6 w-auto" />
+            <Logo className="h-6 w-auto" />
           </div>
           <div className="flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-10">
@@ -122,7 +124,12 @@ function AppSidebar({ accountType }: { accountType: 'personal' | 'business' }) {
       const isActive = location === item.href;
       return (
         <SidebarMenuItem key={item.href}>
-          <SidebarMenuButton asChild isActive={isActive} size="lg">
+          <SidebarMenuButton
+            asChild
+            isActive={isActive}
+            size="default"
+            className={isActive ? 'border-l-2 border-primary' : ''}
+          >
             <Link href={item.href} className="flex items-center gap-2">
               <Icon className="h-4 w-4" />
               <span>{item.title}</span>
@@ -137,9 +144,10 @@ function AppSidebar({ accountType }: { accountType: 'personal' | 'business' }) {
       <Sidebar collapsible="icon">
         <SidebarHeader className="space-y-3">
           <div className="px-3 pt-3">
-            <img src="/logo.png" alt="Nexfin" className="h-7 w-auto" />
+            <Logo className="h-7 w-auto" />
           </div>
           <AccountSwitcher />
+          <SidebarSeparator />
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
@@ -204,7 +212,7 @@ function UserMenuSidebar() {
           size="lg"
           className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
         >
-          <Avatar className="h-8 w-8 rounded-lg">
+          <Avatar className="h-8 w-8 rounded-lg ring-2 ring-primary/30">
             <AvatarFallback className="rounded-lg bg-primary/10 text-primary">
               {initials}
             </AvatarFallback>

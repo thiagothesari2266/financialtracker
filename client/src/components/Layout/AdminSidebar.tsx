@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { Logo } from '@/components/Logo';
 import { Users, UserCog, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -39,7 +40,7 @@ export default function AdminSidebar({ isOpen = false, onClose }: AdminSidebarPr
       >
         <div className="flex h-full flex-col p-4">
           <div className="mb-4">
-            <img src="/logo.png" alt="Nexfin" className="h-8 w-auto" />
+            <Logo className="h-8 w-auto" />
           </div>
           <div className="mb-4 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Admin
