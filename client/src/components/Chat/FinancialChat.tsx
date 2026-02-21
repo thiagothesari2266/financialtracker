@@ -172,8 +172,8 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center ${
                       message.type === 'user'
-                        ? 'bg-primary text-white'
-                        : 'bg-slate-100 text-slate-600'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground'
                     }`}
                   >
                     {message.type === 'user' ? (
@@ -185,8 +185,8 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
                   <div
                     className={`rounded-lg px-4 py-2 ${
                       message.type === 'user'
-                        ? 'bg-primary text-white'
-                        : 'bg-slate-100 text-slate-900'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-foreground'
                     }`}
                   >
                     <div
@@ -208,18 +208,18 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
             {isLoading && (
               <div className="flex justify-start">
                 <div className="flex gap-2">
-                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-slate-600" />
+                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-muted-foreground" />
                   </div>
-                  <div className="bg-slate-100 rounded-lg px-4 py-2">
+                  <div className="bg-muted rounded-lg px-4 py-2">
                     <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" />
+                      <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" />
                       <div
-                        className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                        className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
                         style={{ animationDelay: '0.1s' }}
                       />
                       <div
-                        className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"
+                        className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
                         style={{ animationDelay: '0.2s' }}
                       />
                     </div>
@@ -236,7 +236,7 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
             <div className="mb-4">
               <div className="flex items-center gap-2 mb-2">
                 <Lightbulb className="w-4 h-4 text-amber-500" />
-                <span className="text-sm font-medium text-slate-600">Sugestões:</span>
+                <span className="text-sm font-medium text-muted-foreground">Sugestões:</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {SUGGESTED_QUESTIONS.map((question, index) => (
@@ -265,7 +265,7 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
                 disabled={isLoading}
                 maxLength={500}
               />
-              <div className="text-xs text-slate-500 mt-1 text-right">
+              <div className="text-xs text-muted-foreground mt-1 text-right">
                 {inputMessage.length}/500
               </div>
             </div>

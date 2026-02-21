@@ -11,8 +11,8 @@ interface SummaryCardProps {
 
 const toneStyles: Record<NonNullable<SummaryCardProps['tone']>, string> = {
   default: 'text-foreground',
-  positive: 'text-green-600',
-  negative: 'text-red-600',
+  positive: 'text-green-600 dark:text-green-400',
+  negative: 'text-red-600 dark:text-red-400',
 };
 
 export function SummaryCard({
@@ -23,12 +23,12 @@ export function SummaryCard({
   icon,
 }: SummaryCardProps) {
   return (
-    <Card>
-      <CardContent className="flex items-center justify-between space-y-0 p-4 sm:p-5">
+    <Card className="border border-border shadow-none">
+      <CardContent className="flex items-center justify-between space-y-0 p-4">
         <div>
-          <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
-          <p className={cn('text-lg font-semibold sm:text-2xl', toneStyles[tone])}>{value}</p>
-          {helperText && <p className="text-xs text-muted-foreground">{helperText}</p>}
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+          <p className={cn('text-lg font-bold sm:text-2xl', toneStyles[tone])} style={{ fontVariantNumeric: 'tabular-nums' }}>{value}</p>
+          {helperText && <p className="mt-0.5 text-xs text-muted-foreground">{helperText}</p>}
         </div>
         {icon}
       </CardContent>

@@ -46,7 +46,7 @@ export function DatePicker({
           {date && !disabled && (
             <button
               type="button"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               onClick={(event) => {
                 event.stopPropagation();
                 onSelect(undefined);
