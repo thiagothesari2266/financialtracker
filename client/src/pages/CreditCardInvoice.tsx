@@ -278,7 +278,56 @@ export default function CreditCardInvoice() {
 
   const transactionCount = filteredTransactions.length;
 
-  // Header actions: seleção ativa → badge + cancelar + excluir; senão → voltar + nova transação
+  // Resolve invoice payment status
+  const invoiceStatus = useMemo(() => {
+    if (!invoice) return null;
+    const payment = invoice.invoicePayment;
+    if (payment?.status === 'paid') return 'paid';
+    if (invoiceTotal <= 0) return null;
+    // Verifica se esta vencido
+    if (invoice.dueDate) {
+      const due = new Date(invoice.dueDate);
+      if (due < new Date() && payment?.status !== 'paid') return 'overdue';
+    }
+    return 'pending';
+  }, [invoice, invoiceTotal]);
+
+  const statusBadge = useMemo(() => {
+    if (!invoiceStatus) return null;
+    switch (invoiceStatus) {
+      case 'paid':
+        return (
+          <span
+            className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+            style={{ backgroundColor: 'hsl(var(--success) / 0.15)', color: 'hsl(var(--success))' }}
+          >
+            Pago
+          </span>
+        );
+      case 'overdue':
+        return (
+          <span
+            className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+            style={{ backgroundColor: 'hsl(var(--destructive) / 0.15)', color: 'hsl(var(--destructive))' }}
+          >
+            Vencido
+          </span>
+        );
+      case 'pending':
+        return (
+          <span
+            className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+            style={{ backgroundColor: 'hsl(var(--warning) / 0.15)', color: 'hsl(var(--warning))' }}
+          >
+            Pendente
+          </span>
+        );
+      default:
+        return null;
+    }
+  }, [invoiceStatus]);
+
+  // Header actions: seleção ativa ou padrão
   const headerActions =
     selectedTransactions.size > 0 ? (
       <div className="flex flex-wrap items-center gap-2">
@@ -319,7 +368,7 @@ export default function CreditCardInvoice() {
     if (hasInvalidParams) {
       return (
         <EmptyState
-          icon={<CreditCardIcon className="h-12 w-12 text-slate-400" />}
+          icon={<CreditCardIcon className="h-12 w-12 text-muted-foreground" />}
           title="Parâmetros inválidos"
           description="Os parâmetros creditCardId e month são obrigatórios."
           action={{
@@ -335,11 +384,11 @@ export default function CreditCardInvoice() {
       return <EmptyState title="Carregando fatura..." className="border-dashed bg-transparent" />;
     }
 
-    // Cartão inválido → beco sem saída
+    // Cartão inválido
     if (!creditCard) {
       return (
         <EmptyState
-          icon={<CreditCardIcon className="h-12 w-12 text-slate-400" />}
+          icon={<CreditCardIcon className="h-12 w-12 text-muted-foreground" />}
           title="Fatura não encontrada"
           description="A fatura solicitada não existe ou não pôde ser carregada."
           action={{
@@ -351,46 +400,47 @@ export default function CreditCardInvoice() {
       );
     }
 
-    // Cartão existe mas fatura pode ser null (mês sem transações) → layout completo com zeros
     return (
-      <div className="space-y-6">
-        {/* Navegação de mês centralizada */}
-        <div className="flex items-center justify-center gap-1 rounded-lg border bg-card/60 px-3 py-2">
-          <Button variant="secondary" size="sm" onClick={handleCurrentMonth}>
-            Hoje
-          </Button>
-          <Button variant="ghost" size="icon" onClick={handlePreviousMonth}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="px-2 text-sm font-medium">{month ? formatMonth(month) : ''}</span>
-          <Button variant="ghost" size="icon" onClick={handleNextMonth}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+      <div className="space-y-4">
+        {/* Header da fatura */}
+        <Card className="bg-card border border-border rounded-[10px]">
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <CreditCardIcon className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">{creditCard.name}</span>
+                  {statusBadge}
+                </div>
+                <p className="text-2xl font-bold tabular-nums">
+                  {formatCurrency(invoiceTotal)}
+                </p>
+                {invoice?.dueDate && (
+                  <p className="text-sm text-muted-foreground">
+                    Vencimento: {formatDate(invoice.dueDate)}
+                  </p>
+                )}
+              </div>
 
-        {/* Search/filter em Card */}
-        <Card>
-          <CardContent className="flex flex-col gap-3 pt-4 sm:flex-row">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por descrição ou categoria"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline">
-                <Filter className="mr-2 h-4 w-4" />
-                Filtros
-              </Button>
+              {/* Navegação de mês */}
+              <div className="flex items-center gap-1 rounded-[10px] border border-border bg-muted/30 px-2 py-1.5">
+                <Button variant="secondary" size="sm" className="h-7 text-xs" onClick={handleCurrentMonth}>
+                  Hoje
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePreviousMonth}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="px-2 text-sm font-medium">{month ? formatMonth(month) : ''}</span>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNextMonth}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Summary cards */}
-        <div className={cn('grid gap-4 pt-2', totalCredits > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
+        <div className={cn('grid gap-4', totalCredits > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
           <SummaryCard
             label="Total da Fatura"
             value={formatCurrency(invoiceTotal)}
@@ -413,8 +463,29 @@ export default function CreditCardInvoice() {
           />
         </div>
 
+        {/* Search/filter */}
+        <Card className="bg-card border border-border rounded-[10px]">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por descrição ou categoria"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 bg-background border border-border"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm">
+                <Filter className="mr-2 h-4 w-4" />
+                Filtros
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Tabela de transações */}
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden bg-card border border-border rounded-[10px]">
           <CardContent className="p-0">
             {filteredTransactions.length === 0 ? (
               <EmptyState
@@ -433,12 +504,12 @@ export default function CreditCardInvoice() {
             ) : (
               <>
                 {/* Mobile view */}
-                <div className="divide-y sm:hidden">
+                <div className="divide-y divide-border/50 sm:hidden">
                   {filteredTransactions.map((transaction: any, index: number) => (
                     <div
                       key={transaction.id}
                       className={cn(
-                        'cursor-pointer px-4 py-3 transition-colors hover:bg-muted/30',
+                        'cursor-pointer px-4 py-3 transition-colors hover:bg-muted/20',
                         selectedTransactions.has(transaction.id) && 'bg-primary/5'
                       )}
                       onClick={() => handleEditTransaction(transaction)}
@@ -460,7 +531,7 @@ export default function CreditCardInvoice() {
                               className="mt-1"
                             />
                             <div>
-                              <div className="flex items-center gap-2 font-semibold">
+                              <div className="flex items-center gap-2 font-medium">
                                 {transaction.description}
                                 {transaction.installments > 1 && (
                                   <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal">
@@ -468,7 +539,12 @@ export default function CreditCardInvoice() {
                                   </span>
                                 )}
                                 {transaction.launchType === 'credito' && (
-                                  <span className="rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-xs font-normal">Crédito</span>
+                                  <span
+                                    className="rounded-full px-2 py-0.5 text-xs font-normal"
+                                    style={{ backgroundColor: 'hsl(var(--success) / 0.15)', color: 'hsl(var(--success))' }}
+                                  >
+                                    Crédito
+                                  </span>
                                 )}
                               </div>
                               <div className="text-xs text-muted-foreground">
@@ -477,7 +553,7 @@ export default function CreditCardInvoice() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className={cn('text-sm font-semibold', parseFloat(transaction.amount) < 0 ? 'text-green-600' : 'text-red-600')}>
+                            <p className={cn('text-sm font-medium tabular-nums', parseFloat(transaction.amount) < 0 ? 'text-green-600' : 'text-red-600')}>
                               {parseFloat(transaction.amount) < 0 ? '+ ' : ''}{formatCurrencyAbs(transaction.amount)}
                             </p>
                             <p className="text-xs text-muted-foreground">
@@ -494,21 +570,21 @@ export default function CreditCardInvoice() {
                 <div className="hidden sm:block">
                   <Table>
                     <TableHeader>
-                      <TableRow>
+                      <TableRow className="bg-muted/30 border-b border-border">
                         <TableHead className="w-[50px]">
                           <Checkbox checked={isAllSelected} onCheckedChange={handleSelectAll} />
                         </TableHead>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead>Categoria</TableHead>
-                        <TableHead>Data</TableHead>
-                        <TableHead className="text-right">Valor</TableHead>
+                        <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Descrição</TableHead>
+                        <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Categoria</TableHead>
+                        <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Data</TableHead>
+                        <TableHead className="text-xs uppercase tracking-wider text-muted-foreground text-right">Valor</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredTransactions.map((transaction: any, index: number) => (
                         <TableRow
                           key={transaction.id}
-                          className="cursor-pointer"
+                          className="cursor-pointer border-b border-border/50 hover:bg-muted/20"
                           data-state={
                             selectedTransactions.has(transaction.id) ? 'selected' : undefined
                           }
@@ -537,7 +613,12 @@ export default function CreditCardInvoice() {
                                 </span>
                               )}
                               {transaction.launchType === 'credito' && (
-                                <span className="rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-xs font-normal">Crédito</span>
+                                <span
+                                  className="rounded-full px-2 py-0.5 text-xs font-normal"
+                                  style={{ backgroundColor: 'hsl(var(--success) / 0.15)', color: 'hsl(var(--success))' }}
+                                >
+                                  Crédito
+                                </span>
                               )}
                             </div>
                           </TableCell>
@@ -552,8 +633,8 @@ export default function CreditCardInvoice() {
                               {formatDate(transaction.date)}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right font-semibold">
-                            <span className={parseFloat(transaction.amount) < 0 ? 'text-green-600' : 'text-red-600'}>
+                          <TableCell className="text-right">
+                            <span className={cn('font-medium tabular-nums', parseFloat(transaction.amount) < 0 ? 'text-green-600' : 'text-red-600')}>
                               {parseFloat(transaction.amount) < 0 ? '+ ' : ''}{formatCurrencyAbs(transaction.amount)}
                             </span>
                           </TableCell>
@@ -573,9 +654,9 @@ export default function CreditCardInvoice() {
   return (
     <>
       <AppShell>
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">{pageTitle}</h1>
+            <h1 className="text-xl font-semibold">{pageTitle}</h1>
             {headerActions}
           </div>
           {renderContent()}

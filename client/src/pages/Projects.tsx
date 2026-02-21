@@ -51,9 +51,9 @@ export default function Projects() {
     return (
       <AppShell>
         <div className="space-y-6">
-          <h1 className="text-2xl font-bold">Projetos</h1>
+          <h1 className="text-xl font-semibold">Projetos</h1>
           <EmptyState
-            icon={<Folder className="h-16 w-16 text-slate-400" />}
+            icon={<Folder className="h-16 w-16 text-muted-foreground" />}
             title="Projetos não disponíveis"
             description="A funcionalidade de projetos está disponível apenas para contas empresariais."
           />
@@ -118,7 +118,7 @@ export default function Projects() {
       <AppShell>
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Projetos</h1>
+            <h1 className="text-xl font-semibold">Projetos</h1>
             <Button onClick={handleOpenCreateModal}>
               <Plus className="h-4 w-4 mr-2" />
               Novo Projeto
@@ -129,7 +129,7 @@ export default function Projects() {
           <EmptyState title="Carregando projetos..." className="border-dashed bg-transparent" />
         ) : projects.length === 0 ? (
           <EmptyState
-            icon={<Folder className="h-16 w-16 text-slate-400" />}
+            icon={<Folder className="h-16 w-16 text-muted-foreground" />}
             title="Nenhum projeto encontrado"
             description="Comece criando seu primeiro projeto para organizar suas atividades."
             action={{
@@ -144,7 +144,7 @@ export default function Projects() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="mb-2 text-lg font-semibold text-slate-900">
+                      <CardTitle className="mb-2 text-lg font-semibold text-foreground">
                         {project.name}
                       </CardTitle>
                       {getStatusBadge(project.status)}
@@ -173,24 +173,24 @@ export default function Projects() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {project.description && (
-                    <p className="text-sm text-slate-600 line-clamp-2">{project.description}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
                   )}
 
-                  <div className="grid grid-cols-2 gap-3 text-sm text-slate-600">
+                  <div className="grid grid-cols-2 gap-3 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-slate-400" />
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
                       <span>{formatDate(project.startDate)}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-slate-400" />
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
                       <span>{project.endDate ? formatDate(project.endDate) : '-'}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-slate-400" />
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
                       <span>{formatCurrency(project.budget)}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-slate-400" />
+                      <User className="h-4 w-4 text-muted-foreground" />
                       <span>{project.client?.name || 'Sem cliente'}</span>
                     </div>
                   </div>

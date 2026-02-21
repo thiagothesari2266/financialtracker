@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { useAccount } from '@/contexts/AccountContext';
 import { AppShell } from '@/components/Layout/AppShell';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, CreditCard, Calendar, DollarSign, RefreshCw, Upload } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import CreditCardModal from '@/components/Modals/CreditCardModal';
 import { useLocation } from 'wouter';
 import InvoiceUploadModal from '@/components/Modals/InvoiceUploadModal';
@@ -184,10 +182,11 @@ export default function CreditCards() {
       <AppShell>
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Cartões de Crédito</h1>
+            <h1 className="text-xl font-semibold">Cartões de Crédito</h1>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={handleProcessInvoices}
                 disabled={processInvoices.isPending}
               >
@@ -196,7 +195,7 @@ export default function CreditCards() {
                 />
                 Processar faturas
               </Button>
-              <Button onClick={() => setIsCreditCardModalOpen(true)}>
+              <Button size="sm" onClick={() => setIsCreditCardModalOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Novo cartão
               </Button>
@@ -235,7 +234,7 @@ export default function CreditCards() {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {isLoading ? (
               <EmptyState
                 title="Carregando cartões..."
@@ -260,108 +259,101 @@ export default function CreditCards() {
                     : 0;
 
                 return (
-                  <Card key={card.id} className="hover:shadow-lg transition-shadow">
-                    <CardHeader className="pb-4">
+                  <div
+                    key={card.id}
+                    className="relative overflow-hidden rounded-[10px] bg-gradient-to-br from-[#1e293b] to-[#0f172a] border border-white/10"
+                  >
+                    {/* Barra lateral lime */}
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
+
+                    <div className="p-4 pl-5 space-y-4">
+                      {/* Header: nome + bandeira */}
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <CreditCard className="h-5 w-5 text-blue-600" />
-                          <CardTitle className="text-lg">{card.name}</CardTitle>
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="h-4 w-4 text-white/60" />
+                          <span className="font-medium text-white">{card.name}</span>
                         </div>
-                        <Badge variant="outline">{card.brand}</Badge>
+                        <span className="text-xs font-medium text-white/40 uppercase tracking-wider">
+                          {card.brand}
+                        </span>
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {/* Balance and Limit */}
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-slate-600">Fatura Atual</span>
-                            <span className="font-semibold text-red-600">
-                              {formatCurrency(card.currentBalance || '0.00')}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-slate-600">Mês da Fatura</span>
-                            <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                              {formatInvoiceMonth(card.closingDay || 1)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-slate-600">Limite</span>
-                            <span className="font-semibold text-slate-900">
-                              {formatCurrency(card.creditLimit || '0.00')}
-                            </span>
-                          </div>
 
-                          {/* Usage Bar */}
-                          <div className="w-full bg-slate-200 rounded-full h-2">
-                            <div
-                              className={`h-2 rounded-full transition-all ${
-                                usagePercentage > 80
-                                  ? 'bg-red-500'
-                                  : usagePercentage > 60
-                                    ? 'bg-yellow-500'
-                                    : 'bg-green-500'
-                              }`}
-                              style={{ width: `${Math.min(usagePercentage, 100)}%` }}
-                            ></div>
-                          </div>
-                          <div className="text-xs text-slate-500 text-right">
-                            {usagePercentage.toFixed(1)}% utilizado
-                          </div>
+                      {/* Numero parcial ficticio */}
+                      <p className="text-white/60 text-sm tracking-wider">
+                        **** **** **** ****
+                      </p>
+
+                      {/* Fatura atual */}
+                      <div className="space-y-1">
+                        <span className="text-xs text-white/40">Fatura atual</span>
+                        <p className="text-white text-xl font-bold tabular-nums">
+                          {formatCurrency(card.currentBalance || '0.00')}
+                        </p>
+                      </div>
+
+                      {/* Mês da fatura */}
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-3.5 w-3.5 text-white/40" />
+                        <span className="text-xs text-white/60">
+                          {formatInvoiceMonth(card.closingDay || 1)}
+                        </span>
+                      </div>
+
+                      {/* Limite + barra de uso */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-white/40">Limite</span>
+                          <span className="text-xs text-white/60 tabular-nums">
+                            {formatCurrency(card.creditLimit || '0.00')}
+                          </span>
                         </div>
-
-                        {/* Due Date e Closing Day */}
-                        <div className="flex items-start justify-between gap-6 pt-2 border-t">
-                          {/* Fechamento */}
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center space-x-2">
-                              <Calendar className="h-4 w-4 text-slate-400" />
-                              <span className="text-sm text-slate-600">Fechamento</span>
-                            </div>
-                            <span className="text-sm font-medium">
-                              Dia {card.closingDay || '-'}
-                            </span>
-                          </div>
-
-                          {/* Vencimento */}
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center space-x-2">
-                              <Calendar className="h-4 w-4 text-slate-400" />
-                              <span className="text-sm text-slate-600">Vencimento</span>
-                            </div>
-                            <span className="text-sm font-medium">Dia {card.dueDate}</span>
-                          </div>
+                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all"
+                            style={{ width: `${Math.min(usagePercentage, 100)}%` }}
+                          />
                         </div>
+                        <p className="text-xs text-white/40 text-right tabular-nums">
+                          {usagePercentage.toFixed(1)}% utilizado
+                        </p>
+                      </div>
 
-                        {/* Actions */}
-                        <div className="grid grid-cols-3 gap-2 pt-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewInvoices(card)}
-                          >
-                            Ver Fatura
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleUploadInvoice(card)}
-                          >
-                            <Upload className="h-3 w-3 mr-1" />
-                            Importar
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditCreditCard(card)}
-                          >
-                            Editar
-                          </Button>
+                      {/* Fechamento / Vencimento */}
+                      <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                        <div className="text-xs">
+                          <span className="text-white/40">Fecha dia </span>
+                          <span className="text-white/80 font-medium">{card.closingDay || '-'}</span>
+                        </div>
+                        <div className="text-xs">
+                          <span className="text-white/40">Vence dia </span>
+                          <span className="text-white/80 font-medium">{card.dueDate}</span>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+
+                      {/* Actions */}
+                      <div className="grid grid-cols-3 gap-2 pt-1">
+                        <button
+                          onClick={() => handleViewInvoices(card)}
+                          className="text-xs font-medium text-white/80 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-[10px] px-2 py-1.5 transition-colors"
+                        >
+                          Ver Fatura
+                        </button>
+                        <button
+                          onClick={() => handleUploadInvoice(card)}
+                          className="flex items-center justify-center gap-1 text-xs font-medium text-white/80 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-[10px] px-2 py-1.5 transition-colors"
+                        >
+                          <Upload className="h-3 w-3" />
+                          Importar
+                        </button>
+                        <button
+                          onClick={() => handleEditCreditCard(card)}
+                          className="text-xs font-medium text-white/80 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-[10px] px-2 py-1.5 transition-colors"
+                        >
+                          Editar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 );
               })
             )}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAccount } from '@/contexts/AccountContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,9 +43,31 @@ export default function SettingsPage() {
     transactions: true,
     reports: false,
   });
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState(() => localStorage.getItem('nexfin-theme') || 'light');
   const [currency, setCurrency] = useState('BRL');
   const [language, setLanguage] = useState('pt-BR');
+
+  const applyTheme = useCallback((t: string) => {
+    const root = document.documentElement;
+    if (t === 'dark') {
+      root.classList.add('dark');
+    } else if (t === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      root.classList.toggle('dark', prefersDark);
+    } else {
+      root.classList.remove('dark');
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('nexfin-theme', theme);
+    applyTheme(theme);
+  }, [theme, applyTheme]);
+
+  // Apply saved theme on mount
+  useEffect(() => {
+    applyTheme(theme);
+  }, []);
 
   const updateAccountMutation = useMutation({
     mutationFn: async (data: { name: string; type: string }) => {
@@ -195,7 +217,7 @@ export default function SettingsPage() {
     <AppShell>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Configurações</h1>
+          <h1 className="text-xl font-semibold">Configurações</h1>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={handleExportData}>
               <Download className="h-4 w-4 mr-2" />
@@ -208,7 +230,7 @@ export default function SettingsPage() {
           </div>
         </div>
         {/* Account Settings */}
-        <Card className="mb-6">
+        <Card className="mb-6 border border-border shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
@@ -260,7 +282,7 @@ export default function SettingsPage() {
         </Card>
 
         {/* Preferences */}
-        <Card className="mb-6">
+        <Card className="mb-6 border border-border shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Palette className="h-5 w-5" />
@@ -314,7 +336,7 @@ export default function SettingsPage() {
         </Card>
 
         {/* Notifications */}
-        <Card className="mb-6">
+        <Card className="mb-6 border border-border shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
@@ -386,7 +408,7 @@ export default function SettingsPage() {
         </Card>
 
         {/* Data Management */}
-        <Card className="mb-6">
+        <Card className="mb-6 border border-border shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="h-5 w-5" />
@@ -407,7 +429,7 @@ export default function SettingsPage() {
             </div>
             <Separator />
             <div className="space-y-4">
-              <h4 className="text-sm font-medium text-red-600">Zona de perigo</h4>
+              <h4 className="text-sm font-medium text-destructive">Zona de perigo</h4>
               <div className="space-y-3">
                 <div className="flex flex-col space-y-2">
                   <Button

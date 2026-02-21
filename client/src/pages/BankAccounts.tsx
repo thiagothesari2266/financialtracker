@@ -75,7 +75,7 @@ export default function BankAccounts() {
       <AppShell>
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Contas Bancárias</h1>
+            <h1 className="text-xl font-semibold">Contas Bancárias</h1>
             <Button onClick={() => setIsModalOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Nova Conta Bancária
@@ -88,7 +88,7 @@ export default function BankAccounts() {
             />
           ) : bankAccounts.length === 0 ? (
             <EmptyState
-              icon={<Landmark className="h-10 w-10 text-slate-400" />}
+              icon={<Landmark className="h-10 w-10 text-muted-foreground" />}
               title="Nenhuma conta bancária cadastrada"
               description="Cadastre uma conta para acompanhar saldos e transações."
               action={{
@@ -103,25 +103,25 @@ export default function BankAccounts() {
           ) : (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {bankAccounts.map((ba) => (
-                <Card key={ba.id} className="relative">
+                <Card key={ba.id} className="relative border border-border shadow-none">
                   <CardHeader>
-                    <CardTitle className="text-xl flex items-center gap-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
                       {ba.name}
                       {ba.shared && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/15 text-primary-foreground dark:text-primary">
                           Compartilhada
                         </span>
                       )}
                       {ba.accountId !== currentAccount?.id && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
                           De outra conta
                         </span>
                       )}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="mb-2 text-xs text-slate-500">Pix: {ba.pix}</div>
-                    <div className="mb-2 text-xs text-slate-500">
+                    <div className="mb-2 text-xs text-muted-foreground">Pix: {ba.pix}</div>
+                    <div className="mb-2 text-xs text-muted-foreground">
                       Saldo Inicial: R$ {parseFloat(ba.initialBalance || '0').toFixed(2)}
                     </div>
                     {ba.accountId === currentAccount?.id && (

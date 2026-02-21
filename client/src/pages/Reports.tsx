@@ -173,7 +173,7 @@ export default function Reports() {
     <AppShell>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Relatórios</h1>
+          <h1 className="text-xl font-semibold">Relatórios</h1>
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
             <SelectTrigger className="w-40">
               <SelectValue />
@@ -209,7 +209,7 @@ export default function Reports() {
           <SummaryCard
             label="Transações"
             value={currentMonthStats.transactionCount.toString()}
-            icon={<Calendar className="h-5 w-5 text-slate-600" />}
+            icon={<Calendar className="h-5 w-5 text-muted-foreground" />}
           />
         </div>
 
@@ -242,7 +242,7 @@ export default function Reports() {
                   </RechartsPieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-[300px] items-center justify-center text-slate-500">
+                <div className="flex h-[300px] items-center justify-center text-muted-foreground">
                   Nenhum dado disponível para o período
                 </div>
               )}

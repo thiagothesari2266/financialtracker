@@ -137,13 +137,13 @@ export default function AdminInvites() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-background">
       <AdminSidebar />
       <main className="flex-1 p-6 md:p-8 ml-16 md:ml-64">
         <div className="max-w-4xl mx-auto space-y-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Gerenciar Convites</h1>
-            <p className="text-slate-600">Convide novos usuários para a plataforma</p>
+            <h1 className="text-xl font-semibold">Gerenciar Convites</h1>
+            <p className="text-sm text-muted-foreground">Convide novos usuários para a plataforma</p>
           </div>
 
           {/* Criar convite */}
@@ -173,7 +173,7 @@ export default function AdminInvites() {
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <Label htmlFor="maxPersonal" className="text-sm text-slate-600">
+                    <Label htmlFor="maxPersonal" className="text-sm text-muted-foreground">
                       Contas Pessoais
                     </Label>
                     <Input
@@ -185,7 +185,7 @@ export default function AdminInvites() {
                     />
                   </div>
                   <div className="flex-1">
-                    <Label htmlFor="maxBusiness" className="text-sm text-slate-600">
+                    <Label htmlFor="maxBusiness" className="text-sm text-muted-foreground">
                       Contas Empresariais
                     </Label>
                     <Input
@@ -215,9 +215,9 @@ export default function AdminInvites() {
             </CardHeader>
             <CardContent>
               {invitesQuery.isLoading ? (
-                <div className="text-center py-8 text-slate-500">Carregando...</div>
+                <div className="text-center py-8 text-muted-foreground">Carregando...</div>
               ) : invitesQuery.data?.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
+                <div className="text-center py-8 text-muted-foreground">
                   Nenhum convite enviado ainda
                 </div>
               ) : (
@@ -225,17 +225,17 @@ export default function AdminInvites() {
                   {invitesQuery.data?.map((invite) => (
                     <div
                       key={invite.id}
-                      className="flex items-center justify-between p-4 bg-slate-50 rounded-lg"
+                      className="flex items-center justify-between p-4 bg-muted rounded-lg"
                     >
                       <div className="space-y-1">
-                        <div className="font-medium text-slate-900">{invite.email}</div>
-                        <div className="text-sm text-slate-500">
+                        <div className="font-medium text-foreground">{invite.email}</div>
+                        <div className="text-sm text-muted-foreground">
                           Criado em {formatDate(invite.createdAt)}
                           {invite.status === 'pending' && (
                             <> | Expira em {formatDate(invite.expiresAt)}</>
                           )}
                         </div>
-                        <div className="text-xs text-slate-400">
+                        <div className="text-xs text-muted-foreground">
                           Limites: {invite.maxPersonalAccounts} pessoal, {invite.maxBusinessAccounts} empresarial
                         </div>
                       </div>

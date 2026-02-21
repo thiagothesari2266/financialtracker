@@ -194,16 +194,16 @@ export default function Debts() {
       return (
         <TableRow key={debt.id} className="hover:bg-muted/40">
           <TableCell>
-            <div className="font-medium text-slate-900">{debt.name}</div>
+            <div className="font-medium text-foreground">{debt.name}</div>
             {debt.type && <div className="text-xs text-muted-foreground">{debt.type}</div>}
           </TableCell>
           <TableCell className="text-sm">{formatCurrency(debt.balance)}</TableCell>
           <TableCell className="text-sm">
             {formatPercent(debt.interestRate, debt.ratePeriod)}
           </TableCell>
-          <TableCell className="text-sm text-amber-600">{formatCurrency(monthlyCost)}</TableCell>
+          <TableCell className="text-sm text-amber-600 dark:text-amber-400" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(monthlyCost)}</TableCell>
           <TableCell className="text-sm">
-            <Badge variant="outline" className="bg-amber-50 text-amber-700">
+            <Badge variant="outline" className="bg-amber-600/10 text-amber-700 dark:text-amber-400 border-amber-600/20">
               {debt.ratePeriod === 'yearly' ? 'a.a.' : 'a.m.'}
             </Badge>
           </TableCell>
@@ -235,7 +235,7 @@ export default function Debts() {
       <AppShell>
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Painel de Dívidas</h1>
+            <h1 className="text-xl font-semibold">Painel de Dívidas</h1>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleExportCSV}>
                 <Download className="mr-2 h-4 w-4" />
@@ -258,7 +258,7 @@ export default function Debts() {
             <SummaryCard
               label="Saldo total em dívida"
               value={formatCurrency(totals.totalBalance)}
-              icon={<PiggyBank className="h-10 w-10 text-slate-500" />}
+              icon={<PiggyBank className="h-10 w-10 text-muted-foreground" />}
             />
             <SummaryCard
               label="Juros mensais estimados"
@@ -276,7 +276,7 @@ export default function Debts() {
             />
           </div>
 
-          <div className="rounded-lg border bg-card/50 shadow-sm">
+          <div className="rounded-lg border border-border bg-card shadow-none">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <div>
                 <p className="text-sm font-medium">Dívidas monitoradas</p>

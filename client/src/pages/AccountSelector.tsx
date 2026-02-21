@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { Plus } from 'lucide-react';
+import { Logo } from '@/components/Logo';
 import { Button } from '@/components/ui/button';
 import { useAccount } from '@/contexts/AccountContext';
 import AccountModal from '@/components/Modals/AccountModal';
@@ -75,7 +76,7 @@ export default function AccountSelector() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen w-full flex items-center justify-center bg-background">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Carregando contas...</p>
@@ -85,13 +86,13 @@ export default function AccountSelector() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 py-6 sm:py-8 lg:py-12">
+    <div className="min-h-screen w-full bg-background py-6 sm:py-8 lg:py-12">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8 sm:mb-10 lg:mb-12">
           <div className="flex justify-center mb-4">
-            <img src="/logo.png" alt="Nexfin" className="h-12 sm:h-14 lg:h-16 w-auto" />
+            <Logo className="h-12 sm:h-14 lg:h-16 w-auto" />
           </div>
-          <p className="text-base sm:text-lg lg:text-xl text-slate-600">
+          <p className="text-base sm:text-lg lg:text-xl text-muted-foreground">
             Selecione ou crie uma conta para continuar
           </p>
         </div>
@@ -121,7 +122,7 @@ export default function AccountSelector() {
             Nova Conta
           </Button>
           {!canCreateAny && (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               Você atingiu o limite de contas permitido.
             </p>
           )}

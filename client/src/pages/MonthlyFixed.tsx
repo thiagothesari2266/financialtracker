@@ -297,7 +297,7 @@ export default function MonthlyFixed() {
     <AppShell>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Fixos mensais</h1>
+          <h1 className="text-xl font-semibold">Fixos mensais</h1>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"

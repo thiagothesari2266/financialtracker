@@ -489,11 +489,11 @@ export default function Transactions() {
       <AppShell>
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Transações</h1>
+            <h1 className="text-xl font-semibold">Transações</h1>
             {headerActions}
           </div>
 
-          <div className="flex items-center justify-center gap-1 rounded-lg border bg-card/60 px-3 py-2">
+          <div className="flex items-center justify-center gap-1 rounded-lg border border-border bg-card px-3 py-2">
             <Button variant="secondary" size="sm" onClick={handleCurrentPeriod}>
               Hoje
             </Button>
@@ -519,7 +519,7 @@ export default function Transactions() {
             </Button>
           </div>
 
-          <Card>
+          <Card className="border border-border shadow-none">
             <CardContent className="flex flex-col gap-3 pt-4 sm:flex-row">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -552,16 +552,16 @@ export default function Transactions() {
           </div>
 
           {overdueFromPreviousPeriods.length > 0 && (
-            <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
-              <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-600" />
-              <p className="text-sm font-medium text-red-800">
+            <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+              <AlertCircle className="h-5 w-5 flex-shrink-0 text-destructive" />
+              <p className="text-sm font-medium text-destructive">
                 Você tem {overdueFromPreviousPeriods.length} conta
                 {overdueFromPreviousPeriods.length > 1 ? 's' : ''} em atraso
               </p>
             </div>
           )}
 
-          <Card className="overflow-hidden">
+          <Card className="overflow-hidden border border-border shadow-none">
             <CardContent className="p-0">
               {isLoading ? (
                 <EmptyState
@@ -651,21 +651,21 @@ export default function Transactions() {
                             <div className="flex items-center gap-2">
                               {transaction.paid ? (
                                 <div
-                                  className="inline-flex rounded-full bg-green-100 p-1"
+                                  className="inline-flex rounded-full bg-green-600/15 p-1"
                                   title="Pago"
                                 >
                                   <CheckCircle className="h-3 w-3 text-green-600" />
                                 </div>
                               ) : isOverdue(transaction) ? (
                                 <div
-                                  className="inline-flex rounded-full bg-red-100 p-1"
+                                  className="inline-flex rounded-full bg-red-600/15 p-1"
                                   title="Em atraso"
                                 >
                                   <AlertCircle className="h-3 w-3 text-red-600" />
                                 </div>
                               ) : (
                                 <div
-                                  className="inline-flex rounded-full bg-amber-100 p-1"
+                                  className="inline-flex rounded-full bg-amber-600/15 p-1"
                                   title="Pendente"
                                 >
                                   <Clock className="h-3 w-3 text-amber-600" />
@@ -775,21 +775,21 @@ export default function Transactions() {
                             <TableCell className="text-center">
                               {transaction.paid ? (
                                 <div
-                                  className="inline-flex rounded-full bg-green-100 p-1"
+                                  className="inline-flex rounded-full bg-green-600/15 p-1"
                                   title="Pago"
                                 >
                                   <CheckCircle className="h-4 w-4 text-green-600" />
                                 </div>
                               ) : isOverdue(transaction) ? (
                                 <div
-                                  className="inline-flex rounded-full bg-red-100 p-1"
+                                  className="inline-flex rounded-full bg-red-600/15 p-1"
                                   title="Em atraso"
                                 >
                                   <AlertCircle className="h-4 w-4 text-red-600" />
                                 </div>
                               ) : (
                                 <div
-                                  className="inline-flex rounded-full bg-amber-100 p-1"
+                                  className="inline-flex rounded-full bg-amber-600/15 p-1"
                                   title="Pendente"
                                 >
                                   <Clock className="h-4 w-4 text-amber-600" />

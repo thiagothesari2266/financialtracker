@@ -104,7 +104,7 @@ export default function AdminUsers() {
       );
     }
     return (
-      <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">
+      <Badge variant="outline" className="bg-muted text-foreground border-border">
         <User className="w-3 h-3 mr-1" />
         Usuário
       </Badge>
@@ -112,13 +112,13 @@ export default function AdminUsers() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-muted">
       <AdminSidebar />
       <main className="flex-1 p-6 md:p-8 ml-16 md:ml-64">
         <div className="max-w-5xl mx-auto space-y-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Gerenciar Usuários</h1>
-            <p className="text-slate-600">Visualize e gerencie os usuários da plataforma</p>
+            <h1 className="text-xl font-semibold">Gerenciar Usuários</h1>
+            <p className="text-sm text-muted-foreground">Visualize e gerencie os usuários da plataforma</p>
           </div>
 
           <Card>
@@ -132,7 +132,7 @@ export default function AdminUsers() {
               {/* Search */}
               <div className="mb-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Buscar por email..."
                     value={search}
@@ -144,9 +144,9 @@ export default function AdminUsers() {
 
               {/* Users list */}
               {isLoading ? (
-                <div className="text-center py-8 text-slate-500">Carregando...</div>
+                <div className="text-center py-8 text-muted-foreground">Carregando...</div>
               ) : filteredUsers.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
+                <div className="text-center py-8 text-muted-foreground">
                   {search ? 'Nenhum usuário encontrado' : 'Nenhum usuário cadastrado'}
                 </div>
               ) : (
@@ -154,19 +154,19 @@ export default function AdminUsers() {
                   {filteredUsers.map((user) => (
                     <div
                       key={user.id}
-                      className="flex items-center justify-between p-4 bg-slate-50 rounded-lg"
+                      className="flex items-center justify-between p-4 bg-muted rounded-lg"
                     >
                       <div className="space-y-1 flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-slate-900 truncate">
+                          <span className="font-medium text-foreground truncate">
                             {user.email}
                           </span>
                           {getRoleBadge(user.role)}
                         </div>
-                        <div className="text-sm text-slate-500">
+                        <div className="text-sm text-muted-foreground">
                           Criado em {formatDate(user.createdAt)}
                         </div>
-                        <div className="text-xs text-slate-400">
+                        <div className="text-xs text-muted-foreground">
                           Limites: {user.maxPersonalAccounts} pessoal, {user.maxBusinessAccounts} empresarial
                           {' | '}
                           Em uso: {user.accountsCount.personal} pessoal, {user.accountsCount.business} empresarial
@@ -217,7 +217,7 @@ export default function AdminUsers() {
               <br />
               <br />
               Esta ação irá deletar permanentemente:
-              <ul className="list-disc list-inside mt-2 text-slate-600">
+              <ul className="list-disc list-inside mt-2 text-muted-foreground">
                 <li>Todas as contas do usuário</li>
                 <li>Todas as transações e categorias</li>
                 <li>Cartões de crédito e faturas</li>

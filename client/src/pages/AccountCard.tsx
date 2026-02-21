@@ -51,8 +51,8 @@ export function AccountCard({
         </Button>
       </div>
       <div className="p-6">
-        <h2 className="text-lg font-semibold text-slate-900 mb-1">{account.name}</h2>
-        <p className="text-sm text-slate-600 mb-2 capitalize">
+        <h2 className="text-lg font-semibold text-foreground mb-1">{account.name}</h2>
+        <p className="text-sm text-muted-foreground mb-2 capitalize">
           {account.type === 'personal' ? 'Pessoal' : 'Empresarial'}
         </p>
         {/* Adicione saldo ou outras infos aqui se desejar */}

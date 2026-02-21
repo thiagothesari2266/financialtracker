@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useLocation, useSearch } from 'wouter';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { Logo } from '@/components/Logo';
 
 type Mode = 'login' | 'register';
 
@@ -98,46 +98,52 @@ export default function LoginPage() {
   // Se está no modo registro mas não tem convite válido
   if (mode === 'register' && !inviteData && !inviteToken) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4">
-        <div className="mb-8">
-          <img src="/logo.png" alt="Nexfin" className="h-14 w-auto" />
-        </div>
-        <Card className="w-full max-w-md shadow-lg">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-slate-900">Acesso Restrito</CardTitle>
-            <CardDescription className="text-slate-600">
-              O cadastro é feito apenas por convite. Solicite um convite ao administrador.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button className="w-full" onClick={() => setMode('login')}>
+      <div className="min-h-screen flex">
+        {/* Form side */}
+        <div className="flex flex-1 flex-col items-center justify-center px-6 lg:w-1/2">
+          <div className="w-full max-w-sm space-y-6">
+            <div>
+              <Logo className="h-8 w-auto" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold text-foreground">Acesso Restrito</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                O cadastro é feito apenas por convite. Solicite um convite ao administrador.
+              </p>
+            </div>
+            <Button className="w-full bg-primary text-primary-foreground" onClick={() => setMode('login')}>
               Voltar para login
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+        {/* Brand panel */}
+        <BrandPanel />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4">
-      <div className="mb-8">
-        <img src="/logo.png" alt="Nexfin" className="h-14 w-auto" />
-      </div>
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl text-slate-900">
-            {mode === 'login' ? 'Acessar painel' : 'Criar conta'}
-          </CardTitle>
-          <CardDescription className="text-slate-600">
-            {mode === 'login'
-              ? 'Entre para visualizar e gerenciar seus dados financeiros.'
-              : 'Complete seu cadastro para começar a usar o Nexfin.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <div className="min-h-screen flex">
+      {/* Form side */}
+      <div className="flex flex-1 flex-col items-center justify-center px-6 lg:w-1/2">
+        <div className="w-full max-w-sm space-y-6">
+          <div>
+            <Logo className="h-8 w-auto" />
+          </div>
+
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">
+              {mode === 'login' ? 'Entrar na sua conta' : 'Criar conta'}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {mode === 'login'
+                ? 'Gerencie suas finanças com inteligência'
+                : 'Complete seu cadastro para começar a usar o Nexfin.'}
+            </p>
+          </div>
+
           {inviteError && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-600">
+            <div className="p-3 rounded-[10px] border border-destructive/30 bg-destructive/10 text-sm text-destructive">
               {inviteError}
             </div>
           )}
@@ -150,9 +156,11 @@ export default function LoginPage() {
                 type="email"
                 autoComplete="email"
                 required
+                placeholder="seu@email.com"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 disabled={mode === 'register' && !!inviteData}
+                className="bg-background border border-border"
               />
             </div>
 
@@ -165,9 +173,10 @@ export default function LoginPage() {
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   required
                   minLength={mode === 'login' ? 1 : 8}
+                  placeholder="Sua senha"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  className="pr-10"
+                  className="pr-10 bg-background border border-border"
                 />
                 <button
                   type="button"
@@ -182,13 +191,13 @@ export default function LoginPage() {
               )}
             </div>
 
-            <Button className="w-full" type="submit" disabled={isSubmitting}>
+            <Button className="w-full mt-6 bg-primary text-primary-foreground" type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Processando...' : mode === 'login' ? 'Entrar' : 'Criar conta'}
             </Button>
           </form>
 
           {mode === 'register' && (
-            <div className="mt-6 text-center text-sm text-slate-600">
+            <div className="text-center text-sm text-muted-foreground">
               <span>
                 Já possui cadastro?{' '}
                 <Button
@@ -205,8 +214,41 @@ export default function LoginPage() {
               </span>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
+      {/* Brand panel */}
+      <BrandPanel />
+    </div>
+  );
+}
+
+function BrandPanel() {
+  return (
+    <div className="relative hidden lg:flex lg:w-1/2 flex-col items-center justify-center bg-[#0c1222] overflow-hidden">
+      {/* Gradiente radial sutil */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(159,232,112,0.15),_transparent_70%)]" />
+
+      <div className="relative z-10 max-w-md px-8 space-y-8">
+        <div className="space-y-3">
+          <h2 className="text-3xl font-bold text-white">
+            Controle total das suas finanças
+          </h2>
+          <p className="text-lg text-white/60">
+            Acompanhe receitas, despesas, cartões e investimentos em um só lugar.
+          </p>
+        </div>
+
+        {/* Card mock decorativo */}
+        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 space-y-2">
+          <p className="text-white/60 text-sm">Saldo total</p>
+          <p className="text-white text-2xl font-bold tabular-nums">R$ 24.850,00</p>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-primary" />
+            <span className="text-xs text-white/40">Atualizado agora</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

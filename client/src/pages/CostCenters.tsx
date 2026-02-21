@@ -42,9 +42,9 @@ export default function CostCenters() {
     return (
       <AppShell>
         <div className="space-y-6">
-          <h1 className="text-2xl font-bold">Centros de Custo</h1>
+          <h1 className="text-xl font-semibold">Centros de Custo</h1>
           <EmptyState
-            icon={<Building className="h-16 w-16 text-slate-400" />}
+            icon={<Building className="h-16 w-16 text-muted-foreground" />}
             title="Centros de custo não disponíveis"
             description="A funcionalidade está disponível apenas para contas empresariais."
           />
@@ -91,7 +91,7 @@ export default function CostCenters() {
       <AppShell>
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Centros de Custo</h1>
+            <h1 className="text-xl font-semibold">Centros de Custo</h1>
             <Button onClick={handleOpenCreateModal}>
               <Plus className="h-4 w-4 mr-2" />
               Novo Centro
@@ -105,7 +105,7 @@ export default function CostCenters() {
           />
         ) : costCenters.length === 0 ? (
           <EmptyState
-            icon={<Building className="h-16 w-16 text-slate-400" />}
+            icon={<Building className="h-16 w-16 text-muted-foreground" />}
             title="Nenhum centro de custo encontrado"
             description="Comece criando seu primeiro centro de custo para organizar suas despesas."
             action={{
@@ -120,7 +120,7 @@ export default function CostCenters() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="mb-2 text-lg font-semibold text-slate-900">
+                      <CardTitle className="mb-2 text-lg font-semibold text-foreground">
                         {costCenter.name}
                       </CardTitle>
                       <Badge variant="outline" className="text-xs">
@@ -151,25 +151,25 @@ export default function CostCenters() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {costCenter.description && (
-                    <p className="text-sm text-slate-600 line-clamp-2">{costCenter.description}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-2">{costCenter.description}</p>
                   )}
 
                   {costCenter.department && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Building className="h-4 w-4" />
                       <span>{costCenter.department}</span>
                     </div>
                   )}
 
                   {costCenter.manager && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <User className="h-4 w-4" />
                       <span>{costCenter.manager}</span>
                     </div>
                   )}
 
                   {costCenter.budget && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <DollarSign className="h-4 w-4" />
                       <span>Orçamento: {formatCurrency(costCenter.budget)}</span>
                     </div>

@@ -54,9 +54,9 @@ export default function Categories() {
   const expenseCategories = categories.filter((cat) => cat.type === 'expense');
 
   const renderGroup = (title: string, items: Category[], tone: 'income' | 'expense') => (
-    <Card className="border-muted">
+    <Card className="border border-border shadow-none">
       <CardHeader className="pb-4">
-        <CardTitle className={tone === 'income' ? 'text-green-600' : 'text-red-600'}>
+        <CardTitle className={tone === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
           {title}
         </CardTitle>
       </CardHeader>
@@ -110,7 +110,7 @@ export default function Categories() {
       <AppShell>
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Categorias</h1>
+            <h1 className="text-xl font-semibold">Categorias</h1>
             <Button
               size="sm"
               onClick={() => {
