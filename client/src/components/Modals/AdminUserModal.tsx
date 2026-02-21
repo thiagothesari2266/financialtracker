@@ -75,14 +75,14 @@ export default function AdminUserModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-lg font-semibold text-slate-900">
+          <DialogTitle className="text-lg font-semibold text-foreground">
             Editar Usuário
           </DialogTitle>
         </DialogHeader>
 
-        <div className="mb-4 p-3 bg-slate-50 rounded-lg">
-          <div className="text-sm text-slate-600">Email</div>
-          <div className="font-medium text-slate-900">{user.email}</div>
+        <div className="mb-4 p-3 bg-muted rounded-lg">
+          <div className="text-sm text-muted-foreground">Email</div>
+          <div className="font-medium text-foreground">{user.email}</div>
         </div>
 
         <Form {...form}>

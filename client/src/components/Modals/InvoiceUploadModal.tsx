@@ -323,7 +323,7 @@ export default function InvoiceUploadModal({
     switch (status) {
       case 'uploading':
       case 'processing':
-        return <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500" />;
+        return <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />;
       case 'completed':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'error':
@@ -379,20 +379,20 @@ export default function InvoiceUploadModal({
           <div
             {...getRootProps()}
             className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-              isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+              isDragActive ? 'border-primary bg-primary/10' : 'border-border hover:border-muted-foreground'
             }`}
           >
             <input {...getInputProps()} />
-            <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
 
             {isDragActive ? (
               <p className="text-blue-600">Solte os arquivos aqui...</p>
             ) : (
               <div>
-                <p className="text-gray-600 mb-2">
+                <p className="text-muted-foreground mb-2">
                   Arraste uma ou múltiplas imagens aqui ou clique para selecionar
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Suporta imagens (PNG, JPG) até 10MB cada. Múltiplas imagens serão processadas como
                   uma única fatura.
                 </p>
@@ -403,9 +403,9 @@ export default function InvoiceUploadModal({
           {/* Paste Button */}
           <div className="text-center">
             <div className="flex items-center justify-center gap-4">
-              <div className="flex-1 border-t border-gray-300"></div>
-              <span className="text-sm text-gray-500">ou</span>
-              <div className="flex-1 border-t border-gray-300"></div>
+              <div className="flex-1 border-t border-border"></div>
+              <span className="text-sm text-muted-foreground">ou</span>
+              <div className="flex-1 border-t border-border"></div>
             </div>
             <Button
               onClick={handlePaste}
@@ -416,13 +416,13 @@ export default function InvoiceUploadModal({
               <Clipboard className="h-4 w-4 mr-2" />
               {isPasting ? 'Processando...' : 'Colar Imagem da Área de Transferência'}
             </Button>
-            <p className="text-xs text-gray-500 mt-2">Cole uma imagem copiada (Ctrl+V)</p>
+            <p className="text-xs text-muted-foreground mt-2">Cole uma imagem copiada (Ctrl+V)</p>
           </div>
 
           {/* Uploaded Files */}
           {uploadedFiles.length > 0 && (
             <div className="space-y-4">
-              <h3 className="font-medium text-gray-900">Arquivos Enviados</h3>
+              <h3 className="font-medium text-foreground">Arquivos Enviados</h3>
 
               {uploadedFiles.map((uploadedFile) => (
                 <div key={uploadedFile.file.name} className="border rounded-lg p-4">
@@ -433,7 +433,7 @@ export default function InvoiceUploadModal({
                         <p className="font-medium text-sm truncate max-w-xs">
                           {uploadedFile.file.name}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           {(uploadedFile.file.size / 1024 / 1024).toFixed(2)} MB
                         </p>
                       </div>
@@ -441,7 +441,7 @@ export default function InvoiceUploadModal({
 
                     <div className="flex items-center gap-2">
                       {getStatusIcon(uploadedFile.status)}
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-muted-foreground">
                         {getStatusText(uploadedFile.status)}
                       </span>
                       <Button

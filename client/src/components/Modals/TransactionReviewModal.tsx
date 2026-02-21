@@ -459,7 +459,7 @@ export default function TransactionReviewModal({
           </Alert>
 
           {/* Seleção do Mês da Fatura */}
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="p-4 bg-primary/10 border border-primary rounded-lg">
             <Label htmlFor="invoice-month" className="font-medium text-blue-900 mb-2 block">
               Mês da Fatura
             </Label>
@@ -476,7 +476,7 @@ export default function TransactionReviewModal({
           </div>
 
           {/* Controles de seleção */}
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
             <div className="flex items-center gap-4">
               <Checkbox checked={selectAll} onCheckedChange={handleSelectAll} id="select-all" />
               <Label htmlFor="select-all" className="font-medium">
@@ -484,7 +484,7 @@ export default function TransactionReviewModal({
               </Label>
             </div>
 
-            <div className="flex items-center gap-4 text-sm text-gray-600">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span>{selectedCount} selecionadas</span>
               <span className="font-medium text-green-600">
                 Total: {formatCurrency(totalAmount)}
@@ -498,7 +498,7 @@ export default function TransactionReviewModal({
               <div
                 key={transaction.id}
                 className={`border rounded-lg p-4 transition-colors ${
-                  transaction.selected ? 'bg-blue-50 border-blue-200' : 'bg-white'
+                  transaction.selected ? 'bg-primary/10 border-primary' : 'bg-white'
                 }`}
               >
                 <div className="flex items-start gap-4">
@@ -516,7 +516,7 @@ export default function TransactionReviewModal({
                     {/* Header */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-gray-900">{transaction.description}</h3>
+                        <h3 className="font-medium text-foreground">{transaction.description}</h3>
                         {transaction.edited && (
                           <Badge variant="outline" className="text-xs">
                             Editada
@@ -560,15 +560,15 @@ export default function TransactionReviewModal({
                     {/* Detalhes */}
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-gray-400" />
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
                         <span>{formatDate(transaction.date)}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-gray-400" />
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
                         <span className="font-medium">{formatCurrency(transaction.amount)}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Tag className="h-4 w-4 text-gray-400" />
+                        <Tag className="h-4 w-4 text-muted-foreground" />
                         <span>
                           {categories.find((c) => c.id === transaction.categoryId)?.name ||
                             'Sem categoria'}
@@ -596,7 +596,7 @@ export default function TransactionReviewModal({
 
                     {/* Formulário de edição */}
                     {editingTransaction === transaction.id && (
-                      <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded border">
+                      <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded border">
                         <div>
                           <Label htmlFor={`desc-${transaction.id}`}>Descrição</Label>
                           <Input
@@ -749,7 +749,7 @@ export default function TransactionReviewModal({
 
           {/* Ações */}
           <div className="flex justify-between items-center pt-4 border-t">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-muted-foreground">
               {selectedCount} de {transactions.length} transações selecionadas
             </div>
 

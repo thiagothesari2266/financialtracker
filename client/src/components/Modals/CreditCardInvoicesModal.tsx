@@ -119,7 +119,7 @@ function CreditCardInvoicesModal({
           {isLoading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-slate-600">Carregando faturas...</p>
+              <p className="text-muted-foreground">Carregando faturas...</p>
             </div>
           ) : cardInvoices.length > 0 ? (
             <div className="space-y-4">
@@ -137,7 +137,7 @@ function CreditCardInvoicesModal({
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-slate-500" />
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
                           <CardTitle className="text-lg">{formatMonth(invoice.month)}</CardTitle>
                           {isOverdue && (
                             <Badge variant="destructive" className="text-xs">
@@ -147,14 +147,14 @@ function CreditCardInvoicesModal({
                           {hasInstallments && (
                             <Badge
                               variant="outline"
-                              className="text-xs text-blue-600 border-blue-300"
+                              className="text-xs text-blue-600 border-border"
                             >
                               Parceladas
                             </Badge>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-slate-600">
+                          <Badge variant="outline" className="text-muted-foreground">
                             {invoice.transactions?.length ?? 0} transações
                           </Badge>
                           <Button
@@ -172,13 +172,13 @@ function CreditCardInvoicesModal({
                     <CardContent>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
-                          <p className="text-sm text-slate-600">Período</p>
+                          <p className="text-sm text-muted-foreground">Período</p>
                           <p className="font-medium">
                             {formatDate(invoice.periodStart)} - {formatDate(invoice.periodEnd)}
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm text-slate-600">Total da Fatura</p>
+                          <p className="text-sm text-muted-foreground">Total da Fatura</p>
                           <p
                             className={`font-semibold text-lg ${isOverdue ? 'text-red-700' : 'text-red-600'}`}
                           >
@@ -191,7 +191,7 @@ function CreditCardInvoicesModal({
                           )}
                         </div>
                         <div>
-                          <p className="text-sm text-slate-600">Status</p>
+                          <p className="text-sm text-muted-foreground">Status</p>
                           <p
                             className={`font-medium ${isOverdue ? 'text-red-600' : 'text-green-600'}`}
                           >
@@ -200,7 +200,7 @@ function CreditCardInvoicesModal({
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <h4 className="text-sm font-medium text-slate-700 border-b pb-1">
+                        <h4 className="text-sm font-medium text-foreground border-b pb-1">
                           Transações desta fatura:
                         </h4>
                         {(invoice.transactions?.length ?? 0) > 0 ? (
@@ -209,7 +209,7 @@ function CreditCardInvoicesModal({
                             .map((transaction: any, index: number) => (
                               <div
                                 key={index}
-                                className="flex items-center justify-between p-2 bg-slate-50 rounded hover:bg-slate-100 transition-colors"
+                                className="flex items-center justify-between p-2 bg-muted rounded hover:bg-muted transition-colors"
                               >
                                 {' '}
                                 <div className="flex items-center space-x-3">
@@ -220,17 +220,17 @@ function CreditCardInvoicesModal({
                                   </div>
                                   <div>
                                     {' '}
-                                    <p className="text-sm font-medium text-slate-900">
+                                    <p className="text-sm font-medium text-foreground">
                                       <CreditCardIcon className="inline h-4 w-4 text-blue-600 mr-2" />
                                       {transaction.description}
                                       {transaction.installments > 1 && (
-                                        <span className="ml-2 text-xs text-slate-500">
+                                        <span className="ml-2 text-xs text-muted-foreground">
                                           {transaction.currentInstallment}/
                                           {transaction.installments}
                                         </span>
                                       )}
                                     </p>
-                                    <p className="text-xs text-slate-600">
+                                    <p className="text-xs text-muted-foreground">
                                       {transaction.category?.name || 'Sem categoria'} •{' '}
                                       {formatDate(transaction.date)}
                                     </p>
@@ -259,12 +259,12 @@ function CreditCardInvoicesModal({
                               </div>
                             ))
                         ) : (
-                          <p className="text-xs text-slate-500 text-center pt-2">
+                          <p className="text-xs text-muted-foreground text-center pt-2">
                             Nenhuma transação nesta fatura
                           </p>
                         )}
                         {(invoice.transactions?.length ?? 0) > 3 && (
-                          <p className="text-xs text-slate-500 text-center pt-2">
+                          <p className="text-xs text-muted-foreground text-center pt-2">
                             E mais {invoice.transactions!.length - 3} transações...
                           </p>
                         )}
@@ -276,9 +276,9 @@ function CreditCardInvoicesModal({
             </div>
           ) : (
             <div className="text-center py-8">
-              <CreditCardIcon className="h-12 w-12 mx-auto mb-4 opacity-50 text-slate-400" />
-              <p className="text-slate-600 font-medium">Nenhuma fatura encontrada</p>
-              <p className="text-sm text-slate-500">
+              <CreditCardIcon className="h-12 w-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
+              <p className="text-muted-foreground font-medium">Nenhuma fatura encontrada</p>
+              <p className="text-sm text-muted-foreground">
                 Este cartão ainda não possui faturas com transações
               </p>
             </div>

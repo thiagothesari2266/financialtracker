@@ -122,7 +122,7 @@ export default function AccountModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-lg font-semibold text-slate-900">Nova Conta</DialogTitle>
+          <DialogTitle className="text-lg font-semibold text-foreground">Nova Conta</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -171,12 +171,12 @@ export default function AccountModal({
               )}
             />
 
-            <div className="bg-slate-50 rounded-lg p-4 mt-4">
-              <div className="text-sm text-slate-700">
+            <div className="bg-muted rounded-lg p-4 mt-4">
+              <div className="text-sm text-foreground">
                 <strong>Pessoal:</strong> Para controle financeiro individual, despesas domésticas e
                 orçamento pessoal.
               </div>
-              <div className="text-sm text-slate-700 mt-2">
+              <div className="text-sm text-foreground mt-2">
                 <strong>Empresarial:</strong> Inclui recursos avançados como controle por cliente,
                 projeto e centro de custo.
               </div>

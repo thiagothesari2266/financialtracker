@@ -284,27 +284,27 @@ export default function InvoiceTransactionModal({
 
         <div className="space-y-6">
           {/* Informações da Fatura */}
-          <div className="bg-slate-50 rounded-lg p-4 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <div className="bg-muted rounded-lg p-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <CreditCard className="h-4 w-4" />
               Detalhes da Fatura
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-slate-600">Descrição:</span>
+                <span className="text-muted-foreground">Descrição:</span>
                 <p className="font-medium">{transaction.description}</p>
               </div>
               <div>
-                <span className="text-slate-600">Valor:</span>
+                <span className="text-muted-foreground">Valor:</span>
                 <p className="font-bold text-red-600">{formatCurrencyAbs(transaction.amount)}</p>
               </div>
               <div>
-                <span className="text-slate-600">Período:</span>
+                <span className="text-muted-foreground">Período:</span>
                 <p className="font-medium">{getInvoiceMonth()}</p>
               </div>{' '}
               <div>
-                <span className="text-slate-600">Status:</span>
+                <span className="text-muted-foreground">Status:</span>
                 <span
                   className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
                     localPaid ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
@@ -317,7 +317,7 @@ export default function InvoiceTransactionModal({
           </div>
 
           {/* Status de Pagamento */}
-          <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg">
+          <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
             <Checkbox
               checked={localPaid}
               onCheckedChange={handleTogglePaid}
@@ -342,7 +342,7 @@ export default function InvoiceTransactionModal({
               date={paymentDate ? parse(paymentDate, 'yyyy-MM-dd', new Date()) : undefined}
               onSelect={(date) => setPaymentDate(date ? format(date, 'yyyy-MM-dd') : '')}
             />
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted-foreground">
               Data de vencimento da fatura (calculada automaticamente baseada no cartão de crédito)
             </p>
           </div>

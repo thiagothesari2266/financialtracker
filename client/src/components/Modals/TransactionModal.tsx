@@ -946,7 +946,7 @@ export default function TransactionModal({
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-slate-900">
+            <DialogTitle className="text-lg font-semibold text-foreground">
               {transaction ? 'Editar Transação' : 'Nova Transação'}
             </DialogTitle>
           </DialogHeader>
@@ -1305,8 +1305,8 @@ export default function TransactionModal({
               )}
               {/* Business account specific fields */}
               {currentAccount?.type === 'business' && (
-                <div className="space-y-4 border-t border-slate-200 pt-4">
-                  <div className="text-sm font-medium text-slate-700 mb-2">
+                <div className="space-y-4 border-t border-border pt-4">
+                  <div className="text-sm font-medium text-foreground mb-2">
                     Informações Empresariais
                   </div>
 
@@ -1396,7 +1396,7 @@ export default function TransactionModal({
             <DialogTitle>Excluir transação</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted-foreground">
               Tem certeza que deseja excluir esta transação? Esta ação não pode ser desfeita.
             </p>
             <div className="flex justify-end gap-2">
