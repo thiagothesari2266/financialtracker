@@ -229,6 +229,7 @@ const mapCreditCard = (card: PrismaCreditCard): CreditCard => ({
   creditLimit: decimalToString(card.creditLimit),
   dueDate: card.dueDate,
   closingDay: card.closingDay,
+  shared: card.shared,
   accountId: card.accountId,
   createdAt: ensureDateTimeString(card.createdAt) ?? '',
 });
@@ -415,7 +416,7 @@ export interface IStorage {
   ): Promise<{ deletedTransactions: number; deletedCreditCardTransactions: number }>;
 
   createCreditCard(creditCard: InsertCreditCard): Promise<CreditCard>;
-  getCreditCards(accountId: number): Promise<CreditCard[]>;
+  getCreditCards(accountId: number, userId: number): Promise<CreditCard[]>;
   getCreditCard(id: number): Promise<CreditCard | undefined>;
   updateCreditCard(
     id: number,
@@ -1280,9 +1281,20 @@ export class DatabaseStorage implements IStorage {
     return mapCreditCard(created);
   }
 
-  async getCreditCards(accountId: number): Promise<CreditCard[]> {
+  async getCreditCards(accountId: number, userId: number): Promise<CreditCard[]> {
+    const userAccounts = await prisma.account.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+    const userAccountIds = userAccounts.map(a => a.id);
+
     const cards = await prisma.creditCard.findMany({
-      where: { accountId },
+      where: {
+        OR: [
+          { accountId },
+          { shared: true, accountId: { in: userAccountIds } },
+        ],
+      },
       orderBy: { name: 'asc' },
     });
     return cards.map(mapCreditCard);

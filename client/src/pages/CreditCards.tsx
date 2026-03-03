@@ -116,6 +116,7 @@ export default function CreditCards() {
       creditLimit: data.creditLimit,
       dueDate: Number(data.dueDate),
       closingDay: Number(data.closingDay),
+      shared: data.shared ?? false,
       accountId: currentAccount.id,
     };
     if (editingCard) {

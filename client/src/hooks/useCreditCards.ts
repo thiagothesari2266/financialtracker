@@ -35,7 +35,10 @@ export function useCreateCreditCard(accountId: number) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'credit-cards'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts'], predicate: (query) => {
+        const key = query.queryKey;
+        return Array.isArray(key) && key[0] === '/api/accounts' && key[2] === 'credit-cards';
+      }});
     },
   });
 }
@@ -49,9 +52,10 @@ export function useUpdateCreditCard() {
       return response.json();
     },
     onSuccess: (creditCard: CreditCard) => {
-      queryClient.invalidateQueries({
-        queryKey: ['/api/accounts', creditCard.accountId, 'credit-cards'],
-      });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey;
+        return Array.isArray(key) && key[0] === '/api/accounts' && key[2] === 'credit-cards';
+      }});
       queryClient.invalidateQueries({ queryKey: ['/api/credit-cards', creditCard.id] });
     },
   });

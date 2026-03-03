@@ -107,6 +107,7 @@ export const insertCreditCardSchema = z.object({
   creditLimit: z.string().optional(),
   dueDate: z.number(),
   closingDay: z.number(),
+  shared: z.boolean().optional().default(false),
 });
 export type InsertCreditCard = z.infer<typeof insertCreditCardSchema>;
 
@@ -285,6 +286,7 @@ export interface CreditCard {
   creditLimit: string;
   dueDate: number;
   closingDay: number;
+  shared: boolean;
   accountId: number;
   createdAt: string;
 }

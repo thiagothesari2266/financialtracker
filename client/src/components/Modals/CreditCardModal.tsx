@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { z } from 'zod';
 import { useDeleteCreditCard } from '@/hooks/useCreditCards';
 
@@ -14,6 +15,7 @@ const creditCardSchema = z.object({
   creditLimit: z.string().optional(),
   dueDate: z.string().min(1, 'Vencimento obrigatório'),
   closingDay: z.string().min(1, 'Dia de fechamento obrigatório'),
+  shared: z.boolean().optional().default(false),
 });
 
 type CreditCardForm = z.infer<typeof creditCardSchema>;
@@ -41,6 +43,7 @@ export default function CreditCardModal({
       creditLimit: '',
       dueDate: '',
       closingDay: '',
+      shared: false,
     },
     values: creditCard
       ? {
@@ -49,6 +52,7 @@ export default function CreditCardModal({
           creditLimit: creditCard.creditLimit,
           dueDate: String(creditCard.dueDate),
           closingDay: creditCard.closingDay ? String(creditCard.closingDay) : '',
+          shared: creditCard.shared ?? false,
         }
       : undefined,
   });
@@ -61,6 +65,7 @@ export default function CreditCardModal({
         creditLimit: creditCard.creditLimit,
         dueDate: String(creditCard.dueDate),
         closingDay: creditCard.closingDay ? String(creditCard.closingDay) : '',
+        shared: creditCard.shared ?? false,
       });
     } else {
       form.reset({
@@ -69,6 +74,7 @@ export default function CreditCardModal({
         creditLimit: '',
         dueDate: '',
         closingDay: '',
+        shared: false,
       });
     }
   }, [creditCard, form]);
@@ -124,6 +130,18 @@ export default function CreditCardModal({
             min={1}
             max={31}
             {...form.register('closingDay')}
+          />
+          <Controller
+            control={form.control}
+            name="shared"
+            render={({ field }) => (
+              <div className="flex items-center space-x-2">
+                <Checkbox id="shared" checked={field.value} onCheckedChange={field.onChange} />
+                <label htmlFor="shared" className="text-sm cursor-pointer">
+                  Compartilhado (visível em todas as contas)
+                </label>
+              </div>
+            )}
           />
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>

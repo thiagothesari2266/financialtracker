@@ -626,7 +626,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `[GET /api/accounts/${accountId}/credit-cards] Buscando cartões para accountId:`,
         accountId
       );
-      const creditCards = await storage.getCreditCards(accountId);
+      const userId = req.session.userId!;
+      const creditCards = await storage.getCreditCards(accountId, userId);
       console.log(
         `[GET /api/accounts/${accountId}/credit-cards] Encontrados ${creditCards.length} cartões:`,
         creditCards
