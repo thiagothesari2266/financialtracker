@@ -1,0 +1,32 @@
+{
+  "name": "Nexfin - Gestão Financeira",
+  "short_name": "Nexfin",
+  "description": "Gestão financeira pessoal e empresarial",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0c1222",
+  "theme_color": "#9FE870",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["finance", "productivity"],
+  "lang": "pt-BR",
+  "dir": "ltr"
+}
