@@ -137,10 +137,10 @@ export default function AdminInvites() {
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <AdminSidebar />
-      <main className="flex-1 p-6 md:p-8 ml-16 md:ml-64">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <main className="pt-12 md:pt-0 md:ml-64">
+        <div className="max-w-4xl mx-auto space-y-6 px-4 py-4 sm:px-6 sm:py-6">
           <div>
             <h1 className="text-xl font-semibold">Gerenciar Convites</h1>
             <p className="text-sm text-muted-foreground">Convide novos usuários para a plataforma</p>
@@ -225,22 +225,28 @@ export default function AdminInvites() {
                   {invitesQuery.data?.map((invite) => (
                     <div
                       key={invite.id}
-                      className="flex items-center justify-between p-4 bg-muted rounded-lg"
+                      className="p-3 sm:p-4 bg-muted rounded-lg space-y-2"
                     >
-                      <div className="space-y-1">
-                        <div className="font-medium text-foreground">{invite.email}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Criado em {formatDate(invite.createdAt)}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="font-medium text-foreground text-sm truncate">{invite.email}</div>
+                          <div className="text-xs sm:text-sm text-muted-foreground">
+                            Criado em {formatDate(invite.createdAt)}
+                          </div>
                           {invite.status === 'pending' && (
-                            <> | Expira em {formatDate(invite.expiresAt)}</>
+                            <div className="text-xs text-muted-foreground">
+                              Expira em {formatDate(invite.expiresAt)}
+                            </div>
                           )}
+                          <div className="text-xs text-muted-foreground">
+                            Limites: {invite.maxPersonalAccounts} pessoal, {invite.maxBusinessAccounts} empresarial
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Limites: {invite.maxPersonalAccounts} pessoal, {invite.maxBusinessAccounts} empresarial
+                        <div className="flex items-center gap-2 shrink-0">
+                          {getStatusBadge(invite)}
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        {getStatusBadge(invite)}
+                      <div className="flex items-center gap-2 justify-end">
                         {invite.status === 'pending' &&
                           new Date(invite.expiresAt) > new Date() && (
                             <Button
@@ -249,10 +255,11 @@ export default function AdminInvites() {
                               onClick={() => copyInviteLink(invite.token)}
                             >
                               {copiedToken === invite.token ? (
-                                <Check className="w-4 h-4" />
+                                <Check className="w-4 h-4 mr-1" />
                               ) : (
-                                <Copy className="w-4 h-4" />
+                                <Copy className="w-4 h-4 mr-1" />
                               )}
+                              <span className="text-xs">Copiar link</span>
                             </Button>
                           )}
                         <Button

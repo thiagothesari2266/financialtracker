@@ -112,10 +112,10 @@ export default function AdminUsers() {
   };
 
   return (
-    <div className="flex min-h-screen bg-muted">
+    <div className="min-h-screen bg-muted">
       <AdminSidebar />
-      <main className="flex-1 p-6 md:p-8 ml-16 md:ml-64">
-        <div className="max-w-5xl mx-auto space-y-6">
+      <main className="pt-12 md:pt-0 md:ml-64">
+        <div className="max-w-5xl mx-auto space-y-6 px-4 py-4 sm:px-6 sm:py-6">
           <div>
             <h1 className="text-xl font-semibold">Gerenciar Usuários</h1>
             <p className="text-sm text-muted-foreground">Visualize e gerencie os usuários da plataforma</p>
@@ -154,40 +154,43 @@ export default function AdminUsers() {
                   {filteredUsers.map((user) => (
                     <div
                       key={user.id}
-                      className="flex items-center justify-between p-4 bg-muted rounded-lg"
+                      className="p-3 sm:p-4 bg-muted rounded-lg space-y-2"
                     >
-                      <div className="space-y-1 flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-foreground truncate">
-                            {user.email}
-                          </span>
-                          {getRoleBadge(user.role)}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-foreground text-sm truncate">
+                              {user.email}
+                            </span>
+                            {getRoleBadge(user.role)}
+                          </div>
+                          <div className="text-xs sm:text-sm text-muted-foreground">
+                            Criado em {formatDate(user.createdAt)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Limites: {user.maxPersonalAccounts} pessoal, {user.maxBusinessAccounts} empresarial
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Em uso: {user.accountsCount.personal} pessoal, {user.accountsCount.business} empresarial
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          Criado em {formatDate(user.createdAt)}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditingUser(user)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => setDeletingUser(user)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Limites: {user.maxPersonalAccounts} pessoal, {user.maxBusinessAccounts} empresarial
-                          {' | '}
-                          Em uso: {user.accountsCount.personal} pessoal, {user.accountsCount.business} empresarial
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 ml-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setEditingUser(user)}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => setDeletingUser(user)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
                       </div>
                     </div>
                   ))}
