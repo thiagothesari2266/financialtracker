@@ -35,7 +35,11 @@
   --destructive: 0 72% 51%;            /* #ef4444 */
   --destructive-foreground: 0 0% 100%;
   --warning: 38 92% 50%;               /* #f59e0b */
+  --warning-foreground: 30 80% 30%;    /* texto escuro sobre warning bg */
   --success: 142 71% 45%;              /* #22c55e */
+  --success-foreground: 142 60% 25%;   /* texto escuro sobre success bg */
+  --info: 217 91% 60%;                 /* #3b82f6 */
+  --info-foreground: 217 70% 30%;      /* texto escuro sobre info bg */
 
   /* Borders */
   --border: 214 32% 91%;               /* #e2e8f0 */
@@ -95,7 +99,11 @@
   --destructive: 0 63% 45%;
   --destructive-foreground: 210 40% 98%;
   --warning: 38 80% 50%;
+  --warning-foreground: 38 90% 75%;
   --success: 142 71% 50%;
+  --success-foreground: 142 60% 75%;
+  --info: 217 91% 65%;
+  --info-foreground: 217 80% 80%;
 
   /* Borders */
   --border: 222 30% 16%;
@@ -194,7 +202,12 @@
     min-width: 44px;
   }
 
-  /* Exceção para botões inline pequenos que já têm padding adequado */
+  /* Exceção para controles de formulário com tamanho próprio */
+  [role="checkbox"],
+  [role="switch"],
+  [role="slider"],
+  [role="combobox"],
+  [data-sidebar] button,
   .inline-btn {
     min-height: auto;
     min-width: auto;
