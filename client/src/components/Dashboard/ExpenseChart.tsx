@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount } from '@/contexts/AccountContext';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,14 @@ export default function ExpenseChart({ currentMonth }: ExpenseChartProps) {
     const parsed = parseFloat(value);
     return isNaN(parsed) ? 0 : parsed;
   };
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const chartData = (categoryStats as any[])
     .filter((stat: any) => stat && stat.total && safeParseFloat(stat.total) > 0)
@@ -91,28 +100,40 @@ export default function ExpenseChart({ currentMonth }: ExpenseChartProps) {
         </div>
       </div>
       {chartData.length > 0 ? (
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={100}
-                dataKey="value"
-              >
-                {chartData.map((entry: any, index: number) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomTooltip />} />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        <>
+          <div className={isMobile ? 'h-48' : 'h-64'}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={isMobile ? 40 : 60}
+                  outerRadius={isMobile ? 70 : 100}
+                  dataKey="value"
+                >
+                  {chartData.map((entry: any, index: number) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+                {!isMobile && <Legend />}
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          {isMobile && (
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+              {chartData.map((entry: any, index: number) => (
+                <div key={index} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                  {entry.name}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       ) : (
-        <div className="h-64 bg-muted/30 rounded-lg flex items-center justify-center">
+        <div className="h-48 sm:h-64 bg-muted/30 rounded-lg flex items-center justify-center">
           <div className="text-center">
             <PieChartIcon className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
             <p className="text-muted-foreground">Nenhuma despesa encontrada</p>
