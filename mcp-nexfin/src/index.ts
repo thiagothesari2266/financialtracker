@@ -18,8 +18,13 @@ for (const arg of args) {
   if (arg.startsWith("--password=")) config.password = arg.split("=")[1];
 }
 
+// Filtro de acesso: apenas contas do Thiago (user_id=1), exceto Amanda (id=11)
+const USER_ID = 1;
+const EXCLUDED_ACCOUNT_IDS = [11]; // Amanda
+const ACCOUNT_FILTER = `a.user_id = ${USER_ID} AND a.id NOT IN (${EXCLUDED_ACCOUNT_IDS.join(",")})`;
+
 // Conexão SSH
-const DB_URL = "postgresql://postgres:adreport123@localhost:5432/nexfin";
+const DB_URL = "postgresql://postgres:tmttx22ID%4022@localhost:5432/nexfin";
 let sshClient: Client | null = null;
 let isConnected = false;
 
@@ -136,6 +141,7 @@ server.tool(
       FROM accounts a
       LEFT JOIN transactions t ON t.account_id = a.id
         AND to_char(t.date, 'YYYY-MM') = '${targetMonth}'
+      WHERE ${ACCOUNT_FILTER}
       GROUP BY a.name, t.type
       ORDER BY a.name, t.type
     `;
@@ -200,6 +206,7 @@ server.tool(
         fc.end_month as fim
       FROM fixed_cashflow fc
       JOIN accounts a ON fc.account_id = a.id
+      WHERE ${ACCOUNT_FILTER}
       ORDER BY a.name, fc.type DESC, fc.amount DESC
     `;
 
@@ -266,10 +273,12 @@ server.tool(
     // Buscar fluxo fixo
     const queryFixo = `
       SELECT
-        type as tipo,
-        SUM(amount) as total
-      FROM fixed_cashflow
-      GROUP BY type
+        fc.type as tipo,
+        SUM(fc.amount) as total
+      FROM fixed_cashflow fc
+      JOIN accounts a ON fc.account_id = a.id
+      WHERE ${ACCOUNT_FILTER}
+      GROUP BY fc.type
     `;
 
     const resultFixo = await execQuery(queryFixo);
@@ -329,7 +338,8 @@ server.tool(
         a.name as conta
       FROM transactions t
       JOIN accounts a ON t.account_id = a.id
-      WHERE t.paid = false
+      WHERE ${ACCOUNT_FILTER}
+        AND t.paid = false
         AND t.type = 'expense'
         AND t.date <= '${em7dias}'
       ORDER BY t.date
@@ -343,9 +353,10 @@ server.tool(
       SELECT
         fc.description as cliente,
         fc.amount as valor,
-        ROUND((fc.amount / (SELECT SUM(amount) FROM fixed_cashflow WHERE type = 'income')) * 100, 1) as percentual
+        ROUND((fc.amount / (SELECT SUM(fc2.amount) FROM fixed_cashflow fc2 JOIN accounts a2 ON fc2.account_id = a2.id WHERE fc2.type = 'income' AND a2.user_id = ${USER_ID} AND a2.id NOT IN (${EXCLUDED_ACCOUNT_IDS.join(",")}))) * 100, 1) as percentual
       FROM fixed_cashflow fc
-      WHERE fc.type = 'income'
+      JOIN accounts a ON fc.account_id = a.id
+      WHERE ${ACCOUNT_FILTER} AND fc.type = 'income'
       ORDER BY fc.amount DESC
     `;
 
@@ -354,7 +365,7 @@ server.tool(
 
     // Fluxo fixo para verificar saldo
     const queryFluxo = `
-      SELECT type, SUM(amount) as total FROM fixed_cashflow GROUP BY type
+      SELECT fc.type, SUM(fc.amount) as total FROM fixed_cashflow fc JOIN accounts a ON fc.account_id = a.id WHERE ${ACCOUNT_FILTER} GROUP BY fc.type
     `;
     const fluxo = await execQuery(queryFluxo);
     const rowsFluxo = parseRows(fluxo, ["tipo", "total"]);
@@ -425,7 +436,7 @@ server.tool(
     limite: z.number().default(50).describe("Limite de resultados (padrão: 50)"),
   },
   async ({ conta, tipo, data_inicio, data_fim, limite }) => {
-    let where = "1=1";
+    let where = ACCOUNT_FILTER;
 
     if (conta) where += ` AND a.name = '${conta}'`;
     if (tipo) where += ` AND t.type = '${tipo}'`;
@@ -434,6 +445,7 @@ server.tool(
 
     const query = `
       SELECT
+        t.id,
         t.date as data,
         t.description as descricao,
         t.type as tipo,
@@ -450,20 +462,20 @@ server.tool(
     `;
 
     const result = await execQuery(query);
-    const rows = parseRows(result, ["data", "descricao", "tipo", "valor", "pago", "conta", "categoria"]);
+    const rows = parseRows(result, ["id", "data", "descricao", "tipo", "valor", "pago", "conta", "categoria"]);
 
     let output = `## Transações\n\n`;
 
     if (rows.length === 0) {
       output += `Nenhuma transação encontrada com os filtros especificados.\n`;
     } else {
-      output += `| Data | Descrição | Tipo | Valor | Pago | Conta |\n`;
-      output += `|------|-----------|------|-------|------|-------|\n`;
+      output += `| ID | Data | Descrição | Tipo | Valor | Pago | Conta |\n`;
+      output += `|----|------|-----------|------|-------|------|-------|\n`;
 
       for (const row of rows) {
         const tipoIcon = row.tipo === "income" ? "📈" : "📉";
         const pagoIcon = row.pago === "t" ? "✅" : "⏳";
-        output += `| ${row.data} | ${row.descricao} | ${tipoIcon} | ${formatMoney(row.valor)} | ${pagoIcon} | ${row.conta} |\n`;
+        output += `| ${row.id} | ${row.data} | ${row.descricao} | ${tipoIcon} | ${formatMoney(row.valor)} | ${pagoIcon} | ${row.conta} |\n`;
       }
 
       output += `\n**Total:** ${rows.length} transações`;
@@ -491,6 +503,7 @@ server.tool(
         a.name as conta
       FROM debts d
       JOIN accounts a ON d.account_id = a.id
+      WHERE ${ACCOUNT_FILTER}
       ORDER BY d.balance DESC
     `;
 
@@ -523,6 +536,287 @@ server.tool(
     }
 
     return { content: [{ type: "text", text: output }] };
+  }
+);
+
+// Tool 7: Listar Contas
+server.tool(
+  "nexfin_listar_contas",
+  "Lista todas as contas com seus IDs (necessário para criar transações e fluxo fixo)",
+  {},
+  async () => {
+    const query = `SELECT a.id, a.name, a.type FROM accounts a WHERE ${ACCOUNT_FILTER} ORDER BY a.name`;
+    const result = await execQuery(query);
+    const rows = parseRows(result, ["id", "nome", "tipo"]);
+
+    let output = `## Contas Cadastradas\n\n`;
+    output += `| ID | Nome | Tipo |\n`;
+    output += `|----|------|------|\n`;
+
+    for (const row of rows) {
+      output += `| ${row.id} | ${row.nome} | ${row.tipo} |\n`;
+    }
+
+    return { content: [{ type: "text", text: output }] };
+  }
+);
+
+// Tool 8: Listar Categorias
+server.tool(
+  "nexfin_listar_categorias",
+  "Lista todas as categorias com seus IDs (necessário para criar transações)",
+  {},
+  async () => {
+    const query = `
+      SELECT c.id, c.name, c.type, a.name as conta
+      FROM categories c
+      JOIN accounts a ON c.account_id = a.id
+      WHERE ${ACCOUNT_FILTER}
+      ORDER BY a.name, c.type, c.name
+    `;
+    const result = await execQuery(query);
+    const rows = parseRows(result, ["id", "nome", "tipo", "conta"]);
+
+    let output = `## Categorias Cadastradas\n\n`;
+    output += `| ID | Nome | Tipo | Conta |\n`;
+    output += `|----|------|------|-------|\n`;
+
+    for (const row of rows) {
+      const tipoLabel = row.tipo === "income" ? "Receita" : "Despesa";
+      output += `| ${row.id} | ${row.nome} | ${tipoLabel} | ${row.conta} |\n`;
+    }
+
+    return { content: [{ type: "text", text: output }] };
+  }
+);
+
+// Helper: escapar aspas simples para SQL
+function escSql(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+// Helper: IDs de contas permitidas
+const ALLOWED_ACCOUNT_IDS = [1, 2, 3]; // Pessoal, Orbit, Full Up
+
+function isAccountAllowed(accountId: number): boolean {
+  return ALLOWED_ACCOUNT_IDS.includes(accountId);
+}
+
+// Tool 9: Criar Transação
+server.tool(
+  "nexfin_criar_transacao",
+  "Cria uma transação simples (sem parcelamento/recorrência). Para parceladas ou recorrentes, usar a interface web.",
+  {
+    descricao: z.string().describe("Descrição da transação"),
+    valor: z.number().positive().describe("Valor da transação"),
+    tipo: z.enum(["income", "expense"]).describe("Tipo: income (receita) ou expense (despesa)"),
+    data: z.string().describe("Data no formato YYYY-MM-DD"),
+    categoria_id: z.number().describe("ID da categoria (use nexfin_listar_categorias para ver IDs)"),
+    conta_id: z.number().describe("ID da conta (use nexfin_listar_contas para ver IDs)"),
+    pago: z.boolean().default(false).describe("Se já foi pago/recebido (padrão: false)"),
+  },
+  async ({ descricao, valor, tipo, data, categoria_id, conta_id, pago }) => {
+    if (!isAccountAllowed(conta_id)) {
+      return { content: [{ type: "text", text: `Erro: conta_id ${conta_id} não permitida. Use nexfin_listar_contas para ver as contas disponíveis.` }] };
+    }
+
+    const query = `
+      INSERT INTO transactions (description, amount, type, date, category_id, account_id, paid, installments, current_installment, is_invoice_transaction, is_exception)
+      VALUES ('${escSql(descricao)}', ${valor}, '${tipo}', '${data}', ${categoria_id}, ${conta_id}, ${pago}, 1, 1, false, false)
+      RETURNING id, description, amount, type, date, paid
+    `;
+
+    const result = await execQuery(query);
+
+    if (result.startsWith("{")) {
+      return { content: [{ type: "text", text: `Erro ao criar transação: ${result}` }] };
+    }
+
+    const rows = parseRows(result, ["id", "descricao", "valor", "tipo", "data", "pago"]);
+    const row = rows[0];
+
+    if (!row) {
+      return { content: [{ type: "text", text: `Erro: resposta inesperada do banco.` }] };
+    }
+
+    const tipoLabel = row.tipo === "income" ? "Receita" : "Despesa";
+    const pagoLabel = row.pago === "t" ? "Sim" : "Não";
+
+    let output = `## Transação Criada\n\n`;
+    output += `- **ID:** ${row.id}\n`;
+    output += `- **Descrição:** ${row.descricao}\n`;
+    output += `- **Valor:** ${formatMoney(row.valor)}\n`;
+    output += `- **Tipo:** ${tipoLabel}\n`;
+    output += `- **Data:** ${row.data}\n`;
+    output += `- **Pago:** ${pagoLabel}\n`;
+
+    return { content: [{ type: "text", text: output }] };
+  }
+);
+
+// Tool 10: Atualizar Transação
+server.tool(
+  "nexfin_atualizar_transacao",
+  "Atualiza campos de uma transação existente",
+  {
+    id: z.number().describe("ID da transação"),
+    descricao: z.string().optional().describe("Nova descrição"),
+    valor: z.number().positive().optional().describe("Novo valor"),
+    tipo: z.enum(["income", "expense"]).optional().describe("Novo tipo"),
+    data: z.string().optional().describe("Nova data (YYYY-MM-DD)"),
+    categoria_id: z.number().optional().describe("Novo ID da categoria"),
+    pago: z.boolean().optional().describe("Marcar como pago/não pago"),
+  },
+  async ({ id, descricao, valor, tipo, data, categoria_id, pago }) => {
+    const sets: string[] = [];
+
+    if (descricao !== undefined) sets.push(`description='${escSql(descricao)}'`);
+    if (valor !== undefined) sets.push(`amount=${valor}`);
+    if (tipo !== undefined) sets.push(`type='${tipo}'`);
+    if (data !== undefined) sets.push(`date='${data}'`);
+    if (categoria_id !== undefined) sets.push(`category_id=${categoria_id}`);
+    if (pago !== undefined) sets.push(`paid=${pago}`);
+
+    if (sets.length === 0) {
+      return { content: [{ type: "text", text: "Nenhum campo fornecido para atualizar." }] };
+    }
+
+    const query = `
+      UPDATE transactions SET ${sets.join(", ")}
+      WHERE id=${id} AND account_id IN (${ALLOWED_ACCOUNT_IDS.join(",")})
+      RETURNING id, description, amount, type, date, paid
+    `;
+
+    const result = await execQuery(query);
+
+    if (result.startsWith("{")) {
+      return { content: [{ type: "text", text: `Erro ao atualizar transação: ${result}` }] };
+    }
+
+    const rows = parseRows(result, ["id", "descricao", "valor", "tipo", "data", "pago"]);
+    const row = rows[0];
+
+    if (!row) {
+      return { content: [{ type: "text", text: `Transação ID ${id} não encontrada.` }] };
+    }
+
+    const tipoLabel = row.tipo === "income" ? "Receita" : "Despesa";
+    const pagoLabel = row.pago === "t" ? "Sim" : "Não";
+
+    let output = `## Transação Atualizada\n\n`;
+    output += `- **ID:** ${row.id}\n`;
+    output += `- **Descrição:** ${row.descricao}\n`;
+    output += `- **Valor:** ${formatMoney(row.valor)}\n`;
+    output += `- **Tipo:** ${tipoLabel}\n`;
+    output += `- **Data:** ${row.data}\n`;
+    output += `- **Pago:** ${pagoLabel}\n`;
+
+    return { content: [{ type: "text", text: output }] };
+  }
+);
+
+// Tool 11: Deletar Transação
+server.tool(
+  "nexfin_deletar_transacao",
+  "Deleta uma transação pelo ID",
+  {
+    id: z.number().describe("ID da transação a deletar"),
+  },
+  async ({ id }) => {
+    const query = `DELETE FROM transactions WHERE id=${id} AND account_id IN (${ALLOWED_ACCOUNT_IDS.join(",")}) RETURNING id, description`;
+    const result = await execQuery(query);
+
+    if (result.startsWith("{")) {
+      return { content: [{ type: "text", text: `Erro ao deletar transação: ${result}` }] };
+    }
+
+    const rows = parseRows(result, ["id", "descricao"]);
+    const row = rows[0];
+
+    if (!row) {
+      return { content: [{ type: "text", text: `Transação ID ${id} não encontrada.` }] };
+    }
+
+    return { content: [{ type: "text", text: `Transação deletada: **${row.descricao}** (ID: ${row.id})` }] };
+  }
+);
+
+// Tool 12: Criar Fluxo Fixo
+server.tool(
+  "nexfin_criar_fluxo_fixo",
+  "Cria um item de fluxo de caixa fixo (receita ou despesa recorrente mensal)",
+  {
+    descricao: z.string().describe("Descrição do fluxo fixo"),
+    valor: z.number().positive().describe("Valor mensal"),
+    tipo: z.enum(["income", "expense"]).describe("Tipo: income (receita) ou expense (despesa)"),
+    conta_id: z.number().describe("ID da conta (use nexfin_listar_contas para ver IDs)"),
+    mes_inicio: z.string().optional().describe("Mês de início no formato YYYY-MM (opcional)"),
+    mes_fim: z.string().optional().describe("Mês de fim no formato YYYY-MM (opcional, null = sem fim)"),
+    dia_vencimento: z.number().min(1).max(31).optional().describe("Dia do vencimento (1-31, opcional)"),
+  },
+  async ({ descricao, valor, tipo, conta_id, mes_inicio, mes_fim, dia_vencimento }) => {
+    if (!isAccountAllowed(conta_id)) {
+      return { content: [{ type: "text", text: `Erro: conta_id ${conta_id} não permitida. Use nexfin_listar_contas para ver as contas disponíveis.` }] };
+    }
+
+    const startMonth = `'${mes_inicio || new Date().toISOString().slice(0, 7)}'`;
+    const endMonth = mes_fim ? `'${mes_fim}'` : "null";
+    const dueDay = dia_vencimento !== undefined ? dia_vencimento : "null";
+
+    const query = `
+      INSERT INTO fixed_cashflow (description, amount, type, account_id, start_month, end_month, due_day)
+      VALUES ('${escSql(descricao)}', ${valor}, '${tipo}', ${conta_id}, ${startMonth}, ${endMonth}, ${dueDay})
+      RETURNING id, description, amount, type
+    `;
+
+    const result = await execQuery(query);
+
+    if (result.startsWith("{")) {
+      return { content: [{ type: "text", text: `Erro ao criar fluxo fixo: ${result}` }] };
+    }
+
+    const rows = parseRows(result, ["id", "descricao", "valor", "tipo"]);
+    const row = rows[0];
+
+    if (!row) {
+      return { content: [{ type: "text", text: `Erro: resposta inesperada do banco.` }] };
+    }
+
+    const tipoLabel = row.tipo === "income" ? "Receita" : "Despesa";
+
+    let output = `## Fluxo Fixo Criado\n\n`;
+    output += `- **ID:** ${row.id}\n`;
+    output += `- **Descrição:** ${row.descricao}\n`;
+    output += `- **Valor:** ${formatMoney(row.valor)}\n`;
+    output += `- **Tipo:** ${tipoLabel}\n`;
+
+    return { content: [{ type: "text", text: output }] };
+  }
+);
+
+// Tool 13: Deletar Fluxo Fixo
+server.tool(
+  "nexfin_deletar_fluxo_fixo",
+  "Deleta um item de fluxo de caixa fixo pelo ID",
+  {
+    id: z.number().describe("ID do fluxo fixo a deletar"),
+  },
+  async ({ id }) => {
+    const query = `DELETE FROM fixed_cashflow WHERE id=${id} AND account_id IN (${ALLOWED_ACCOUNT_IDS.join(",")}) RETURNING id, description`;
+    const result = await execQuery(query);
+
+    if (result.startsWith("{")) {
+      return { content: [{ type: "text", text: `Erro ao deletar fluxo fixo: ${result}` }] };
+    }
+
+    const rows = parseRows(result, ["id", "descricao"]);
+    const row = rows[0];
+
+    if (!row) {
+      return { content: [{ type: "text", text: `Fluxo fixo ID ${id} não encontrado.` }] };
+    }
+
+    return { content: [{ type: "text", text: `Fluxo fixo deletado: **${row.descricao}** (ID: ${row.id})` }] };
   }
 );
 
