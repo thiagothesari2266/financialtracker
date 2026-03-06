@@ -443,7 +443,7 @@ export default function TransactionReviewModal({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600" />
+            <CheckCircle className="h-5 w-5 text-success" />
             Revisar Transações - {creditCard?.name}
           </DialogTitle>
         </DialogHeader>
@@ -460,7 +460,7 @@ export default function TransactionReviewModal({
 
           {/* Seleção do Mês da Fatura */}
           <div className="p-4 bg-primary/10 border border-primary rounded-lg">
-            <Label htmlFor="invoice-month" className="font-medium text-blue-900 mb-2 block">
+            <Label htmlFor="invoice-month" className="font-medium text-info-foreground mb-2 block">
               Mês da Fatura
             </Label>
             <Input
@@ -470,7 +470,7 @@ export default function TransactionReviewModal({
               onChange={(e) => setSelectedInvoiceMonth(e.target.value)}
               className="w-full max-w-xs"
             />
-            <p className="text-sm text-blue-700 mt-1">
+            <p className="text-sm text-info mt-1">
               Selecione em qual fatura estas transações devem ser lançadas
             </p>
           </div>
@@ -486,7 +486,7 @@ export default function TransactionReviewModal({
 
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span>{selectedCount} selecionadas</span>
-              <span className="font-medium text-green-600">
+              <span className="font-medium text-success">
                 Total: {formatCurrency(totalAmount)}
               </span>
             </div>
@@ -528,7 +528,7 @@ export default function TransactionReviewModal({
                           </Badge>
                         )}
                         {transaction.launchType === 'recorrente' && (
-                          <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">
+                          <Badge variant="outline" className="text-xs bg-chart-5/10 text-chart-5">
                             Recorrente
                           </Badge>
                         )}
@@ -550,7 +550,7 @@ export default function TransactionReviewModal({
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteTransaction(transaction.id)}
-                          className="text-red-600 hover:text-red-700"
+                          className="text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -578,7 +578,7 @@ export default function TransactionReviewModal({
 
                     {/* Detalhes de recorrência */}
                     {transaction.launchType === 'recorrente' && (
-                      <div className="grid grid-cols-2 gap-4 text-sm text-purple-700 bg-purple-50 p-2 rounded">
+                      <div className="grid grid-cols-2 gap-4 text-sm text-chart-5 bg-chart-5/10 p-2 rounded">
                         <div className="flex items-center gap-2">
                           <span className="font-medium">Frequência:</span>
                           <span>

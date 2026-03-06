@@ -325,20 +325,20 @@ export default function MonthlyFixed() {
             label="Entradas fixas"
             value={formatCurrency(summary.totals.income)}
             tone="positive"
-            icon={<TrendingUp className="h-5 w-5 text-green-600" />}
+            icon={<TrendingUp className="h-5 w-5 text-success" />}
             helperText={isLoading ? 'Carregando...' : `${summary.income.length} recorrência(s)`}
           />
           <SummaryCard
             label="Saídas fixas"
             value={formatCurrency(summary.totals.expenses)}
             tone="negative"
-            icon={<TrendingUp className="h-5 w-5 rotate-180 text-red-600" />}
+            icon={<TrendingUp className="h-5 w-5 rotate-180 text-destructive" />}
             helperText={isLoading ? 'Carregando...' : `${summary.expenses.length} recorrência(s)`}
           />
           <SummaryCard
             label="Saldo fixo estimado"
             value={formatCurrency(summary.totals.net)}
-            icon={<DollarSign className="h-5 w-5 text-blue-600" />}
+            icon={<DollarSign className="h-5 w-5 text-info" />}
             helperText="Receitas fixas menos despesas fixas"
           />
         </div>
@@ -373,7 +373,7 @@ export default function MonthlyFixed() {
                       <TableCell className="text-center text-muted-foreground">
                         {item.dueDay ? `Dia ${item.dueDay}` : '-'}
                       </TableCell>
-                      <TableCell className="text-right font-medium text-green-600">
+                      <TableCell className="text-right font-medium text-success">
                         {formatCurrency(item.amount)}
                       </TableCell>
                       <TableCell className="text-right">
@@ -439,7 +439,7 @@ export default function MonthlyFixed() {
                       <TableCell className="text-center text-muted-foreground">
                         {item.dueDay ? `Dia ${item.dueDay}` : '-'}
                       </TableCell>
-                      <TableCell className="text-right font-medium text-red-600">
+                      <TableCell className="text-right font-medium text-destructive">
                         {formatCurrency(item.amount)}
                       </TableCell>
                       <TableCell className="text-right">

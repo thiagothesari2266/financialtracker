@@ -116,7 +116,7 @@ export default function AccountSelector() {
           <Button
             onClick={handleCreateAccount}
             disabled={!canCreateAny}
-            className="bg-primary text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-primary text-white hover:bg-info disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="h-4 w-4 mr-2" />
             Nova Conta

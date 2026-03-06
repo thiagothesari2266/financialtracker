@@ -132,7 +132,7 @@ function CreditCardInvoicesModal({
                 return (
                   <Card
                     key={`${invoice.creditCardId}-${invoice.month}`}
-                    className={`hover:shadow-lg transition-shadow ${isOverdue ? 'border-red-200 bg-red-50' : ''}`}
+                    className={`hover:shadow-lg transition-shadow ${isOverdue ? 'border-destructive/20 bg-destructive/10' : ''}`}
                   >
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
@@ -147,7 +147,7 @@ function CreditCardInvoicesModal({
                           {hasInstallments && (
                             <Badge
                               variant="outline"
-                              className="text-xs text-blue-600 border-border"
+                              className="text-xs text-info border-border"
                             >
                               Parceladas
                             </Badge>
@@ -161,7 +161,7 @@ function CreditCardInvoicesModal({
                             variant="outline"
                             size="sm"
                             onClick={() => handleViewInvoice(invoice)}
-                            className="text-primary hover:text-blue-600"
+                            className="text-primary hover:text-info"
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             Ver Fatura
@@ -180,12 +180,12 @@ function CreditCardInvoicesModal({
                         <div>
                           <p className="text-sm text-muted-foreground">Total da Fatura</p>
                           <p
-                            className={`font-semibold text-lg ${isOverdue ? 'text-red-700' : 'text-red-600'}`}
+                            className={`font-semibold text-lg ${isOverdue ? 'text-destructive' : 'text-destructive'}`}
                           >
                             {formatCurrencyAbs(invoice.total)}
                           </p>
                           {isOverdue && (
-                            <p className="text-xs text-red-600 font-medium">
+                            <p className="text-xs text-destructive font-medium">
                               Venceu em {creditCard.dueDate}/{invoice.month.split('-')[1]}
                             </p>
                           )}
@@ -193,7 +193,7 @@ function CreditCardInvoicesModal({
                         <div>
                           <p className="text-sm text-muted-foreground">Status</p>
                           <p
-                            className={`font-medium ${isOverdue ? 'text-red-600' : 'text-green-600'}`}
+                            className={`font-medium ${isOverdue ? 'text-destructive' : 'text-success'}`}
                           >
                             {isOverdue ? `${daysOverdue} dias em atraso` : 'Em dia'}
                           </p>
@@ -213,15 +213,15 @@ function CreditCardInvoicesModal({
                               >
                                 {' '}
                                 <div className="flex items-center space-x-3">
-                                  <div className="w-8 h-8 rounded-full flex items-center justify-center bg-red-100">
+                                  <div className="w-8 h-8 rounded-full flex items-center justify-center bg-destructive/15">
                                     <i
-                                      className={`${transaction.category?.icon || 'fas fa-exchange-alt'} text-red-600 text-xs`}
+                                      className={`${transaction.category?.icon || 'fas fa-exchange-alt'} text-destructive text-xs`}
                                     ></i>
                                   </div>
                                   <div>
                                     {' '}
                                     <p className="text-sm font-medium text-foreground">
-                                      <CreditCardIcon className="inline h-4 w-4 text-blue-600 mr-2" />
+                                      <CreditCardIcon className="inline h-4 w-4 text-info mr-2" />
                                       {transaction.description}
                                       {transaction.installments > 1 && (
                                         <span className="ml-2 text-xs text-muted-foreground">
@@ -238,7 +238,7 @@ function CreditCardInvoicesModal({
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <div className="text-right">
-                                    <p className="text-sm font-semibold text-red-600">
+                                    <p className="text-sm font-semibold text-destructive">
                                       {formatCurrencyAbs(transaction.amount)}
                                     </p>
                                     {transaction.installments > 1 && (

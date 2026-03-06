@@ -956,20 +956,20 @@ export default function TransactionModal({
               className={cn(
                 'flex items-center justify-between px-4 py-3 rounded-lg border transition-colors',
                 localPaid
-                  ? 'bg-green-50 border-green-200'
-                  : 'bg-amber-50 border-amber-200'
+                  ? 'bg-success/10 border-success/20'
+                  : 'bg-warning/10 border-warning/20'
               )}
             >
               <div className="flex items-center gap-3">
                 {localPaid ? (
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  <CheckCircle2 className="w-5 h-5 text-success" />
                 ) : (
-                  <Clock className="w-5 h-5 text-amber-600" />
+                  <Clock className="w-5 h-5 text-warning" />
                 )}
                 <span
                   className={cn(
                     'text-sm font-medium',
-                    localPaid ? 'text-green-700' : 'text-amber-700'
+                    localPaid ? 'text-success-foreground' : 'text-warning-foreground'
                   )}
                 >
                   {localPaid ? 'Pago' : 'Pendente'}
@@ -980,7 +980,7 @@ export default function TransactionModal({
                 onCheckedChange={(checked) => handleTogglePaid(checked)}
                 className={cn(
                   localPaid
-                    ? 'data-[state=checked]:bg-green-500'
+                    ? 'data-[state=checked]:bg-success'
                     : ''
                 )}
               />
@@ -1176,7 +1176,7 @@ export default function TransactionModal({
                             </SelectContent>
                           </Select>
                           {selectedCard && invoiceInfo && (
-                            <p className="text-xs text-blue-600 mt-1">{invoiceInfo}</p>
+                            <p className="text-xs text-info mt-1">{invoiceInfo}</p>
                           )}
                           <FormMessage />
                         </FormItem>
@@ -1257,15 +1257,15 @@ export default function TransactionModal({
                       }
 
                       return (
-                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                          <h4 className="text-sm font-medium text-amber-800 mb-2">
+                        <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                          <h4 className="text-sm font-medium text-warning-foreground mb-2">
                             🗓️ Faturas que serão afetadas:
                           </h4>
                           <div className="space-y-1 max-h-32 overflow-y-auto">
                             {affectedInvoices.map((invoice, index) => (
                               <div
                                 key={index}
-                                className="text-xs text-amber-700 flex justify-between"
+                                className="text-xs text-warning-foreground flex justify-between"
                               >
                                 <span>Parcela {invoice.installment}:</span>
                                 <span className="font-medium">{invoice.formatted}</span>

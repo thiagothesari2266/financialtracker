@@ -56,7 +56,7 @@ export default function Categories() {
   const renderGroup = (title: string, items: Category[], tone: 'income' | 'expense') => (
     <Card className="border border-border shadow-none">
       <CardHeader className="pb-4">
-        <CardTitle className={tone === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+        <CardTitle className={tone === 'income' ? 'text-success' : 'text-destructive'}>
           {title}
         </CardTitle>
       </CardHeader>

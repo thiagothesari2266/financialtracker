@@ -97,7 +97,7 @@ export default function AdminUsers() {
   const getRoleBadge = (role: string) => {
     if (role === 'admin') {
       return (
-        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+        <Badge variant="outline" className="bg-chart-5/10 text-chart-5 border-chart-5/20">
           <Shield className="w-3 h-3 mr-1" />
           Admin
         </Badge>
@@ -185,7 +185,7 @@ export default function AdminUsers() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => setDeletingUser(user)}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -227,14 +227,14 @@ export default function AdminUsers() {
                 <li>Projetos, clientes e centros de custo</li>
               </ul>
               <br />
-              <strong className="text-red-600">Esta ação não pode ser desfeita.</strong>
+              <strong className="text-destructive">Esta ação não pode ser desfeita.</strong>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteUser}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
               disabled={deleteUserMutation.isPending}
             >
               {deleteUserMutation.isPending ? 'Excluindo...' : 'Excluir usuário'}

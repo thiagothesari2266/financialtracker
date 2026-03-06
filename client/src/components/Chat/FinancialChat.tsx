@@ -235,7 +235,7 @@ export default function FinancialChat({ isOpen, onClose }: FinancialChatProps) {
           {messages.length <= 1 && (
             <div className="mb-4">
               <div className="flex items-center gap-2 mb-2">
-                <Lightbulb className="w-4 h-4 text-amber-500" />
+                <Lightbulb className="w-4 h-4 text-warning" />
                 <span className="text-sm font-medium text-muted-foreground">Sugestões:</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

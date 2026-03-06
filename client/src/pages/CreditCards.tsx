@@ -214,14 +214,14 @@ export default function CreditCards() {
                 )
               )}
               tone="negative"
-              icon={<DollarSign className="h-6 w-6 text-red-600" />}
+              icon={<DollarSign className="h-6 w-6 text-destructive" />}
             />
             <SummaryCard
               label="Limite total"
               value={formatCurrency(
                 creditCards.reduce((sum, card) => sum + parseFloat(card.creditLimit || '0.00'), 0)
               )}
-              icon={<CreditCard className="h-6 w-6 text-blue-600" />}
+              icon={<CreditCard className="h-6 w-6 text-info" />}
             />
             <SummaryCard
               label="Limite disponível"

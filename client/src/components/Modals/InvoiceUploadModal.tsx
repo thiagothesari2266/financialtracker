@@ -314,9 +314,9 @@ export default function InvoiceUploadModal({
 
   const getFileIcon = (file: File) => {
     if (file.type === 'application/pdf') {
-      return <FileText className="h-8 w-8 text-red-500" />;
+      return <FileText className="h-8 w-8 text-destructive" />;
     }
-    return <Image className="h-8 w-8 text-blue-500" />;
+    return <Image className="h-8 w-8 text-info" />;
   };
 
   const getStatusIcon = (status: UploadedFile['status']) => {
@@ -325,9 +325,9 @@ export default function InvoiceUploadModal({
       case 'processing':
         return <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />;
       case 'completed':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-success" />;
       case 'error':
-        return <AlertTriangle className="h-4 w-4 text-red-500" />;
+        return <AlertTriangle className="h-4 w-4 text-destructive" />;
       default:
         return null;
     }
@@ -386,7 +386,7 @@ export default function InvoiceUploadModal({
             <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
 
             {isDragActive ? (
-              <p className="text-blue-600">Solte os arquivos aqui...</p>
+              <p className="text-info">Solte os arquivos aqui...</p>
             ) : (
               <div>
                 <p className="text-muted-foreground mb-2">

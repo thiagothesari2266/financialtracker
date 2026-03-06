@@ -162,7 +162,7 @@ export default function Projects() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleDeleteProject(project)}
-                          className="text-red-600"
+                          className="text-destructive"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Excluir

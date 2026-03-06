@@ -445,14 +445,14 @@ export default function CreditCardInvoice() {
             label="Total da Fatura"
             value={formatCurrency(invoiceTotal)}
             tone={invoiceTotal <= 0 ? 'default' : 'negative'}
-            icon={<TrendingDown className="h-5 w-5 text-red-600" />}
+            icon={<TrendingDown className="h-5 w-5 text-destructive" />}
           />
           {totalCredits > 0 && (
             <SummaryCard
               label="Créditos"
               value={formatCurrency(totalCredits)}
               tone="positive"
-              icon={<TrendingUp className="h-5 w-5 text-green-600" />}
+              icon={<TrendingUp className="h-5 w-5 text-success" />}
             />
           )}
           <SummaryCard
@@ -553,7 +553,7 @@ export default function CreditCardInvoice() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className={cn('text-sm font-medium tabular-nums', parseFloat(transaction.amount) < 0 ? 'text-green-600' : 'text-red-600')}>
+                            <p className={cn('text-sm font-medium tabular-nums', parseFloat(transaction.amount) < 0 ? 'text-success' : 'text-destructive')}>
                               {parseFloat(transaction.amount) < 0 ? '+ ' : ''}{formatCurrencyAbs(transaction.amount)}
                             </p>
                             <p className="text-xs text-muted-foreground">
@@ -634,7 +634,7 @@ export default function CreditCardInvoice() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className={cn('font-medium tabular-nums', parseFloat(transaction.amount) < 0 ? 'text-green-600' : 'text-red-600')}>
+                            <span className={cn('font-medium tabular-nums', parseFloat(transaction.amount) < 0 ? 'text-success' : 'text-destructive')}>
                               {parseFloat(transaction.amount) < 0 ? '+ ' : ''}{formatCurrencyAbs(transaction.amount)}
                             </span>
                           </TableCell>

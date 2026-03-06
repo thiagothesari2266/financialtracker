@@ -193,18 +193,18 @@ export default function Reports() {
             label="Receitas do mês"
             value={formatCurrency(currentMonthStats.totalIncome)}
             tone="positive"
-            icon={<TrendingUp className="h-5 w-5 text-green-600" />}
+            icon={<TrendingUp className="h-5 w-5 text-success" />}
           />
           <SummaryCard
             label="Despesas do mês"
             value={formatCurrency(currentMonthStats.totalExpenses)}
             tone="negative"
-            icon={<TrendingUp className="h-5 w-5 rotate-180 text-red-600" />}
+            icon={<TrendingUp className="h-5 w-5 rotate-180 text-destructive" />}
           />
           <SummaryCard
             label="Saldo total"
             value={formatCurrency(currentMonthStats.balance)}
-            icon={<DollarSign className="h-5 w-5 text-blue-600" />}
+            icon={<DollarSign className="h-5 w-5 text-info" />}
           />
           <SummaryCard
             label="Transações"

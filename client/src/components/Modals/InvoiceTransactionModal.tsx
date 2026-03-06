@@ -297,7 +297,7 @@ export default function InvoiceTransactionModal({
               </div>
               <div>
                 <span className="text-muted-foreground">Valor:</span>
-                <p className="font-bold text-red-600">{formatCurrencyAbs(transaction.amount)}</p>
+                <p className="font-bold text-destructive">{formatCurrencyAbs(transaction.amount)}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Período:</span>
@@ -307,7 +307,7 @@ export default function InvoiceTransactionModal({
                 <span className="text-muted-foreground">Status:</span>
                 <span
                   className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                    localPaid ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                    localPaid ? 'bg-success/15 text-success-foreground' : 'bg-warning/15 text-warning-foreground'
                   }`}
                 >
                   {localPaid ? '✓ Pago' : '⏳ Pendente'}

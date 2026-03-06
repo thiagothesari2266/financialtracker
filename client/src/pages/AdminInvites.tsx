@@ -101,7 +101,7 @@ export default function AdminInvites() {
   const getStatusBadge = (invite: Invite) => {
     if (invite.status === 'accepted') {
       return (
-        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+        <Badge variant="outline" className="bg-success/10 text-success-foreground border-success/20">
           <UserCheck className="w-3 h-3 mr-1" />
           Aceito
         </Badge>
@@ -111,7 +111,7 @@ export default function AdminInvites() {
     const isExpired = new Date(invite.expiresAt) < new Date();
     if (isExpired || invite.status === 'expired') {
       return (
-        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+        <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
           <AlertCircle className="w-3 h-3 mr-1" />
           Expirado
         </Badge>
@@ -119,7 +119,7 @@ export default function AdminInvites() {
     }
 
     return (
-      <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+      <Badge variant="outline" className="bg-warning/10 text-warning-foreground border-warning/20">
         <Clock className="w-3 h-3 mr-1" />
         Pendente
       </Badge>
@@ -265,7 +265,7 @@ export default function AdminInvites() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
                           onClick={() => deleteInviteMutation.mutate(invite.id)}
                         >
                           <Trash2 className="w-4 h-4" />

@@ -468,13 +468,13 @@ export default function Transactions() {
       label: `Entradas ${getPeriodLabel()}`,
       value: formatCurrency(totalIncomePeriodo),
       tone: 'positive',
-      icon: <TrendingUp className="h-5 w-5 text-green-600" />,
+      icon: <TrendingUp className="h-5 w-5 text-success" />,
     },
     {
       label: `Saídas ${getPeriodLabel()}`,
       value: formatCurrency(totalExpensePeriodo),
       tone: 'negative',
-      icon: <TrendingDown className="h-5 w-5 text-red-600" />,
+      icon: <TrendingDown className="h-5 w-5 text-destructive" />,
     },
     {
       label: `Previsão ${getPrevisaoLabel()}`,
@@ -613,7 +613,7 @@ export default function Transactions() {
                               <div>
                                 <div className="flex items-center gap-2 font-semibold">
                                   {transaction.isInvoiceTransaction && (
-                                    <CreditCard className="h-4 w-4 text-blue-600" />
+                                    <CreditCard className="h-4 w-4 text-info" />
                                   )}
                                   {transaction.description}
                                 </div>
@@ -626,7 +626,7 @@ export default function Transactions() {
                               <p
                                 className={cn(
                                   'text-sm font-semibold',
-                                  transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                                  transaction.type === 'income' ? 'text-success' : 'text-destructive'
                                 )}
                               >
                                 {formatCurrency(transaction.amount)}
@@ -634,7 +634,7 @@ export default function Transactions() {
                               <p className="text-xs text-muted-foreground">
                                 {formatDate(transaction.date)}
                                 {getOriginalMonth(transaction) && (
-                                  <span className="ml-1 text-blue-600">
+                                  <span className="ml-1 text-info">
                                     ({getOriginalMonth(transaction)})
                                   </span>
                                 )}
@@ -651,24 +651,24 @@ export default function Transactions() {
                             <div className="flex items-center gap-2">
                               {transaction.paid ? (
                                 <div
-                                  className="inline-flex rounded-full bg-green-600/15 p-1"
+                                  className="inline-flex rounded-full bg-success/15 p-1"
                                   title="Pago"
                                 >
-                                  <CheckCircle className="h-3 w-3 text-green-600" />
+                                  <CheckCircle className="h-3 w-3 text-success" />
                                 </div>
                               ) : isOverdue(transaction) ? (
                                 <div
-                                  className="inline-flex rounded-full bg-red-600/15 p-1"
+                                  className="inline-flex rounded-full bg-destructive/15 p-1"
                                   title="Em atraso"
                                 >
-                                  <AlertCircle className="h-3 w-3 text-red-600" />
+                                  <AlertCircle className="h-3 w-3 text-destructive" />
                                 </div>
                               ) : (
                                 <div
-                                  className="inline-flex rounded-full bg-amber-600/15 p-1"
+                                  className="inline-flex rounded-full bg-warning/15 p-1"
                                   title="Pendente"
                                 >
-                                  <Clock className="h-3 w-3 text-amber-600" />
+                                  <Clock className="h-3 w-3 text-warning" />
                                 </div>
                               )}
                               {transaction.installments > 1 && (
@@ -726,7 +726,7 @@ export default function Transactions() {
                             <TableCell>
                               <div className="flex items-center gap-2 font-medium">
                                 {transaction.isInvoiceTransaction && (
-                                  <CreditCard className="h-4 w-4 text-blue-600" />
+                                  <CreditCard className="h-4 w-4 text-info" />
                                 )}
                                 {transaction.description}
                                 {transaction.installments > 1 && (
@@ -747,7 +747,7 @@ export default function Transactions() {
                                 {formatDate(transaction.date)}
                                 {getOriginalMonth(transaction) && (
                                   <span
-                                    className="text-xs text-blue-600"
+                                    className="text-xs text-info"
                                     title={`Originalmente de ${getOriginalMonth(transaction)}`}
                                   >
                                     ({getOriginalMonth(transaction)})
@@ -766,7 +766,7 @@ export default function Transactions() {
                             <TableCell className="text-right font-semibold">
                               <span
                                 className={
-                                  transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                                  transaction.type === 'income' ? 'text-success' : 'text-destructive'
                                 }
                               >
                                 {formatCurrency(transaction.amount)}
@@ -775,24 +775,24 @@ export default function Transactions() {
                             <TableCell className="text-center">
                               {transaction.paid ? (
                                 <div
-                                  className="inline-flex rounded-full bg-green-600/15 p-1"
+                                  className="inline-flex rounded-full bg-success/15 p-1"
                                   title="Pago"
                                 >
-                                  <CheckCircle className="h-4 w-4 text-green-600" />
+                                  <CheckCircle className="h-4 w-4 text-success" />
                                 </div>
                               ) : isOverdue(transaction) ? (
                                 <div
-                                  className="inline-flex rounded-full bg-red-600/15 p-1"
+                                  className="inline-flex rounded-full bg-destructive/15 p-1"
                                   title="Em atraso"
                                 >
-                                  <AlertCircle className="h-4 w-4 text-red-600" />
+                                  <AlertCircle className="h-4 w-4 text-destructive" />
                                 </div>
                               ) : (
                                 <div
-                                  className="inline-flex rounded-full bg-amber-600/15 p-1"
+                                  className="inline-flex rounded-full bg-warning/15 p-1"
                                   title="Pendente"
                                 >
-                                  <Clock className="h-4 w-4 text-amber-600" />
+                                  <Clock className="h-4 w-4 text-warning" />
                                 </div>
                               )}
                             </TableCell>

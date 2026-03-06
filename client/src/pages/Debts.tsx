@@ -201,9 +201,9 @@ export default function Debts() {
           <TableCell className="text-sm">
             {formatPercent(debt.interestRate, debt.ratePeriod)}
           </TableCell>
-          <TableCell className="text-sm text-amber-600 dark:text-amber-400" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(monthlyCost)}</TableCell>
+          <TableCell className="text-sm text-warning" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(monthlyCost)}</TableCell>
           <TableCell className="text-sm">
-            <Badge variant="outline" className="bg-amber-600/10 text-amber-700 dark:text-amber-400 border-amber-600/20">
+            <Badge variant="outline" className="bg-warning/10 text-warning-foreground border-warning/20">
               {debt.ratePeriod === 'yearly' ? 'a.a.' : 'a.m.'}
             </Badge>
           </TableCell>
@@ -221,7 +221,7 @@ export default function Debts() {
                 <Pencil className="h-4 w-4" />
               </Button>
               <Button variant="ghost" size="icon" onClick={() => handleDelete(debt)}>
-                <Trash2 className="h-4 w-4 text-red-600" />
+                <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
             </div>
           </TableCell>
@@ -265,7 +265,7 @@ export default function Debts() {
               label="Juros mensais estimados"
               value={formatCurrency(totals.monthlyInterest)}
               helperText="Saldo x taxa mensal"
-              icon={<BadgePercent className="h-10 w-10 text-amber-600" />}
+              icon={<BadgePercent className="h-10 w-10 text-warning" />}
             />
             <SummaryCard
               label="Próxima data alvo"
@@ -321,7 +321,7 @@ export default function Debts() {
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(debt)}>
-                            <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         </div>
                       </div>
@@ -332,7 +332,7 @@ export default function Debts() {
                         </div>
                         <div>
                           <span className="text-xs text-muted-foreground">Juros/mês</span>
-                          <p className="font-medium tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(monthlyCost)}</p>
+                          <p className="font-medium tabular-nums text-warning">{formatCurrency(monthlyCost)}</p>
                         </div>
                         <div>
                           <span className="text-xs text-muted-foreground">Taxa</span>

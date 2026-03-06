@@ -11,8 +11,8 @@ interface SummaryCardProps {
 
 const toneStyles: Record<NonNullable<SummaryCardProps['tone']>, string> = {
   default: 'text-foreground',
-  positive: 'text-green-600 dark:text-green-400',
-  negative: 'text-red-600 dark:text-red-400',
+  positive: 'text-success',
+  negative: 'text-destructive',
 };
 
 export function SummaryCard({
