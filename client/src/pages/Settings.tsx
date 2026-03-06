@@ -216,16 +216,16 @@ export default function SettingsPage() {
   return (
     <AppShell>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold">Configurações</h1>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={handleExportData}>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportData}>
               <Download className="h-4 w-4 mr-2" />
-              Exportar dados
+              <span className="hidden sm:inline">Exportar</span>
             </Button>
-            <Button onClick={handleSaveAccount} disabled={updateAccountMutation.isPending}>
+            <Button size="sm" onClick={handleSaveAccount} disabled={updateAccountMutation.isPending}>
               <Save className="h-4 w-4 mr-2" />
-              Salvar alterações
+              Salvar
             </Button>
           </div>
         </div>
@@ -497,11 +497,11 @@ export default function SettingsPage() {
                 Configure cartões de crédito, contas bancárias e outros métodos de pagamento nas
                 respectivas seções do menu lateral.
               </p>
-              <div className="flex gap-4">
-                <Button variant="outline" asChild>
+              <div className="flex flex-wrap gap-2 sm:gap-4">
+                <Button variant="outline" size="sm" asChild>
                   <a href="/credit-cards">Gerenciar Cartões</a>
                 </Button>
-                <Button variant="outline" asChild>
+                <Button variant="outline" size="sm" asChild>
                   <a href="/bank-accounts">Gerenciar Contas</a>
                 </Button>
               </div>

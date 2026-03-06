@@ -90,9 +90,9 @@ export default function CostCenters() {
     <>
       <AppShell>
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-xl font-semibold">Centros de Custo</h1>
-            <Button onClick={handleOpenCreateModal}>
+            <Button size="sm" onClick={handleOpenCreateModal}>
               <Plus className="h-4 w-4 mr-2" />
               Novo Centro
             </Button>

@@ -45,6 +45,7 @@ import {
   ChevronsUpDown,
 } from 'lucide-react';
 import { AccountSwitcher } from './AccountSwitcher';
+import { BottomNav } from './BottomNav';
 import { useAccount } from '@/contexts/AccountContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -100,16 +101,17 @@ export function AppShell({ children }: AppShellProps) {
       <AppSidebar accountType={currentAccount.type} />
       <SidebarInset>
         <div className="flex min-h-screen flex-col bg-background">
-          <div className="sticky top-0 z-10 flex h-12 items-center gap-2 border-b bg-background/80 backdrop-blur-sm px-4 md:hidden">
+          <div className="sticky top-0 z-10 flex h-12 items-center gap-2 border-b bg-background/80 backdrop-blur-sm px-4 md:hidden safe-top">
             <SidebarTrigger />
             <Logo className="h-6 w-auto" />
           </div>
           <div className="flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-10">
+            <div className="mx-auto w-full max-w-7xl space-y-6 px-3 py-4 sm:px-6 sm:py-6 lg:px-10 has-bottom-nav">
               {children}
             </div>
           </div>
         </div>
+        <BottomNav />
       </SidebarInset>
     </SidebarProvider>
   );

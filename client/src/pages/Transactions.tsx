@@ -488,7 +488,7 @@ export default function Transactions() {
     <>
       <AppShell>
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-xl font-semibold">Transações</h1>
             {headerActions}
           </div>
@@ -539,7 +539,7 @@ export default function Transactions() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 pt-2 lg:grid-cols-4">
             {summaryCards.map((item) => (
               <SummaryCard
                 key={item.label}

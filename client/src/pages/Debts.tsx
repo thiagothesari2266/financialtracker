@@ -234,12 +234,12 @@ export default function Debts() {
     <>
       <AppShell>
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-xl font-semibold">Painel de Dívidas</h1>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleExportCSV}>
                 <Download className="mr-2 h-4 w-4" />
-                Exportar
+                <span className="hidden sm:inline">Exportar</span>
               </Button>
               <Button
                 size="sm"
@@ -249,7 +249,8 @@ export default function Debts() {
                 }}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Nova dívida
+                <span className="hidden sm:inline">Nova dívida</span>
+                <span className="sm:hidden">Nova</span>
               </Button>
             </div>
           </div>
@@ -277,7 +278,7 @@ export default function Debts() {
           </div>
 
           <div className="rounded-lg border border-border bg-card shadow-none">
-            <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-medium">Dívidas monitoradas</p>
                 <p className="text-xs text-muted-foreground">
@@ -285,25 +286,86 @@ export default function Debts() {
                 </p>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Clock3 className="h-4 w-4" />
+                <Clock3 className="h-4 w-4 shrink-0" />
                 Atualize sempre que o saldo mudar
               </div>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Dívida</TableHead>
-                  <TableHead>Saldo</TableHead>
-                  <TableHead>Juros</TableHead>
-                  <TableHead>Juros/mês</TableHead>
-                  <TableHead>Período</TableHead>
-                  <TableHead>Data alvo</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>{renderRows()}</TableBody>
-            </Table>
+            {/* Mobile view */}
+            <div className="divide-y sm:hidden">
+              {isLoading ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">Carregando dívidas...</div>
+              ) : debts.length === 0 ? (
+                <EmptyState
+                  className="border-none"
+                  title="Nenhuma dívida cadastrada"
+                  description="Registre cartões, financiamentos ou outros débitos para acompanhar juros e prazos."
+                  action={{
+                    label: 'Adicionar dívida',
+                    onClick: () => { setEditingDebt(null); setIsModalOpen(true); },
+                  }}
+                />
+              ) : (
+                debts.map((debt) => {
+                  const monthlyRate = getMonthlyRate(debt);
+                  const monthlyCost = toNumber(debt.balance) * monthlyRate;
+                  return (
+                    <div key={debt.id} className="px-4 py-3 space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium text-sm">{debt.name}</p>
+                          {debt.type && <p className="text-xs text-muted-foreground">{debt.type}</p>}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingDebt(debt); setIsModalOpen(true); }}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(debt)}>
+                            <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-xs text-muted-foreground">Saldo</span>
+                          <p className="font-medium tabular-nums">{formatCurrency(debt.balance)}</p>
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground">Juros/mês</span>
+                          <p className="font-medium tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(monthlyCost)}</p>
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground">Taxa</span>
+                          <p className="text-sm">{formatPercent(debt.interestRate, debt.ratePeriod)}</p>
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground">Data alvo</span>
+                          <p className="text-sm">{formatDate(debt.targetDate)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Desktop view */}
+            <div className="hidden sm:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Dívida</TableHead>
+                    <TableHead>Saldo</TableHead>
+                    <TableHead>Juros</TableHead>
+                    <TableHead>Juros/mês</TableHead>
+                    <TableHead>Período</TableHead>
+                    <TableHead>Data alvo</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>{renderRows()}</TableBody>
+              </Table>
+            </div>
           </div>
         </div>
       </AppShell>

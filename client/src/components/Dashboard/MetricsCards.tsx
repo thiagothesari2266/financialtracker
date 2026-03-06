@@ -65,7 +65,7 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 sm:gap-4">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="bg-card border border-border rounded-[10px] p-4">
             <div className="flex items-center gap-3">
@@ -135,7 +135,7 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 sm:gap-4">
       {metrics.map((metric, index) => {
         const Icon = metric.icon;
         return (
@@ -157,9 +157,9 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
                 <Icon className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-muted-foreground font-medium">{metric.title}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground font-medium truncate">{metric.title}</p>
                 <p
-                  className={`text-2xl font-bold tabular-nums ${getValueColor(metric)}`}
+                  className={`text-lg sm:text-2xl font-bold tabular-nums ${getValueColor(metric)}`}
                   style={{ fontVariantNumeric: 'tabular-nums' }}
                 >
                   {metric.value}

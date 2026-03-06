@@ -74,11 +74,12 @@ export default function BankAccounts() {
     <>
       <AppShell>
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-xl font-semibold">Contas Bancárias</h1>
-            <Button onClick={() => setIsModalOpen(true)}>
+            <Button size="sm" onClick={() => setIsModalOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Nova Conta Bancária
+              <span className="hidden sm:inline">Nova Conta Bancária</span>
+              <span className="sm:hidden">Nova</span>
             </Button>
           </div>
           {isLoading ? (

@@ -296,7 +296,7 @@ export default function MonthlyFixed() {
   return (
     <AppShell>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold">Fixos mensais</h1>
           <div className="flex items-center gap-2">
             <Button
@@ -306,7 +306,7 @@ export default function MonthlyFixed() {
               disabled={isLoading || (summary.income.length === 0 && summary.expenses.length === 0)}
             >
               <FileDown className="mr-2 h-4 w-4" />
-              Exportar PDF
+              <span className="hidden sm:inline">Exportar PDF</span>
             </Button>
             <Button
               onClick={() => {
@@ -320,7 +320,7 @@ export default function MonthlyFixed() {
             </Button>
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 sm:gap-4">
           <SummaryCard
             label="Entradas fixas"
             value={formatCurrency(summary.totals.income)}

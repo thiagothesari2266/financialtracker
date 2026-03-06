@@ -182,9 +182,9 @@ export default function CreditCards() {
     <>
       <AppShell>
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-xl font-semibold">Cartões de Crédito</h1>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -192,18 +192,19 @@ export default function CreditCards() {
                 disabled={processInvoices.isPending}
               >
                 <RefreshCw
-                  className={cn('h-4 w-4 mr-2', processInvoices.isPending && 'animate-spin')}
+                  className={cn('h-4 w-4 sm:mr-2', processInvoices.isPending && 'animate-spin')}
                 />
-                Processar faturas
+                <span className="hidden sm:inline">Processar faturas</span>
               </Button>
               <Button size="sm" onClick={() => setIsCreditCardModalOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
-                Novo cartão
+                <span className="hidden sm:inline">Novo cartão</span>
+                <span className="sm:hidden">Novo</span>
               </Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
             <SummaryCard
               label="Total das faturas"
               value={formatCurrency(

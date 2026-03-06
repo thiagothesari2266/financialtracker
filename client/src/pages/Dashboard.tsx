@@ -73,33 +73,34 @@ export default function Dashboard() {
     <>
       <AppShell>
         <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-xl font-semibold">Dashboard</h1>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 bg-card border border-border rounded-lg px-2 py-1">
-                <Button variant="secondary" size="sm" onClick={handleCurrentMonth}>
+              <div className="flex items-center gap-0.5 bg-card border border-border rounded-lg px-1.5 py-1">
+                <Button variant="secondary" size="sm" className="h-7 px-2 text-xs" onClick={handleCurrentMonth}>
                   Hoje
                 </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePreviousMonth}>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePreviousMonth}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="text-sm font-medium px-2 h-8">
+                    <Button variant="ghost" className="text-xs sm:text-sm font-medium px-1.5 h-7">
                       {formattedMonth}
-                      <ChevronDown className="h-4 w-4 ml-1" />
+                      <ChevronDown className="h-3 w-3 ml-0.5" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="center">
                     <DropdownMenuItem disabled>Por mês</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNextMonth}>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNextMonth}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-              <Button size="sm" onClick={() => setIsTransactionModalOpen(true)}>
-                Nova transação
+              <Button size="sm" className="h-8" onClick={() => setIsTransactionModalOpen(true)}>
+                <span className="hidden sm:inline">Nova transação</span>
+                <span className="sm:hidden">Nova</span>
               </Button>
             </div>
           </div>

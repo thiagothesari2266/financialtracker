@@ -172,10 +172,10 @@ export default function Reports() {
   return (
     <AppShell>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold">Relatórios</h1>
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-36 sm:w-40">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -188,7 +188,7 @@ export default function Reports() {
         </div>
 
         <div className="space-y-8">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           <SummaryCard
             label="Receitas do mês"
             value={formatCurrency(currentMonthStats.totalIncome)}
@@ -215,8 +215,8 @@ export default function Reports() {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Despesas por Categoria</CardTitle>
+            <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="text-base">Despesas por Categoria</CardTitle>
               <Button variant="outline" size="sm" onClick={() => handleExportReport('categories')}>
                 <Download className="mr-2 h-4 w-4" />
                 Exportar
@@ -224,13 +224,13 @@ export default function Reports() {
             </CardHeader>
             <CardContent>
               {expensesByCategory.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={250}>
                   <RechartsPieChart>
                     <Pie
                       data={expensesByCategory}
                       cx="50%"
                       cy="50%"
-                      outerRadius={100}
+                      outerRadius={80}
                       dataKey="value"
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
@@ -242,7 +242,7 @@ export default function Reports() {
                   </RechartsPieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+                <div className="flex h-[250px] items-center justify-center text-muted-foreground">
                   Nenhum dado disponível para o período
                 </div>
               )}
@@ -250,19 +250,19 @@ export default function Reports() {
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Tendência Mensal (Últimos 6 meses)</CardTitle>
+            <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="text-base">Tendência Mensal</CardTitle>
               <Button variant="outline" size="sm" onClick={() => handleExportReport('summary')}>
                 <Download className="mr-2 h-4 w-4" />
                 Exportar
               </Button>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250}>
                 <LineChart data={monthlySummary}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis tickFormatter={(value) => formatCurrency(value)} />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                  <YAxis tickFormatter={(value) => formatCurrency(value)} tick={{ fontSize: 11 }} width={70} />
                   <Tooltip formatter={(value) => formatCurrency(value as number)} />
                   <Legend />
                   <Line
@@ -286,19 +286,19 @@ export default function Reports() {
         </div>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Comparativo Mensal - Receitas vs Despesas</CardTitle>
+          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-base">Comparativo Mensal</CardTitle>
             <Button variant="outline" size="sm" onClick={() => handleExportReport('transactions')}>
               <Download className="mr-2 h-4 w-4" />
-              Exportar Transações
+              Exportar
             </Button>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={300}>
               <BarChart data={monthlySummary}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis tickFormatter={(value) => formatCurrency(value)} />
+                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                <YAxis tickFormatter={(value) => formatCurrency(value)} tick={{ fontSize: 11 }} width={70} />
                 <Tooltip formatter={(value) => formatCurrency(value as number)} />
                 <Legend />
                 <Bar dataKey="receitas" fill="#22c55e" name="Receitas" />
