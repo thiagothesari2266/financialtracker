@@ -81,7 +81,7 @@ app.use((req, res, next) => {
     return next();
   }
 
-  if (req.path.startsWith('/api/auth')) {
+  if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/uploads/')) {
     return next();
   }
 

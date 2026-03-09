@@ -42,7 +42,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Switch } from '@/components/ui/switch';
-import { CheckCircle2, Clock, Upload, FileImage, X, ExternalLink } from 'lucide-react';
+import { CheckCircle2, Clock, Upload, FileImage, X, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Adiciona ao schema
@@ -214,6 +214,7 @@ export default function TransactionModal({
   // Receipt upload state
   const [receiptPath, setReceiptPath] = useState<string | null>(null);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [showReceiptPreview, setShowReceiptPreview] = useState(false);
   const receiptInputRef = React.useRef<HTMLInputElement>(null);
 
   // Sync receipt state when transaction changes
@@ -1429,16 +1430,14 @@ export default function TransactionModal({
                   />
                   {receiptPath ? (
                     <>
-                      <a
-                        href={`/api/uploads/receipts/${receiptPath}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        type="button"
                         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        onClick={() => setShowReceiptPreview(true)}
                       >
-                        <FileImage className="w-3.5 h-3.5" />
-                        <span className="truncate max-w-[180px]">Comprovante anexado</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Ver comprovante</span>
+                      </button>
                       <button
                         type="button"
                         className="text-xs text-muted-foreground hover:text-destructive transition-colors"
@@ -1544,6 +1543,32 @@ export default function TransactionModal({
         onCancel={handleDeleteScopeCancel}
         canEditAll={!!(transaction?.installmentsGroupId || transaction?.recurrenceGroupId)}
       />
+
+      {/* Modal de visualização do comprovante */}
+      <Dialog open={showReceiptPreview} onOpenChange={setShowReceiptPreview}>
+        <DialogContent className="max-w-2xl max-h-[90vh] p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle>Comprovante</DialogTitle>
+          </DialogHeader>
+          <div className="p-4 pt-2 flex items-center justify-center overflow-auto max-h-[calc(90vh-80px)]">
+            {receiptPath && (
+              receiptPath.toLowerCase().endsWith('.pdf') ? (
+                <iframe
+                  src={`/api/uploads/receipts/${receiptPath}`}
+                  className="w-full h-[70vh] border-0 rounded"
+                  title="Comprovante PDF"
+                />
+              ) : (
+                <img
+                  src={`/api/uploads/receipts/${receiptPath}`}
+                  alt="Comprovante"
+                  className="max-w-full max-h-[70vh] object-contain rounded"
+                />
+              )
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
