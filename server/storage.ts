@@ -1997,18 +1997,37 @@ export class DatabaseStorage implements IStorage {
       periodEnd: string;
       total: string;
       transactions: CreditCardTransactionWithCategory[];
+      invoicePayment: InvoicePayment | null;
+      dueDate: string;
     }>
   > {
     const invoices = await this.buildCreditCardInvoiceSummaries(accountId);
-    return invoices.map((invoice) => ({
-      creditCardId: invoice.creditCardId,
-      cardName: invoice.cardName,
-      month: invoice.month,
-      periodStart: invoice.periodStart,
-      periodEnd: invoice.periodEnd,
-      total: invoice.total.toFixed(2),
-      transactions: invoice.transactions,
-    }));
+
+    // Buscar payments e cards para enriquecer a resposta
+    const payments = await prisma.invoicePayment.findMany({ where: { accountId } });
+    const paymentMap = new Map(
+      payments.map((p) => [`${p.creditCardId}:${p.invoiceMonth}`, mapInvoicePayment(p)])
+    );
+    const cards = await prisma.creditCard.findMany({ where: { accountId } });
+    const cardMap = new Map(cards.map((c) => [c.id, c]));
+
+    return invoices.map((invoice) => {
+      const key = `${invoice.creditCardId}:${invoice.month}`;
+      const card = cardMap.get(invoice.creditCardId);
+      const dueDay = card?.dueDate ?? 10;
+      const dueDateObj = computeInvoiceDueDate(invoice.month, dueDay);
+      return {
+        creditCardId: invoice.creditCardId,
+        cardName: invoice.cardName,
+        month: invoice.month,
+        periodStart: invoice.periodStart,
+        periodEnd: invoice.periodEnd,
+        total: invoice.total.toFixed(2),
+        transactions: invoice.transactions,
+        invoicePayment: paymentMap.get(key) ?? null,
+        dueDate: ensureDateString(dueDateObj) ?? '',
+      };
+    });
   }
 
   async createInvoicePayment(insertInvoicePayment: InsertInvoicePayment): Promise<InvoicePayment> {

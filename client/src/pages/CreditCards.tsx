@@ -12,6 +12,7 @@ import {
   useCreateCreditCard,
   useUpdateCreditCard,
   useDeleteCreditCard,
+  useCreditCardInvoices,
 } from '@/hooks/useCreditCards';
 import { useProcessOverdueInvoices } from '@/hooks/useProcessInvoices';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +36,7 @@ export default function CreditCards() {
   const updateCreditCard = useUpdateCreditCard();
   const deleteCreditCard = useDeleteCreditCard();
   const processInvoices = useProcessOverdueInvoices();
+  const { data: invoices = [] } = useCreditCardInvoices(accountId);
 
   if (!currentAccount) {
     return (
@@ -47,63 +49,67 @@ export default function CreditCards() {
     );
   }
 
-  // Função para calcular o mês da fatura atual baseado na data atual e dia de fechamento
-  const getCurrentInvoiceMonth = (closingDay: number): string => {
-    const [tY, tM, tD] = todayBR().split('-').map(Number);
-    let invoiceMonth = tM;
-    let invoiceYear = tY;
+  const monthNames = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+  ];
 
-    // Para cartões que fecham no final do mês (>=25), as compras vão sempre para o próximo mês
-    if (closingDay >= 25) {
-      if (tD <= closingDay) {
-        // Estamos antes/no fechamento -> próximo mês
-        invoiceMonth += 1;
-        if (invoiceMonth > 12) {
-          invoiceMonth = 1;
-          invoiceYear += 1;
-        }
-      } else {
-        // Estamos após fechamento -> dois meses à frente
-        invoiceMonth += 2;
-        if (invoiceMonth > 12) {
-          invoiceMonth -= 12;
-          invoiceYear += 1;
-        }
-      }
-    } else {
-      // Lógica tradicional para cartões que fecham no início/meio do mês
-      if (tD > closingDay) {
-        // Após fechamento -> próximo mês
-        invoiceMonth += 1;
-        if (invoiceMonth > 12) {
-          invoiceMonth = 1;
-          invoiceYear += 1;
-        }
-      }
-      // Antes/no fechamento -> mesmo mês (não altera)
-    }
-
-    return `${invoiceYear}-${String(invoiceMonth).padStart(2, '0')}`;
+  // Helpers de mês
+  const mkMonth = (y: number, m: number): string => `${y}-${String(m).padStart(2, '0')}`;
+  const nextMonthStr = (ym: string): string => {
+    const [y, m] = ym.split('-').map(Number);
+    return m === 12 ? mkMonth(y + 1, 1) : mkMonth(y, m + 1);
+  };
+  const prevMonthStr = (ym: string): string => {
+    const [y, m] = ym.split('-').map(Number);
+    return m === 1 ? mkMonth(y - 1, 12) : mkMonth(y, m - 1);
   };
 
-  // Função para formatar o mês da fatura de forma amigável
-  const formatInvoiceMonth = (closingDay: number): string => {
-    const yearMonth = getCurrentInvoiceMonth(closingDay);
-    const [year, month] = yearMonth.split('-');
-    const monthNames = [
-      'Janeiro',
-      'Fevereiro',
-      'Março',
-      'Abril',
-      'Maio',
-      'Junho',
-      'Julho',
-      'Agosto',
-      'Setembro',
-      'Outubro',
-      'Novembro',
-      'Dezembro',
-    ];
+  // Retorna { month, status } considerando pagamento
+  const getDisplayInvoiceMonth = (card: any): { month: string; status: 'open' | 'pending' | 'overdue' | null } => {
+    const closingDay = card.closingDay || 1;
+    const [tY, tM, tD] = todayBR().split('-').map(Number);
+    const today = todayBR();
+    const currentMonth = mkMonth(tY, tM);
+
+    // Determinar o último mês que fechou e o mês em acumulação
+    let lastClosedMonth: string;
+    let accumulatingMonth: string;
+
+    if (tD > closingDay) {
+      // Após fechamento: a fatura do mês atual já fechou
+      lastClosedMonth = currentMonth;
+      accumulatingMonth = nextMonthStr(currentMonth);
+    } else {
+      // Antes/no fechamento: a fatura do mês anterior foi a última a fechar
+      lastClosedMonth = prevMonthStr(currentMonth);
+      accumulatingMonth = currentMonth;
+    }
+
+    // Verificar se a última fatura fechada foi paga
+    const closedInvoice = invoices.find(
+      (inv: any) => inv.creditCardId === card.id && inv.month === lastClosedMonth
+    );
+
+    if (closedInvoice) {
+      const payment = closedInvoice.invoicePayment;
+      const isPaid = payment && payment.status === 'paid';
+      const totalZero = parseFloat(closedInvoice.total) === 0;
+
+      if (!isPaid && !totalZero) {
+        // Não paga: mostra a fatura fechada com status
+        const dueDate = closedInvoice.dueDate;
+        const isOverdue = dueDate && today > dueDate;
+        return { month: lastClosedMonth, status: isOverdue ? 'overdue' : 'pending' };
+      }
+    }
+
+    // Paga, zerada ou sem gastos: mostra mês em acumulação
+    return { month: accumulatingMonth, status: null };
+  };
+
+  const formatMonthStr = (ym: string): string => {
+    const [year, month] = ym.split('-');
     return `${monthNames[parseInt(month) - 1]} de ${year}`;
   };
 
@@ -150,8 +156,8 @@ export default function CreditCards() {
     }
   }
   function handleViewInvoices(card: any) {
-    const invoiceMonth = getCurrentInvoiceMonth(card.closingDay || 1);
-    navigate(`/credit-card-invoice?creditCardId=${card.id}&month=${invoiceMonth}`);
+    const { month } = getDisplayInvoiceMonth(card);
+    navigate(`/credit-card-invoice?creditCardId=${card.id}&month=${month}`);
   }
 
   function handleUploadInvoice(card: any) {
@@ -295,12 +301,27 @@ export default function CreditCards() {
                       </div>
 
                       {/* Mês da fatura */}
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-3.5 w-3.5 text-white/40" />
-                        <span className="text-xs text-white/60">
-                          {formatInvoiceMonth(card.closingDay || 1)}
-                        </span>
-                      </div>
+                      {(() => {
+                        const { month, status } = getDisplayInvoiceMonth(card);
+                        return (
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-3.5 w-3.5 text-white/40" />
+                            <span className="text-xs text-white/60">
+                              {formatMonthStr(month)}
+                            </span>
+                            {status === 'pending' && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">
+                                Pendente
+                              </span>
+                            )}
+                            {status === 'overdue' && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
+                                Vencida
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {/* Limite + barra de uso */}
                       <div className="space-y-1.5">
