@@ -1499,10 +1499,10 @@ export class DatabaseStorage implements IStorage {
 
     const existingTransactions = await prisma.transaction.findMany({
       where: { accountId, isInvoiceTransaction: true },
-      select: { id: true, creditCardInvoiceId: true },
+      select: { id: true, creditCardInvoiceId: true, date: true },
       orderBy: { id: 'asc' },
     });
-    const existingMap = new Map<string, number>();
+    const existingMap = new Map<string, { id: number; date: Date }>();
     const duplicatesToDelete: number[] = [];
     for (const transaction of existingTransactions) {
       const key = transaction.creditCardInvoiceId ?? '';
@@ -1513,7 +1513,7 @@ export class DatabaseStorage implements IStorage {
       if (existingMap.has(key)) {
         duplicatesToDelete.push(transaction.id);
       } else {
-        existingMap.set(key, transaction.id);
+        existingMap.set(key, { id: transaction.id, date: transaction.date });
       }
     }
     if (duplicatesToDelete.length > 0) {
@@ -1532,12 +1532,12 @@ export class DatabaseStorage implements IStorage {
       if (total <= 0) {
         const invoiceId = `${card.id}-${invoice.month}`;
         if (existingMap.has(invoiceId)) {
-          const txId = existingMap.get(invoiceId)!;
+          const existing = existingMap.get(invoiceId)!;
           await prisma.invoicePayment.updateMany({
-            where: { transactionId: txId },
+            where: { transactionId: existing.id },
             data: { transactionId: null, status: 'pending', paidAt: null },
           });
-          await prisma.transaction.delete({ where: { id: txId } });
+          await prisma.transaction.delete({ where: { id: existing.id } });
           existingMap.delete(invoiceId);
         }
         continue;
@@ -1553,13 +1553,14 @@ export class DatabaseStorage implements IStorage {
       const amountStr = total.toFixed(2);
 
       if (existingMap.has(invoiceId)) {
-        const txId = existingMap.get(invoiceId)!;
+        const existing = existingMap.get(invoiceId)!;
+        const userChangedDate = existing.date.getTime() !== dueDate.getTime();
         await prisma.transaction.update({
-          where: { id: txId },
+          where: { id: existing.id },
           data: {
             description,
             amount: amountStr,
-            date: dueDate,
+            ...(userChangedDate ? {} : { date: dueDate }),
             categoryId: invoiceCategory.id,
             type: 'expense',
             creditCardId: card.id,
@@ -1568,10 +1569,10 @@ export class DatabaseStorage implements IStorage {
             paid,
           },
         });
-        if (payment && payment.transactionId !== txId) {
+        if (payment && payment.transactionId !== existing.id) {
           await prisma.invoicePayment.update({
             where: { id: payment.id },
-            data: { transactionId: txId, totalAmount: amountStr },
+            data: { transactionId: existing.id, totalAmount: amountStr },
           });
         }
       } else {
