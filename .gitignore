@@ -14,5 +14,11 @@ mcp-ssh/node_modules
 .claude/settings.local.json
 .claude/commands/
 
+# Playwright MCP output
+.playwright-mcp/
+
+# Interface design notes
+.interface-design/
+
 # Windows artifacts
 nul
