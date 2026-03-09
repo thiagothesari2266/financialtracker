@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
+import { todayBR, currentMonthBR } from './utils/date-br';
 import type {
   Prisma,
   Account as PrismaAccount,
@@ -1656,7 +1657,7 @@ export class DatabaseStorage implements IStorage {
       const mapped = mapCreditCardTransaction(tx, tx.category);
       const existing = invoices.get(key);
       const dateStr =
-        ensureDateString(tx.date) ?? new Date().toISOString().slice(0, DATE_ONLY_LENGTH);
+        ensureDateString(tx.date) ?? todayBR();
       if (existing) {
         existing.total += Number.parseFloat(tx.amount.toString());
         existing.periodStart = existing.periodStart < dateStr ? existing.periodStart : dateStr;
@@ -1890,7 +1891,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMonthlyFixedSummary(accountId: number): Promise<MonthlyFixedSummary> {
-    const todayMonth = new Date().toISOString().slice(0, 7);
+    const todayMonth = currentMonthBR();
 
     const entries = await prisma.fixedCashflow.findMany({
       where: {
@@ -1933,7 +1934,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFixedCashflow(entry: InsertFixedCashflow): Promise<MonthlyFixedItem> {
-    const todayMonth = new Date().toISOString().slice(0, 7);
+    const todayMonth = currentMonthBR();
     const created = await prisma.fixedCashflow.create({
       data: {
         ...entry,
@@ -1958,7 +1959,7 @@ export class DatabaseStorage implements IStorage {
     id: number,
     entry: Partial<InsertFixedCashflow>
   ): Promise<MonthlyFixedItem | undefined> {
-    const _todayMonth = new Date().toISOString().slice(0, 7);
+    const _todayMonth = currentMonthBR();
     const updated = await prisma.fixedCashflow.update({
       where: { id },
       data: {

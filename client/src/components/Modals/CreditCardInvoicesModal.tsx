@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { todayBR } from '@/lib/date-br';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -74,10 +75,9 @@ function CreditCardInvoicesModal({
     if (!creditCard.dueDate) return false;
     const [year, month] = invoice.month.split('-');
     const dueDate = new Date(parseInt(year), parseInt(month) - 1, creditCard.dueDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayDate = new Date(todayBR() + 'T00:00:00');
     dueDate.setHours(0, 0, 0, 0);
-    return dueDate < today;
+    return dueDate < todayDate;
   };
 
   // Função para calcular dias de atraso
@@ -85,8 +85,8 @@ function CreditCardInvoicesModal({
     if (!creditCard.dueDate) return 0;
     const [year, month] = invoice.month.split('-');
     const dueDate = new Date(parseInt(year), parseInt(month) - 1, creditCard.dueDate);
-    const today = new Date();
-    const diffTime = today.getTime() - dueDate.getTime();
+    const todayDate = new Date(todayBR() + 'T00:00:00');
+    const diffTime = todayDate.getTime() - dueDate.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays > 0 ? diffDays : 0;
   };

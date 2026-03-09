@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { todayBR, currentMonthBR } from '@/lib/date-br';
 import { useAccount } from '@/contexts/AccountContext';
 import { Button } from '@/components/ui/button';
 import { Plus, CreditCard } from 'lucide-react';
@@ -14,12 +15,12 @@ export default function CreditCards() {
 
   const formatDueDate = (dueDate: number) => {
     if (!dueDate || isNaN(dueDate) || dueDate < 1 || dueDate > 31) return '--/--';
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
+    const [tY, tM, tD] = todayBR().split('-').map(Number);
+    const currentMonth = tM;
+    const currentYear = tY;
 
     // If due date has passed this month, show next month
-    const month = now.getDate() > dueDate ? currentMonth + 1 : currentMonth;
+    const month = tD > dueDate ? currentMonth + 1 : currentMonth;
     const _year = month > 12 ? currentYear + 1 : currentYear;
     const finalMonth = month > 12 ? 1 : month;
 

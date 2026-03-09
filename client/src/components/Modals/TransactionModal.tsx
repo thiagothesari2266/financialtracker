@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { format, parse } from 'date-fns';
+import { todayBR } from '@/lib/date-br';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Form,
@@ -90,7 +91,7 @@ export default function TransactionModal({
       description: '',
       amount: '',
       type: 'expense',
-      date: new Date().toISOString().split('T')[0],
+      date: todayBR(),
       categoryId: '',
       bankAccountId: '',
       clientName: '',
@@ -111,7 +112,7 @@ export default function TransactionModal({
           date:
             transaction.date && transaction.date !== ''
               ? transaction.date.split('T')[0]
-              : new Date().toISOString().split('T')[0],
+              : todayBR(),
           categoryId: transaction.categoryId ? String(transaction.categoryId) : '',
           bankAccountId: transaction.bankAccountId ? String(transaction.bankAccountId) : '',
           clientName: transaction.clientName || '',
@@ -160,7 +161,7 @@ export default function TransactionModal({
         date:
           transaction.date && transaction.date !== ''
             ? transaction.date.split('T')[0]
-            : new Date().toISOString().split('T')[0],
+            : todayBR(),
         categoryId: transaction.categoryId ? String(transaction.categoryId) : '',
         bankAccountId: transaction.bankAccountId ? String(transaction.bankAccountId) : '',
         clientName: transaction.clientName || '',
@@ -184,7 +185,7 @@ export default function TransactionModal({
         description: '',
         amount: '',
         type: 'expense',
-        date: new Date().toISOString().split('T')[0],
+        date: todayBR(),
         categoryId: '',
         bankAccountId: defaultBankAccountId,
         clientName: '',

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { addMonths, format, subMonths } from 'date-fns';
+import { todayBR } from '@/lib/date-br';
 import { AppShell } from '@/components/Layout/AppShell';
 import MetricsCards from '@/components/Dashboard/MetricsCards';
 import ExpenseChart from '@/components/Dashboard/ExpenseChart';
@@ -20,7 +21,7 @@ import {
 export default function Dashboard() {
   const { currentAccount } = useAccount();
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
-  const [currentDate, setCurrentDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [currentDate, setCurrentDate] = useState(() => todayBR());
 
   const currentMonth = useMemo(() => {
     return currentDate.substring(0, 7);
@@ -66,7 +67,7 @@ export default function Dashboard() {
   };
 
   const handleCurrentMonth = () => {
-    setCurrentDate(format(new Date(), 'yyyy-MM-dd'));
+    setCurrentDate(todayBR());
   };
 
   return (

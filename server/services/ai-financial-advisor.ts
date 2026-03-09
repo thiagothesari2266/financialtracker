@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { storage } from '../storage';
+import { todayBR, currentMonthBR } from '../utils/date-br';
 
 if (!process.env.OPENAI_API_KEY) {
   console.warn('⚠️  OPENAI_API_KEY não encontrada. Funcionalidade de IA desabilitada.');
@@ -79,8 +80,8 @@ export class AIFinancialAdvisor {
   static async getFinancialContext(accountId: number, userId: number): Promise<FinancialContext> {
     try {
       console.log(`[AIFinancialAdvisor] Getting context for account ${accountId}`);
-      const currentMonth = new Date().toISOString().substring(0, 7);
-      const today = new Date().toISOString().substring(0, 10);
+      const currentMonth = currentMonthBR();
+      const today = todayBR();
 
       // Buscar estatísticas da conta
       console.log(

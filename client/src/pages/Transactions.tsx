@@ -1,5 +1,6 @@
 import { type MouseEvent, useEffect, useMemo, useState } from 'react';
 import { addMonths, endOfMonth, format, parse, startOfMonth, subMonths } from 'date-fns';
+import { todayBR } from '@/lib/date-br';
 import { ptBR } from 'date-fns/locale';
 import { useAccount } from '@/contexts/AccountContext';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -71,7 +72,7 @@ export default function Transactions() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
-  const [currentDate, setCurrentDate] = useState(() => new Date().toISOString().substring(0, 10));
+  const [currentDate, setCurrentDate] = useState(() => todayBR());
   const [viewType, setViewType] = useState<ViewType>('month');
   const storageKey = currentAccount ? `transactions-period-${currentAccount.id}` : null;
 
@@ -150,7 +151,7 @@ export default function Transactions() {
   };
 
   const handleCurrentPeriod = () => {
-    setCurrentDate(new Date().toISOString().substring(0, 10));
+    setCurrentDate(todayBR());
   };
 
   const getDateRange = () => {

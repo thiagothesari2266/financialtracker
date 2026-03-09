@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { todayBR } from '@/lib/date-br';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -104,7 +105,7 @@ export default function InvoiceTransactionModal({
     }
 
     // Fallback para data atual se não conseguir calcular
-    return format(new Date(), 'yyyy-MM-dd');
+    return todayBR();
   };
 
   // Mutação para atualizar data de pagamento

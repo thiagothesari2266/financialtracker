@@ -1,4 +1,5 @@
 import { type MouseEvent, useState, useMemo } from 'react';
+import { todayBR, currentMonthBR } from '@/lib/date-br';
 import { useAccount } from '@/contexts/AccountContext';
 import { useCreditCards, useCreditCardInvoices } from '@/hooks/useCreditCards';
 import { Button } from '@/components/ui/button';
@@ -116,8 +117,7 @@ export default function CreditCardInvoice() {
   };
 
   const handleCurrentMonth = () => {
-    const now = new Date();
-    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const currentMonthStr = currentMonthBR();
     navigate(`/credit-card-invoice?creditCardId=${creditCardId}&month=${currentMonthStr}`);
   };
 
@@ -241,7 +241,7 @@ export default function CreditCardInvoice() {
     const newTransaction = {
       creditCardId: Number(creditCardId),
       type: 'expense',
-      date: new Date().toISOString().split('T')[0],
+      date: todayBR(),
     };
     setSelectedTransaction(newTransaction);
     setIsTransactionModalOpen(true);
@@ -251,7 +251,7 @@ export default function CreditCardInvoice() {
     setSelectedTransaction({
       creditCardId: Number(creditCardId),
       type: 'expense',
-      date: new Date().toISOString().split('T')[0],
+      date: todayBR(),
       launchType: 'credito',
     });
     setIsTransactionModalOpen(true);
@@ -287,7 +287,7 @@ export default function CreditCardInvoice() {
     // Verifica se esta vencido
     if (invoice.dueDate) {
       const due = new Date(invoice.dueDate);
-      if (due < new Date() && payment?.status !== 'paid') return 'overdue';
+      if (due < new Date(todayBR() + 'T23:59:59') && payment?.status !== 'paid') return 'overdue';
     }
     return 'pending';
   }, [invoice, invoiceTotal]);

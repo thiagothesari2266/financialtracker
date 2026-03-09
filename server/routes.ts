@@ -1,6 +1,7 @@
 import type { Express } from 'express';
 import { createServer, type Server } from 'http';
 import { storage } from './storage';
+import { currentMonthBR } from './utils/date-br';
 import { validateAccountOwnership } from './middleware/account-ownership';
 import {
   uploadInvoice,
@@ -115,7 +116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/accounts/:id/stats', validateAccountOwnership, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const month = (req.query.month as string) || new Date().toISOString().substring(0, 7);
+      const month = (req.query.month as string) || currentMonthBR();
       const stats = await storage.getAccountStats(id, month);
       if (!stats) {
         return res.status(404).json({ message: 'Account not found' });
@@ -390,7 +391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/accounts/:accountId/categories/stats', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
-      const month = (req.query.month as string) || new Date().toISOString().substring(0, 7);
+      const month = (req.query.month as string) || currentMonthBR();
       const stats = await storage.getCategoryStats(accountId, month);
       res.json(stats);
     } catch (error) {

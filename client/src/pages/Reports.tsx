@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { currentMonthBR } from '@/lib/date-br';
 import { useAccount } from '@/contexts/AccountContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,10 +82,10 @@ export default function Reports() {
   // Generate monthly summary data for the last 6 months
   const generateMonthlySummary = () => {
     const months = [];
-    const today = new Date();
+    const [cYear, cMonth] = currentMonthBR().split('-').map(Number);
 
     for (let i = 5; i >= 0; i--) {
-      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const date = new Date(cYear, cMonth - 1 - i, 1);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
       const monthTransactions = transactions.filter(

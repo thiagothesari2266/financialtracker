@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { todayBR } from '@/lib/date-br';
 import { useAccount } from '@/contexts/AccountContext';
 import { AppShell } from '@/components/Layout/AppShell';
 import { Button } from '@/components/ui/button';
@@ -48,13 +49,13 @@ export default function CreditCards() {
 
   // Função para calcular o mês da fatura atual baseado na data atual e dia de fechamento
   const getCurrentInvoiceMonth = (closingDay: number): string => {
-    const today = new Date();
-    let invoiceMonth = today.getMonth() + 1; // 1-12
-    let invoiceYear = today.getFullYear();
+    const [tY, tM, tD] = todayBR().split('-').map(Number);
+    let invoiceMonth = tM;
+    let invoiceYear = tY;
 
     // Para cartões que fecham no final do mês (>=25), as compras vão sempre para o próximo mês
     if (closingDay >= 25) {
-      if (today.getDate() <= closingDay) {
+      if (tD <= closingDay) {
         // Estamos antes/no fechamento -> próximo mês
         invoiceMonth += 1;
         if (invoiceMonth > 12) {
@@ -71,7 +72,7 @@ export default function CreditCards() {
       }
     } else {
       // Lógica tradicional para cartões que fecham no início/meio do mês
-      if (today.getDate() > closingDay) {
+      if (tD > closingDay) {
         // Após fechamento -> próximo mês
         invoiceMonth += 1;
         if (invoiceMonth > 12) {

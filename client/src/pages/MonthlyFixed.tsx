@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { todayBR } from '@/lib/date-br';
 import { AppShell } from '@/components/Layout/AppShell';
 import { SummaryCard } from '@/components/ui/summary-card';
 import { useAccount } from '@/contexts/AccountContext';
@@ -172,7 +173,8 @@ export default function MonthlyFixed() {
     // Date
     doc.setFontSize(10);
     doc.setTextColor(128, 128, 128);
-    const today = new Date().toLocaleDateString('pt-BR', {
+    const [y, m, d] = todayBR().split('-');
+    const today = new Date(Number(y), Number(m) - 1, Number(d)).toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: 'long',
       year: 'numeric'
