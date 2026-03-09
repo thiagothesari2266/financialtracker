@@ -394,6 +394,7 @@ export type TransactionWithCategory = Transaction & {
 
 export type CreditCardTransactionWithCategory = CreditCardTransaction & {
   category: Category | null;
+  isVirtual?: boolean;
 };
 
 export type CreditCardWithTransactions = CreditCard & {

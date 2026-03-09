@@ -1653,28 +1653,92 @@ export class DatabaseStorage implements IStorage {
       }
     >();
 
-    for (const tx of transactions) {
-      const key = `${tx.creditCardId}:${tx.invoiceMonth}`;
-      const mapped = mapCreditCardTransaction(tx, tx.category);
+    // Helper para adicionar transação ao mapa de faturas
+    const addToInvoice = (
+      creditCardId: number,
+      invoiceMonth: string,
+      mapped: CreditCardTransactionWithCategory,
+      amt: number,
+      dateStr: string,
+      isIncome: boolean
+    ) => {
+      const key = `${creditCardId}:${invoiceMonth}`;
       const existing = invoices.get(key);
-      const dateStr =
-        ensureDateString(tx.date) ?? todayBR();
+      const adjustedAmt = isIncome ? -amt : amt;
       if (existing) {
-        const amt = Number.parseFloat(tx.amount.toString());
-        existing.total += tx.category?.type === 'income' ? -amt : amt;
+        existing.total += adjustedAmt;
         existing.periodStart = existing.periodStart < dateStr ? existing.periodStart : dateStr;
         existing.periodEnd = existing.periodEnd > dateStr ? existing.periodEnd : dateStr;
         existing.transactions.push(mapped);
       } else {
-        const amt = Number.parseFloat(tx.amount.toString());
         invoices.set(key, {
-          creditCardId: tx.creditCardId,
-          month: tx.invoiceMonth,
-          total: tx.category?.type === 'income' ? -amt : amt,
+          creditCardId,
+          month: invoiceMonth,
+          total: adjustedAmt,
           periodStart: dateStr,
           periodEnd: dateStr,
           transactions: [mapped],
         });
+      }
+    };
+
+    // 1. Adicionar transações físicas
+    for (const tx of transactions) {
+      const mapped = mapCreditCardTransaction(tx, tx.category);
+      const dateStr = ensureDateString(tx.date) ?? todayBR();
+      const amt = Number.parseFloat(tx.amount.toString());
+      const isIncome = tx.category?.type === 'income';
+      addToInvoice(tx.creditCardId, tx.invoiceMonth, mapped, amt, dateStr, isIncome);
+    }
+
+    // 2. Gerar instâncias virtuais de transações recorrentes para meses futuros
+    const recurrents = transactions.filter(
+      (tx) => tx.launchType === 'recorrente' && tx.recurrenceFrequency === 'mensal'
+    );
+
+    const currentMonth = currentMonthBR(); // 'YYYY-MM'
+    for (const tx of recurrents) {
+      const baseMonth = tx.invoiceMonth; // mês original da definição
+      const [baseYear, baseMonthNum] = baseMonth.split('-').map(Number);
+      const recurrenceEnd = tx.recurrenceEndDate ? ensureDateString(tx.recurrenceEndDate) : null;
+
+      // Gerar para até 12 meses à frente do mês atual
+      for (let offset = 1; offset <= 12; offset++) {
+        let newMonthNum = baseMonthNum + offset;
+        let newYear = baseYear;
+        while (newMonthNum > 12) {
+          newMonthNum -= 12;
+          newYear++;
+        }
+        const futureMonth = `${newYear}-${String(newMonthNum).padStart(2, '0')}`;
+
+        // Não gerar para meses anteriores ao atual
+        if (futureMonth < currentMonth) continue;
+
+        // Respeitar recurrenceEndDate
+        if (recurrenceEnd && futureMonth > recurrenceEnd.slice(0, 7)) break;
+
+        // Não gerar se já existe transação física com mesma descrição neste mês/cartão
+        const alreadyExists = transactions.some(
+          (existing) =>
+            existing.creditCardId === tx.creditCardId &&
+            existing.invoiceMonth === futureMonth &&
+            existing.description === tx.description
+        );
+        if (alreadyExists) continue;
+
+        const mapped = mapCreditCardTransaction(tx, tx.category);
+        // Marcar como virtual com o mês correto
+        const virtualMapped = {
+          ...mapped,
+          invoiceMonth: futureMonth,
+          isVirtual: true,
+        } as CreditCardTransactionWithCategory;
+
+        const dateStr = ensureDateString(tx.date) ?? todayBR();
+        const amt = Number.parseFloat(tx.amount.toString());
+        const isIncome = tx.category?.type === 'income';
+        addToInvoice(tx.creditCardId, futureMonth, virtualMapped, amt, dateStr, isIncome);
       }
     }
 
