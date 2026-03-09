@@ -216,7 +216,11 @@ export default function CreditCards() {
               label="Total das faturas"
               value={formatCurrency(
                 creditCards.reduce(
-                  (sum, card) => sum + parseFloat(card.currentBalance || '0.00'),
+                  (sum, card) => {
+                    const { month } = getDisplayInvoiceMonth(card);
+                    const inv = invoices.find((i: any) => i.creditCardId === card.id && i.month === month);
+                    return sum + parseFloat(inv ? inv.total : (card.currentBalance || '0.00'));
+                  },
                   0
                 )
               )}
@@ -235,7 +239,11 @@ export default function CreditCards() {
               value={formatCurrency(
                 creditCards.reduce((sum, card) => sum + parseFloat(card.creditLimit || '0.00'), 0) -
                   creditCards.reduce(
-                    (sum, card) => sum + parseFloat(card.currentBalance || '0.00'),
+                    (sum, card) => {
+                      const { month } = getDisplayInvoiceMonth(card);
+                      const inv = invoices.find((i: any) => i.creditCardId === card.id && i.month === month);
+                      return sum + parseFloat(inv ? inv.total : (card.currentBalance || '0.00'));
+                    },
                     0
                   )
               )}
@@ -292,34 +300,38 @@ export default function CreditCards() {
                         **** **** **** ****
                       </p>
 
-                      {/* Fatura atual */}
-                      <div className="space-y-1">
-                        <span className="text-xs text-white/40">Fatura atual</span>
-                        <p className="text-white text-xl font-bold tabular-nums">
-                          {formatCurrency(card.currentBalance || '0.00')}
-                        </p>
-                      </div>
-
-                      {/* Mês da fatura */}
+                      {/* Fatura atual + Mês da fatura */}
                       {(() => {
                         const { month, status } = getDisplayInvoiceMonth(card);
+                        const invoice = invoices.find(
+                          (inv: any) => inv.creditCardId === card.id && inv.month === month
+                        );
+                        const invoiceTotal = invoice ? invoice.total : (card.currentBalance || '0.00');
                         return (
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-3.5 w-3.5 text-white/40" />
-                            <span className="text-xs text-white/60">
-                              {formatMonthStr(month)}
-                            </span>
-                            {status === 'pending' && (
-                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">
-                                Pendente
+                          <>
+                            <div className="space-y-1">
+                              <span className="text-xs text-white/40">Fatura atual</span>
+                              <p className="text-white text-xl font-bold tabular-nums">
+                                {formatCurrency(invoiceTotal)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-3.5 w-3.5 text-white/40" />
+                              <span className="text-xs text-white/60">
+                                {formatMonthStr(month)}
                               </span>
-                            )}
-                            {status === 'overdue' && (
-                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
-                                Vencida
-                              </span>
-                            )}
-                          </div>
+                              {status === 'pending' && (
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">
+                                  Pendente
+                                </span>
+                              )}
+                              {status === 'overdue' && (
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">
+                                  Vencida
+                                </span>
+                              )}
+                            </div>
+                          </>
                         );
                       })()}
 
