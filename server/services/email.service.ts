@@ -30,10 +30,6 @@ function getTransporter(): nodemailer.Transporter | null {
   return transporter;
 }
 
-export function isEmailConfigured(): boolean {
-  return Boolean(SMTP_USER && SMTP_PASS);
-}
-
 function getInviteEmailHtml(inviteLink: string): string {
   return `
 <!DOCTYPE html>

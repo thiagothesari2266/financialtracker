@@ -96,30 +96,6 @@ export async function processImageBuffer(
 }
 
 /**
- * Valida se o arquivo é uma fatura válida baseado no conteúdo
- */
-export function validateInvoiceContent(text: string): boolean {
-  const invoiceKeywords = [
-    'fatura',
-    'cartão',
-    'crédito',
-    'vencimento',
-    'pagamento',
-    'compra',
-    'valor',
-    'total',
-    'saldo',
-    'limite',
-  ];
-
-  const lowercaseText = text.toLowerCase();
-  const foundKeywords = invoiceKeywords.filter((keyword) => lowercaseText.includes(keyword));
-
-  // Deve conter pelo menos 3 palavras-chave relacionadas a fatura
-  return foundKeywords.length >= 3;
-}
-
-/**
  * Limpa arquivos temporários
  */
 export function cleanupTempFile(filePath: string): void {
