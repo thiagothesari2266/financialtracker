@@ -1659,15 +1659,17 @@ export class DatabaseStorage implements IStorage {
       const dateStr =
         ensureDateString(tx.date) ?? todayBR();
       if (existing) {
-        existing.total += Number.parseFloat(tx.amount.toString());
+        const amt = Number.parseFloat(tx.amount.toString());
+        existing.total += tx.category?.type === 'income' ? -amt : amt;
         existing.periodStart = existing.periodStart < dateStr ? existing.periodStart : dateStr;
         existing.periodEnd = existing.periodEnd > dateStr ? existing.periodEnd : dateStr;
         existing.transactions.push(mapped);
       } else {
+        const amt = Number.parseFloat(tx.amount.toString());
         invoices.set(key, {
           creditCardId: tx.creditCardId,
           month: tx.invoiceMonth,
-          total: Number.parseFloat(tx.amount.toString()),
+          total: tx.category?.type === 'income' ? -amt : amt,
           periodStart: dateStr,
           periodEnd: dateStr,
           transactions: [mapped],

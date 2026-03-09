@@ -57,7 +57,7 @@ const transactionSchema = z.object({
   clientName: z.string().optional(),
   projectName: z.string().optional(),
   costCenter: z.string().optional(),
-  launchType: z.enum(['unica', 'recorrente', 'parcelada', 'credito']).default('unica'),
+  launchType: z.enum(['unica', 'recorrente', 'parcelada']).default('unica'),
   installments: z.string().optional(), // para parcelada
   recurrenceFrequency: z.string().optional(), // para recorrente
   recurrenceEndDate: z.string().optional(), // para recorrente
@@ -105,9 +105,7 @@ export default function TransactionModal({
     values: transaction
       ? {
           description: transaction.description || '',
-          amount: transaction.launchType === 'credito'
-            ? Math.abs(parseFloat(transaction.amount || '0')).toString()
-            : (transaction.amount || ''),
+          amount: transaction.amount || '',
           type: transaction.type || 'expense',
           date:
             transaction.date && transaction.date !== ''
@@ -121,8 +119,7 @@ export default function TransactionModal({
           launchType:
             transaction.launchType === 'recorrente' ||
             transaction.launchType === 'parcelada' ||
-            transaction.launchType === 'unica' ||
-            transaction.launchType === 'credito'
+            transaction.launchType === 'unica'
               ? transaction.launchType
               : transaction.installments && transaction.installments > 1
                 ? 'parcelada'
@@ -142,8 +139,7 @@ export default function TransactionModal({
       const transactionLaunchType =
         transaction.launchType === 'recorrente' ||
         transaction.launchType === 'parcelada' ||
-        transaction.launchType === 'unica' ||
-        transaction.launchType === 'credito'
+        transaction.launchType === 'unica'
           ? transaction.launchType
           : transaction.installments && transaction.installments > 1
             ? 'parcelada'
@@ -154,9 +150,7 @@ export default function TransactionModal({
       setDestinationType(transaction.creditCardId ? 'credit' : 'bank');
       form.reset({
         description: transaction.description || '',
-        amount: transaction.launchType === 'credito'
-          ? Math.abs(parseFloat(transaction.amount || '0')).toString()
-          : (transaction.amount || ''),
+        amount: transaction.amount || '',
         type: transaction.type || 'expense',
         date:
           transaction.date && transaction.date !== ''
@@ -384,13 +378,6 @@ export default function TransactionModal({
         return;
       }
       // installments será convertido para número na mutation
-    } else if (launchTypeValue === 'credito') {
-      data.launchType = 'credito';
-      const absAmount = Math.abs(parseFloat(data.amount));
-      data.amount = (-absAmount).toString();
-      data.installments = undefined;
-      data.recurrenceFrequency = undefined;
-      data.recurrenceEndDate = undefined;
     } else {
       data.launchType = 'unica';
     }
@@ -1263,7 +1250,6 @@ export default function TransactionModal({
                       <SelectItem value="unica">Única</SelectItem>
                       <SelectItem value="recorrente">Recorrente</SelectItem>
                       <SelectItem value="parcelada">Parcelada</SelectItem>
-                      <SelectItem value="credito">Crédito / Estorno</SelectItem>
                     </SelectContent>
                   </Select>
                 </FormItem>

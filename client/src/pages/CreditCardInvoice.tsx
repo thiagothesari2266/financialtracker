@@ -250,9 +250,8 @@ export default function CreditCardInvoice() {
   const handleAddCredit = () => {
     setSelectedTransaction({
       creditCardId: Number(creditCardId),
-      type: 'expense',
+      type: 'income',
       date: todayBR(),
-      launchType: 'credito',
     });
     setIsTransactionModalOpen(true);
   };
@@ -270,8 +269,7 @@ export default function CreditCardInvoice() {
   const totalCredits = useMemo(() => {
     let credits = 0;
     for (const tx of filteredTransactions) {
-      const amt = parseFloat(tx.amount);
-      if (amt < 0) credits += Math.abs(amt);
+      if (tx.category?.type === 'income') credits += parseFloat(tx.amount);
     }
     return credits;
   }, [filteredTransactions]);
@@ -538,7 +536,7 @@ export default function CreditCardInvoice() {
                                     {transaction.currentInstallment}/{transaction.installments}
                                   </span>
                                 )}
-                                {transaction.launchType === 'credito' && (
+                                {transaction.category?.type === 'income' && (
                                   <span
                                     className="rounded-full px-2 py-0.5 text-xs font-normal"
                                     style={{ backgroundColor: 'hsl(var(--success) / 0.15)', color: 'hsl(var(--success))' }}
@@ -553,8 +551,8 @@ export default function CreditCardInvoice() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className={cn('text-sm font-medium tabular-nums', parseFloat(transaction.amount) < 0 ? 'text-success' : 'text-destructive')}>
-                              {parseFloat(transaction.amount) < 0 ? '+ ' : ''}{formatCurrencyAbs(transaction.amount)}
+                            <p className={cn('text-sm font-medium tabular-nums', transaction.category?.type === 'income' ? 'text-success' : 'text-destructive')}>
+                              {transaction.category?.type === 'income' ? '+ ' : ''}{formatCurrencyAbs(transaction.amount)}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {formatDate(transaction.date)}
@@ -612,7 +610,7 @@ export default function CreditCardInvoice() {
                                   {transaction.currentInstallment}/{transaction.installments}
                                 </span>
                               )}
-                              {transaction.launchType === 'credito' && (
+                              {transaction.category?.type === 'income' && (
                                 <span
                                   className="rounded-full px-2 py-0.5 text-xs font-normal"
                                   style={{ backgroundColor: 'hsl(var(--success) / 0.15)', color: 'hsl(var(--success))' }}
@@ -634,8 +632,8 @@ export default function CreditCardInvoice() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className={cn('font-medium tabular-nums', parseFloat(transaction.amount) < 0 ? 'text-success' : 'text-destructive')}>
-                              {parseFloat(transaction.amount) < 0 ? '+ ' : ''}{formatCurrencyAbs(transaction.amount)}
+                            <span className={cn('font-medium tabular-nums', transaction.category?.type === 'income' ? 'text-success' : 'text-destructive')}>
+                              {transaction.category?.type === 'income' ? '+ ' : ''}{formatCurrencyAbs(transaction.amount)}
                             </span>
                           </TableCell>
                         </TableRow>
