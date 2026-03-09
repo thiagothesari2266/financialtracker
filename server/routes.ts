@@ -1,6 +1,11 @@
 import type { Express } from 'express';
 import { createServer, type Server } from 'http';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import express from 'express';
 import { storage } from './storage';
+import { prisma } from './db';
 import { currentMonthBR } from './utils/date-br';
 import { validateAccountOwnership } from './middleware/account-ownership';
 import {
@@ -58,6 +63,33 @@ const normalizeAmount = (value: unknown, decimals = 2): string | undefined => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Receipt upload config
+  const receiptsDir = path.join(process.cwd(), 'server/uploads/receipts');
+  if (!fs.existsSync(receiptsDir)) {
+    fs.mkdirSync(receiptsDir, { recursive: true });
+  }
+
+  const receiptStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, receiptsDir),
+    filename: (_req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+      const ext = path.extname(file.originalname);
+      cb(null, `receipt-${uniqueSuffix}${ext}`);
+    },
+  });
+
+  const receiptUpload = multer({
+    storage: receiptStorage,
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+      cb(null, allowed.includes(file.mimetype));
+    },
+  });
+
+  // Serve uploaded receipts
+  app.use('/api/uploads/receipts', express.static(receiptsDir));
+
   // Account routes
   app.get('/api/accounts', async (req, res) => {
     try {
@@ -552,6 +584,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? (error as any).message
             : String(error),
       });
+    }
+  });
+
+  // Upload receipt for a transaction
+  app.post('/api/transactions/:id/receipt', receiptUpload.single('receipt'), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!req.file) {
+        return res.status(400).json({ message: 'Nenhum arquivo enviado' });
+      }
+      const receiptPath = req.file.filename;
+      await prisma.transaction.update({
+        where: { id },
+        data: { receiptPath },
+      });
+      res.json({ receiptPath });
+    } catch (error) {
+      console.error('[POST /api/transactions/:id/receipt]', error);
+      res.status(500).json({ message: 'Erro ao salvar comprovante' });
+    }
+  });
+
+  // Delete receipt from a transaction
+  app.delete('/api/transactions/:id/receipt', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const transaction = await prisma.transaction.findUnique({ where: { id } });
+      if (!transaction?.receiptPath) {
+        return res.status(404).json({ message: 'Comprovante não encontrado' });
+      }
+      // Remove file from disk
+      const filePath = path.join(receiptsDir, transaction.receiptPath);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+      await prisma.transaction.update({
+        where: { id },
+        data: { receiptPath: null },
+      });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[DELETE /api/transactions/:id/receipt]', error);
+      res.status(500).json({ message: 'Erro ao remover comprovante' });
     }
   });
 

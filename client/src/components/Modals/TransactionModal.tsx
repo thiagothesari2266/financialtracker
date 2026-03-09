@@ -42,7 +42,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Switch } from '@/components/ui/switch';
-import { CheckCircle2, Clock } from 'lucide-react';
+import { CheckCircle2, Clock, Upload, FileImage, X, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Adiciona ao schema
@@ -210,6 +210,68 @@ export default function TransactionModal({
   const updateTransactionMutation = useUpdateTransaction(currentAccount?.id || 0);
   const _updateCreditCardTransactionMutation = useUpdateCreditCardTransaction();
   const createTransactionMutation = useCreateTransaction(currentAccount?.id || 0);
+
+  // Receipt upload state
+  const [receiptPath, setReceiptPath] = useState<string | null>(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const receiptInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Sync receipt state when transaction changes
+  React.useEffect(() => {
+    if (transaction?.receiptPath) {
+      setReceiptPath(transaction.receiptPath);
+    } else {
+      setReceiptPath(null);
+    }
+  }, [transaction]);
+
+  const handleReceiptUpload = async (file: File) => {
+    if (!transaction?.id) return;
+    setUploadingReceipt(true);
+    try {
+      const formData = new FormData();
+      formData.append('receipt', file);
+      const response = await fetch(`/api/transactions/${transaction.id}/receipt`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Erro ao enviar');
+      const data = await response.json();
+      setReceiptPath(data.receiptPath);
+      toast({ title: 'Comprovante enviado' });
+      queryClient.invalidateQueries({
+        queryKey: ['/api/accounts', currentAccount?.id, 'transactions'],
+        exact: false,
+      });
+    } catch {
+      toast({ title: 'Erro ao enviar comprovante', variant: 'destructive' });
+    } finally {
+      setUploadingReceipt(false);
+    }
+  };
+
+  const handleReceiptDelete = async () => {
+    if (!transaction?.id) return;
+    setUploadingReceipt(true);
+    try {
+      const response = await fetch(`/api/transactions/${transaction.id}/receipt`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Erro ao remover');
+      setReceiptPath(null);
+      toast({ title: 'Comprovante removido' });
+      queryClient.invalidateQueries({
+        queryKey: ['/api/accounts', currentAccount?.id, 'transactions'],
+        exact: false,
+      });
+    } catch {
+      toast({ title: 'Erro ao remover comprovante', variant: 'destructive' });
+    } finally {
+      setUploadingReceipt(false);
+    }
+  };
 
   // Modal para escolher escopo de edição de parcelas
   function EditInstallmentScopeModal({
@@ -1351,6 +1413,54 @@ export default function TransactionModal({
                   />
                 </div>
               )}{' '}
+              {/* Comprovante - apenas na edição */}
+              {transaction && transaction.id && (
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    ref={receiptInputRef}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleReceiptUpload(file);
+                      e.target.value = '';
+                    }}
+                  />
+                  {receiptPath ? (
+                    <>
+                      <a
+                        href={`/api/uploads/receipts/${receiptPath}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <FileImage className="w-3.5 h-3.5" />
+                        <span className="truncate max-w-[180px]">Comprovante anexado</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                        onClick={handleReceiptDelete}
+                        disabled={uploadingReceipt}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => receiptInputRef.current?.click()}
+                      disabled={uploadingReceipt}
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      {uploadingReceipt ? 'Enviando...' : 'Anexar comprovante'}
+                    </button>
+                  )}
+                </div>
+              )}
               <div className="flex justify-end gap-2 pt-2">
                 {transaction && transaction.id && (
                   <Button

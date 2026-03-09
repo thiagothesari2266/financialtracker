@@ -150,6 +150,7 @@ model Transaction {
   isInvoiceTransaction Boolean   @default(false) @map("is_invoice_transaction")
   createdAt            DateTime  @default(now()) @map("created_at")
   paid                 Boolean   @default(false)
+  receiptPath          String?   @map("receipt_path")
   isException          Boolean   @default(false) @map("is_exception")
   exceptionForDate     DateTime? @db.Date @map("exception_for_date")
 
