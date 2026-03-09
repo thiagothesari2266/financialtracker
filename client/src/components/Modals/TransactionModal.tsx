@@ -158,6 +158,7 @@ export default function TransactionModal({
             : todayBR(),
         categoryId: transaction.categoryId ? String(transaction.categoryId) : '',
         bankAccountId: transaction.bankAccountId ? String(transaction.bankAccountId) : '',
+        creditCardId: transaction.creditCardId ? String(transaction.creditCardId) : '',
         clientName: transaction.clientName || '',
         projectName: transaction.projectName || '',
         costCenter: transaction.costCenter || '',
