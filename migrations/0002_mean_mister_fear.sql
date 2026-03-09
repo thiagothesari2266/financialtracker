@@ -1,1 +1,0 @@
-ALTER TABLE "transactions" ADD COLUMN "installments_group_id" text;
