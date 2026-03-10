@@ -649,6 +649,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (installmentsGroupId === null || installmentsGroupId === '') {
         delete (raw as any).installmentsGroupId;
       }
+      // Converte campos numéricos que podem vir como string do frontend
+      if (raw.creditCardId !== undefined && raw.creditCardId !== null) {
+        raw.creditCardId = Number(raw.creditCardId) || null;
+      }
+      if (raw.categoryId !== undefined && raw.categoryId !== null) {
+        raw.categoryId = Number(raw.categoryId);
+      }
+      if (raw.bankAccountId !== undefined && raw.bankAccountId !== null) {
+        raw.bankAccountId = Number(raw.bankAccountId) || null;
+      }
       const validatedData = insertTransactionSchema.partial().parse(raw);
       let transaction;
       if (editScope) {
