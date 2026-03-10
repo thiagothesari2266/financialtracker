@@ -473,6 +473,7 @@ export default function TransactionModal({
       amount: data.amount,
       bankAccountId: data.bankAccountId ? Number(data.bankAccountId) : undefined,
       installments: data.installments ? Number(data.installments) : undefined,
+      creditCardId: data.creditCardId ? Number(data.creditCardId) : null,
       // Inclui status de pago apenas se for edição
       ...(transaction && { paid: localPaid }),
     };
