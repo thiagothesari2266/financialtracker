@@ -73,7 +73,7 @@ export default function Dashboard() {
   return (
     <>
       <AppShell>
-        <div className="space-y-6">
+        <div className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-xl font-semibold">Dashboard</h1>
             <div className="flex items-center gap-2">
@@ -108,14 +108,14 @@ export default function Dashboard() {
 
           <MetricsCards currentMonth={currentMonth} />
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
             <div className="xl:col-span-2">
               <ExpenseChart currentMonth={currentMonth} />
             </div>
             <TopCategories currentMonth={currentMonth} />
           </div>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <RecentTransactions currentMonth={currentMonth} />
             <CreditCards />
           </div>

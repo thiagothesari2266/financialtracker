@@ -25,14 +25,12 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
     enabled: !!currentAccount,
   });
 
-  // Busca todas as transações desde o início até o fim do mês para calcular saldo acumulado
   const { data: allTransactionsUntilMonth = [] } = useTransactions(currentAccount?.id || 0, {
     startDate: '1900-01-01',
     endDate: monthEnd,
     enabled: !!currentAccount,
   });
 
-  // Saldo atual: soma de todas as transações PAGAS até o fim do mês
   const currentBalance = useMemo(
     () =>
       allTransactionsUntilMonth
@@ -67,13 +65,10 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
     return (
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 sm:gap-4">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-card border border-border rounded-[10px] p-4">
-            <div className="flex items-center gap-3">
-              <Skeleton className="w-9 h-9 rounded-full" />
-              <div className="space-y-2 flex-1">
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-7 w-28" />
-              </div>
+          <div key={i} className="card-surface p-5">
+            <div className="space-y-3">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-8 w-28" />
             </div>
           </div>
         ))}
@@ -86,7 +81,6 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
       title: 'Saldo Atual',
       value: formatCurrency(currentBalance),
       icon: Wallet,
-      iconBg: 'bg-primary/15',
       iconColor: 'text-primary',
       isNegative: currentBalance < 0,
       isBalance: true,
@@ -96,8 +90,7 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
       title: 'Receitas',
       value: formatCurrency(monthlyIncome),
       icon: TrendingUp,
-      iconBg: '',
-      iconColor: '',
+      iconColor: 'text-success',
       isNegative: false,
       isBalance: false,
       type: 'income' as const,
@@ -106,7 +99,6 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
       title: 'Despesas',
       value: formatCurrency(monthlyExpenses),
       icon: TrendingDown,
-      iconBg: 'bg-destructive/15',
       iconColor: 'text-destructive',
       isNegative: false,
       isBalance: false,
@@ -116,8 +108,7 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
       title: 'Resultado do Mês',
       value: formatCurrency(monthlyNet),
       icon: BarChart3,
-      iconBg: 'bg-primary/15',
-      iconColor: 'text-primary',
+      iconColor: monthlyNet < 0 ? 'text-destructive' : 'text-primary',
       isNegative: monthlyNet < 0,
       isBalance: false,
       type: 'net' as const,
@@ -141,31 +132,20 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
         return (
           <div
             key={index}
-            className={`bg-card border border-border rounded-[10px] p-4${
-              metric.isBalance ? ' border-l-[3px] border-l-primary' : ''
+            className={`card-surface p-5${
+              metric.isBalance ? ' bg-primary/5 dark:bg-primary/[0.03] ring-1 ring-primary/20' : ''
             }`}
           >
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center ${metric.iconBg} ${metric.iconColor}`}
-                style={
-                  metric.type === 'income'
-                    ? { backgroundColor: 'hsl(var(--success) / 0.15)', color: 'hsl(var(--success))' }
-                    : undefined
-                }
-              >
-                <Icon className="w-4 h-4" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm text-muted-foreground font-medium truncate">{metric.title}</p>
-                <p
-                  className={`text-lg sm:text-2xl font-bold tabular-nums ${getValueColor(metric)}`}
-                  style={{ fontVariantNumeric: 'tabular-nums' }}
-                >
-                  {metric.value}
-                </p>
-              </div>
+            <div className="flex items-start justify-between mb-3">
+              <p className="text-xs text-muted-foreground font-medium">{metric.title}</p>
+              <Icon className={`w-4 h-4 ${metric.iconColor} opacity-70`} />
             </div>
+            <p
+              className={`text-2xl sm:text-3xl font-bold tabular-nums leading-none ${getValueColor(metric)}`}
+              style={{ fontVariantNumeric: 'tabular-nums' }}
+            >
+              {metric.value}
+            </p>
           </div>
         );
       })}

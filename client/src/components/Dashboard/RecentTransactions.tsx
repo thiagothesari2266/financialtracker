@@ -21,7 +21,6 @@ export default function RecentTransactions({ currentMonth }: RecentTransactionsP
     { startDate: monthStart, endDate: monthEnd, enabled: !!currentAccount }
   );
 
-  // Pegar apenas as 5 mais recentes (já vem ordenado por data desc)
   const transactions = allTransactions.slice(0, 5);
 
   const formatDate = (date: string) => {
@@ -29,7 +28,6 @@ export default function RecentTransactions({ currentMonth }: RecentTransactionsP
     const today = new Date();
     const transactionDate = new Date(date);
 
-    // Verifica se a data é válida
     if (isNaN(transactionDate.getTime())) {
       return 'Data inválida';
     }
@@ -57,20 +55,16 @@ export default function RecentTransactions({ currentMonth }: RecentTransactionsP
     return <ArrowDown className="w-4 h-4" style={{ color: categoryColors.expense }} />;
   };
 
-  const getTransactionIconBg = (type: string) => {
-    return type === 'income' ? 'bg-muted' : 'bg-muted';
-  };
-
   if (isLoading) {
     return (
-      <div className="bg-card border border-border rounded-[10px]">
-        <div className="p-4 border-b border-border/50">
+      <div className="card-surface">
+        <div className="p-5 pb-3">
           <div className="flex items-center justify-between">
             <Skeleton className="h-5 w-40" />
             <Skeleton className="h-4 w-16" />
           </div>
         </div>
-        <div className="p-4">
+        <div className="px-5 pb-5">
           <div className="space-y-0">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="flex items-center justify-between py-3">
@@ -94,8 +88,8 @@ export default function RecentTransactions({ currentMonth }: RecentTransactionsP
   }
 
   return (
-    <div className="bg-card border border-border rounded-[10px]">
-      <div className="p-4 border-b border-border/50">
+    <div className="card-surface">
+      <div className="p-5 pb-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">Transações Recentes</h3>
           <a href="/transactions" className="text-primary text-sm hover:underline">
@@ -103,19 +97,24 @@ export default function RecentTransactions({ currentMonth }: RecentTransactionsP
           </a>
         </div>
       </div>
-      <div className="p-4">
+      <div className="px-5 pb-5">
         {transactions.length > 0 ? (
           <div>
             {transactions.map((transaction, idx) => (
               <div
                 key={transaction.id}
-                className={`flex items-center justify-between py-3 hover:bg-muted/30 rounded-lg transition-colors px-1 ${
-                  idx < transactions.length - 1 ? 'border-b border-border/50' : ''
+                className={`flex items-center justify-between py-3 hover:bg-muted/30 -mx-2 px-2 rounded-lg transition-colors duration-150 ${
+                  idx < transactions.length - 1 ? 'border-b border-border/30' : ''
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-9 h-9 ${getTransactionIconBg(transaction.type)} rounded-full flex items-center justify-center`}
+                    className="w-9 h-9 rounded-lg flex items-center justify-center"
+                    style={{
+                      backgroundColor: transaction.type === 'income'
+                        ? 'hsl(var(--success) / 0.08)'
+                        : 'hsl(var(--destructive) / 0.08)',
+                    }}
                   >
                     {getTransactionIcon(transaction.category, transaction.type)}
                   </div>

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount } from '@/contexts/AccountContext';
-import { Button } from '@/components/ui/button';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, Label } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { formatCurrency } from '@/lib/utils';
 import { PieChart as PieChartIcon } from 'lucide-react';
 
@@ -43,34 +43,20 @@ export default function ExpenseChart({ currentMonth }: ExpenseChartProps) {
       name: stat.categoryName || 'Sem nome',
       value: safeParseFloat(stat.total),
       color: stat.color || '#64748b',
+      fill: stat.color || '#64748b',
     }));
 
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-card border border-border rounded-lg p-2 text-sm">
-          <p className="font-medium">{payload[0].name}</p>
-          <p className="text-primary">{formatCurrency(payload[0].value)}</p>
-        </div>
-      );
-    }
-    return null;
-  };
+  const totalExpenses = chartData.reduce((acc, item) => acc + item.value, 0);
+
+  const chartConfig: ChartConfig = chartData.reduce((acc, item) => {
+    acc[item.name] = { label: item.name, color: item.color };
+    return acc;
+  }, {} as ChartConfig);
 
   if (isLoading) {
     return (
-      <div className="bg-card border border-border rounded-[10px] p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold">Distribuição por Categoria</h3>
-          <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm" className="text-sm text-muted-foreground">
-              Despesas
-            </Button>
-            <Button variant="ghost" size="sm" className="text-sm text-muted-foreground">
-              Receitas
-            </Button>
-          </div>
-        </div>
+      <div className="card-surface p-5">
+        <h3 className="font-semibold mb-4">Distribuição por Categoria</h3>
         <div className="h-64 bg-muted/30 rounded-lg flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
@@ -79,58 +65,72 @@ export default function ExpenseChart({ currentMonth }: ExpenseChartProps) {
   }
 
   return (
-    <div className="bg-card border border-border rounded-[10px] p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold">Distribuição por Categoria</h3>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-sm text-muted-foreground hover:text-foreground px-3 py-1 rounded-lg"
-          >
-            Despesas
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-sm text-muted-foreground hover:text-foreground px-3 py-1 rounded-lg"
-          >
-            Receitas
-          </Button>
-        </div>
-      </div>
+    <div className="card-surface p-5">
+      <h3 className="font-semibold mb-4">Distribuição por Categoria</h3>
       {chartData.length > 0 ? (
         <>
           <div className={isMobile ? 'h-48' : 'h-64'}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ChartContainer config={chartConfig} className="w-full h-full">
               <PieChart>
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value) => formatCurrency(value as number)}
+                      hideLabel={false}
+                    />
+                  }
+                />
                 <Pie
                   data={chartData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={isMobile ? 40 : 60}
-                  outerRadius={isMobile ? 70 : 100}
+                  innerRadius={isMobile ? 45 : 65}
+                  outerRadius={isMobile ? 72 : 100}
                   dataKey="value"
+                  nameKey="name"
+                  strokeWidth={2}
+                  stroke="hsl(var(--card))"
                 >
                   {chartData.map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
+                  <Label
+                    content={({ viewBox }) => {
+                      if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
+                        return (
+                          <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
+                            <tspan
+                              x={viewBox.cx}
+                              y={(viewBox.cy || 0) - 6}
+                              className="fill-muted-foreground text-[10px]"
+                            >
+                              Total
+                            </tspan>
+                            <tspan
+                              x={viewBox.cx}
+                              y={(viewBox.cy || 0) + 10}
+                              className="fill-foreground text-sm font-bold"
+                            >
+                              {formatCurrency(totalExpenses)}
+                            </tspan>
+                          </text>
+                        );
+                      }
+                    }}
+                  />
                 </Pie>
-                <Tooltip content={<CustomTooltip />} />
-                {!isMobile && <Legend />}
               </PieChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </div>
-          {isMobile && (
-            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-              {chartData.map((entry: any, index: number) => (
-                <div key={index} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
-                  {entry.name}
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3">
+            {chartData.map((entry: any, index: number) => (
+              <div key={index} className="flex items-center gap-1.5 text-xs">
+                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                <span className="text-muted-foreground">{entry.name}</span>
+                <span className="text-foreground font-medium tabular-nums">{formatCurrency(entry.value)}</span>
+              </div>
+            ))}
+          </div>
         </>
       ) : (
         <div className="h-48 sm:h-64 bg-muted/30 rounded-lg flex items-center justify-center">
