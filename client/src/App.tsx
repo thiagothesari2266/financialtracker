@@ -46,7 +46,9 @@ function AuthenticatedRoutes() {
   return (
     <>
       <Switch>
-        <Route path="/" component={AccountSelector} />
+        <Route path="/">
+          <Redirect to="/dashboard" />
+        </Route>
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/transactions" component={Transactions} />
         <Route path="/categories" component={Categories} />
