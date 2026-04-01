@@ -177,10 +177,21 @@ async function getTransactionsByDateRange(accountId, startDate, endDate) {
             }
         }
     }
-    // 6. Exceptions whose real date falls in period
+    // 6. Exceptions whose real date falls in period,
+    //    excluding those superseded by a newer exception
+    //    (e.g., exception A moved Jan→Mar, then exception B moved Mar→Apr:
+    //     A's date=Mar is superseded by B's exception_for_date=Mar)
     const exceptionsInPeriod = allExceptions.rows.filter((e) => {
         const eDate = new Date(e.date);
-        return eDate >= start && eDate <= end;
+        if (eDate < start || eDate > end)
+            return false;
+        if (e.recurrence_group_id) {
+            const eDateStr = ensureDateString(e.date);
+            const supersededKey = `${e.recurrence_group_id}-${eDateStr}`;
+            if (exceptionKeys.has(supersededKey))
+                return false;
+        }
+        return true;
     });
     // 7. Merge + sort
     const all = [
