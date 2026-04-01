@@ -946,6 +946,41 @@ server.tool(
 
     const isRecurrent = current.launch_type === "recorrente";
 
+    // === CASO 0: row já é exceção → UPDATE direto (nunca criar exceção de exceção) ===
+    if (current.is_exception) {
+      const sets: string[] = [];
+      const params: any[] = [];
+      let pi = 1;
+      if (descricao !== undefined) { sets.push(`description = $${pi++}`); params.push(descricao); }
+      if (valor !== undefined) { sets.push(`amount = $${pi++}`); params.push(valor); }
+      if (tipo !== undefined) { sets.push(`type = $${pi++}`); params.push(tipo); }
+      if (data !== undefined) { sets.push(`date = $${pi++}::date`); params.push(data); }
+      if (categoriaId !== undefined) { sets.push(`category_id = $${pi++}`); params.push(categoriaId); }
+      if (pago !== undefined) { sets.push(`paid = $${pi++}`); params.push(pago); }
+      if (bankAccountId !== undefined) { sets.push(`bank_account_id = $${pi++}`); params.push(bankAccountId); }
+      if (creditCardId !== undefined) { sets.push(`credit_card_id = $${pi++}`); params.push(creditCardId); }
+
+      if (sets.length === 0) {
+        return { content: [{ type: "text" as const, text: "Nenhum campo fornecido para atualizar." }] };
+      }
+
+      params.push(id);
+      const res = await pool.query(
+        `UPDATE transactions SET ${sets.join(", ")}
+         WHERE id = $${pi}
+         RETURNING id, description, amount, type, date, paid`,
+        params
+      );
+      const row = res.rows[0];
+      let output = `## Exceção Atualizada (update direto)\n\n`;
+      output += `- **ID:** ${row.id}\n`;
+      output += `- **Descrição:** ${row.description}\n`;
+      output += `- **Valor:** ${formatBRL(row.amount)}\n`;
+      output += `- **Data:** ${ensureDateString(row.date)}\n`;
+      output += `- **Pago:** ${row.paid ? "Sim" : "Não"}\n`;
+      return { content: [{ type: "text" as const, text: output }] };
+    }
+
     // === CASO 1: single em recorrente → criar/atualizar exceção ===
     if (escopo === "single" && isRecurrent) {
       // Garantir recurrence_group_id
