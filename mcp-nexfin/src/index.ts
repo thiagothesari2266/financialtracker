@@ -85,6 +85,23 @@ function monthLastDay(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
+function calculateInvoiceMonth(date: Date, closingDay: number): string {
+  const day = date.getUTCDate();
+  let month = date.getUTCMonth() + 1;
+  let year = date.getUTCFullYear();
+  if (closingDay >= 25) {
+    if (day <= closingDay) month += 1;
+    else month += 2;
+  } else {
+    if (day > closingDay) month += 1;
+  }
+  if (month > 12) {
+    month -= 12;
+    year += 1;
+  }
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
 // === Transaction type ===
 interface MappedTx {
   id: number;
@@ -1340,6 +1357,172 @@ server.tool(
         },
       ],
     };
+  }
+);
+
+// ==========================================
+// CARTÃO DE CRÉDITO - Transações
+// ==========================================
+
+// === Tool: nexfin_criar_transacao_cartao ===
+server.tool(
+  "nexfin_criar_transacao_cartao",
+  "Cria transação de cartão de crédito (única, parcelada ou recorrente mensal)",
+  {
+    descricao: z.string().describe("Descrição da compra"),
+    valor: z.number().positive().describe("Valor da compra"),
+    data: z.string().describe("Data da compra YYYY-MM-DD"),
+    categoriaId: z.number().describe("ID da categoria (use nexfin_categorias)"),
+    creditCardId: z.number().describe("ID do cartão de crédito"),
+    accountId: z.number().describe("ID da conta financeira"),
+    invoiceMonth: z
+      .string()
+      .optional()
+      .describe("Mês da fatura YYYY-MM (calculado automaticamente se omitido)"),
+    launchType: z
+      .enum(["unica", "recorrente", "parcelada"])
+      .default("unica")
+      .describe("Tipo: unica (avulsa), recorrente (assinatura mensal), parcelada"),
+    installments: z
+      .number()
+      .min(1)
+      .default(1)
+      .describe("Número de parcelas (só para parcelada, padrão: 1)"),
+  },
+  async ({ descricao, valor, data, categoriaId, creditCardId, accountId, invoiceMonth, launchType, installments }) => {
+    // Buscar closingDay do cartão
+    const cardRes = await pool.query(
+      `SELECT closing_day FROM credit_cards WHERE id = $1`,
+      [creditCardId]
+    );
+    if (cardRes.rows.length === 0) {
+      return { content: [{ type: "text" as const, text: `Cartão ID ${creditCardId} não encontrado.` }] };
+    }
+    const closingDay = cardRes.rows[0].closing_day;
+    const baseDate = parseDateInput(data);
+
+    // === Parcelada: criar N registros ===
+    if (launchType === "parcelada" && installments > 1) {
+      const ids: number[] = [];
+      for (let i = 1; i <= installments; i++) {
+        const installDate = addMonthsPreserveDay(baseDate, i - 1);
+        const invMonth = calculateInvoiceMonth(installDate, closingDay);
+        const res = await pool.query(
+          `INSERT INTO credit_card_transactions
+            (description, amount, date, installments, current_installment,
+             category_id, credit_card_id, account_id, invoice_month,
+             launch_type, recurrence_frequency)
+           VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9, 'parcelada', null)
+           RETURNING id`,
+          [
+            descricao, valor, ensureDateString(installDate),
+            installments, i, categoriaId, creditCardId, accountId, invMonth,
+          ]
+        );
+        ids.push(res.rows[0].id);
+      }
+
+      let output = `## Transação Parcelada Criada (${installments}x)\n\n`;
+      output += `- **Descrição:** ${descricao}\n`;
+      output += `- **Valor parcela:** ${formatBRL(valor)}\n`;
+      output += `- **Total:** ${formatBRL(valor * installments)}\n`;
+      output += `- **Cartão ID:** ${creditCardId}\n`;
+      output += `- **IDs criados:** ${ids.join(", ")}\n`;
+      return { content: [{ type: "text" as const, text: output }] };
+    }
+
+    // === Recorrente: criar definição com recurrence_frequency = mensal ===
+    const invMonth = invoiceMonth || calculateInvoiceMonth(baseDate, closingDay);
+    const recFreq = launchType === "recorrente" ? "mensal" : null;
+
+    const res = await pool.query(
+      `INSERT INTO credit_card_transactions
+        (description, amount, date, installments, current_installment,
+         category_id, credit_card_id, account_id, invoice_month,
+         launch_type, recurrence_frequency)
+       VALUES ($1, $2, $3::date, 1, 1, $4, $5, $6, $7, $8, $9)
+       RETURNING id, description, amount, date, invoice_month`,
+      [
+        descricao, valor, data, categoriaId, creditCardId, accountId,
+        invMonth, launchType, recFreq,
+      ]
+    );
+
+    const row = res.rows[0];
+    const tipoLabel = launchType === "recorrente" ? "Recorrente (mensal)" : "Única";
+    let output = `## Transação de Cartão Criada\n\n`;
+    output += `- **ID:** ${row.id}\n`;
+    output += `- **Descrição:** ${row.description}\n`;
+    output += `- **Valor:** ${formatBRL(row.amount)}\n`;
+    output += `- **Data:** ${ensureDateString(row.date)}\n`;
+    output += `- **Fatura:** ${row.invoice_month}\n`;
+    output += `- **Tipo:** ${tipoLabel}\n`;
+    return { content: [{ type: "text" as const, text: output }] };
+  }
+);
+
+// === Tool: nexfin_transacoes_cartao ===
+server.tool(
+  "nexfin_transacoes_cartao",
+  "Lista transações de cartão de crédito por fatura (mês) e/ou cartão",
+  {
+    accountId: z.number().describe("ID da conta"),
+    creditCardId: z.number().optional().describe("ID do cartão (opcional, todos se omitido)"),
+    invoiceMonth: z
+      .string()
+      .optional()
+      .describe("Mês da fatura YYYY-MM (opcional, mês atual se omitido)"),
+  },
+  async ({ accountId, creditCardId, invoiceMonth }) => {
+    const targetMonth = invoiceMonth || currentMonthBR();
+
+    let where = `cct.account_id = $1 AND cct.invoice_month = $2`;
+    const params: any[] = [accountId, targetMonth];
+
+    if (creditCardId !== undefined) {
+      where += ` AND cct.credit_card_id = $3`;
+      params.push(creditCardId);
+    }
+
+    const res = await pool.query(
+      `SELECT cct.id, cct.description, cct.amount, cct.date, cct.invoice_month,
+              cct.credit_card_id, cct.installments, cct.current_installment,
+              cct.launch_type, cct.recurrence_frequency,
+              cc.name as card_name,
+              c.name as category_name, c.type as category_type
+       FROM credit_card_transactions cct
+       LEFT JOIN categories c ON cct.category_id = c.id
+       LEFT JOIN credit_cards cc ON cct.credit_card_id = cc.id
+       WHERE ${where}
+       ORDER BY cct.date ASC`,
+      params
+    );
+
+    if (res.rows.length === 0) {
+      return {
+        content: [{ type: "text" as const, text: `Nenhuma transação de cartão para fatura ${targetMonth}.` }],
+      };
+    }
+
+    let total = 0;
+    let output = `## Transações de Cartão - Fatura ${targetMonth}\n\n`;
+    output += `| Data | Descrição | Valor | Cartão | Categoria |\n`;
+    output += `|------|-----------|-------|--------|----------|\n`;
+
+    for (const row of res.rows) {
+      const amt = parseFloat(String(row.amount));
+      const isIncome = row.category_type === "income";
+      total += isIncome ? -amt : amt;
+      const installment =
+        row.installments > 1 ? ` (${row.current_installment}/${row.installments})` : "";
+      const rec = row.launch_type === "recorrente" ? " [rec]" : "";
+      const cat = row.category_name ?? "Sem categoria";
+      output += `| ${ensureDateString(row.date)} | ${row.description}${installment}${rec} | ${formatBRL(amt)} | ${row.card_name} | ${cat} |\n`;
+    }
+
+    output += `\n**Total fatura:** ${formatBRL(total)} (${res.rows.length} transações)\n`;
+
+    return { content: [{ type: "text" as const, text: output }] };
   }
 );
 
