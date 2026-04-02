@@ -347,8 +347,12 @@ server.tool("nexfin_saldos", "Saldo atual de cada conta bancária (saldo inicial
     // Contas bancárias (próprias + compartilhadas) com saldo calculado
     const bankAccounts = await pool.query(`SELECT ba.id, ba.name, ba.initial_balance, ba.pix, ba.shared, ba.account_id,
               ba.initial_balance + COALESCE(SUM(
-                CASE WHEN t.type = 'income' AND t.paid = true AND t.date <= CURRENT_DATE AND t.account_id = $1 THEN t.amount
-                     WHEN t.type = 'expense' AND t.paid = true AND t.date <= CURRENT_DATE AND t.account_id = $1 THEN -t.amount
+                CASE WHEN t.type = 'income' AND t.paid = true AND t.date <= CURRENT_DATE AND t.account_id = $1
+                          AND NOT (COALESCE(t.launch_type, '') = 'recorrente' AND COALESCE(t.recurrence_frequency, '') = 'mensal' AND t.is_exception = false)
+                     THEN t.amount
+                     WHEN t.type = 'expense' AND t.paid = true AND t.date <= CURRENT_DATE AND t.account_id = $1
+                          AND NOT (COALESCE(t.launch_type, '') = 'recorrente' AND COALESCE(t.recurrence_frequency, '') = 'mensal' AND t.is_exception = false)
+                     THEN -t.amount
                      ELSE 0 END
               ), 0) AS current_balance
        FROM bank_accounts ba
