@@ -898,26 +898,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.session.userId!;
       const bankAccounts = await storage.getBankAccounts(accountId, userId);
 
-      // Calcular saldo atual de cada conta bancária
-      const bankAccountIds = bankAccounts.map(ba => ba.id);
-      const balances = await prisma.$queryRaw<Array<{ bank_account_id: number; income: string; expense: string }>>`
-        SELECT
-          bank_account_id,
-          COALESCE(SUM(CASE WHEN type = 'income' AND paid = true THEN amount ELSE 0 END), 0) AS income,
-          COALESCE(SUM(CASE WHEN type = 'expense' AND paid = true THEN amount ELSE 0 END), 0) AS expense
-        FROM transactions
-        WHERE bank_account_id = ANY(${bankAccountIds})
-        GROUP BY bank_account_id
-      `;
+      // Calcular saldo atual usando rollforward (inclui recorrências virtuais)
+      const today = new Date().toISOString().split('T')[0];
+      const allTxs = await storage.getTransactionsByDateRange(accountId, '1900-01-01', today);
+      const paidTxs = allTxs.filter(t => t.paid);
 
-      const balanceMap = new Map(balances.map(b => [
-        b.bank_account_id,
-        { income: parseFloat(String(b.income)), expense: parseFloat(String(b.expense)) }
-      ]));
+      const balanceMap = new Map<number, number>();
+      for (const tx of paidTxs) {
+        if (!tx.bankAccountId) continue;
+        const current = balanceMap.get(tx.bankAccountId) || 0;
+        const amount = parseFloat(tx.amount);
+        balanceMap.set(tx.bankAccountId, current + (tx.type === 'income' ? amount : -amount));
+      }
 
       const enriched = bankAccounts.map(ba => {
-        const txBalance = balanceMap.get(ba.id) || { income: 0, expense: 0 };
-        const currentBalance = parseFloat(ba.initialBalance || '0') + txBalance.income - txBalance.expense;
+        const txBalance = balanceMap.get(ba.id) || 0;
+        const currentBalance = parseFloat(ba.initialBalance || '0') + txBalance;
         return { ...ba, currentBalance: currentBalance.toFixed(2) };
       });
 
