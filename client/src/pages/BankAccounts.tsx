@@ -123,7 +123,7 @@ export default function BankAccounts() {
                   <CardContent>
                     <div className="mb-2 text-xs text-muted-foreground">Pix: {ba.pix}</div>
                     <div className="mb-2 text-xs text-muted-foreground">
-                      Saldo Inicial: R$ {parseFloat(ba.initialBalance || '0').toFixed(2)}
+                      Saldo Atual: R$ {parseFloat((ba as any).currentBalance || ba.initialBalance || '0').toFixed(2)}
                     </div>
                     {ba.accountId === currentAccount?.id && (
                       <div className="mt-4 flex gap-2">

@@ -897,7 +897,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const accountId = parseInt(req.params.accountId);
       const userId = req.session.userId!;
       const bankAccounts = await storage.getBankAccounts(accountId, userId);
-      res.json(bankAccounts);
+
+      // Calcular saldo atual de cada conta bancária
+      const bankAccountIds = bankAccounts.map(ba => ba.id);
+      const balances = await prisma.$queryRaw<Array<{ bank_account_id: number; income: string; expense: string }>>`
+        SELECT
+          bank_account_id,
+          COALESCE(SUM(CASE WHEN type = 'income' AND paid = true THEN amount ELSE 0 END), 0) AS income,
+          COALESCE(SUM(CASE WHEN type = 'expense' AND paid = true THEN amount ELSE 0 END), 0) AS expense
+        FROM transactions
+        WHERE bank_account_id = ANY(${bankAccountIds})
+        GROUP BY bank_account_id
+      `;
+
+      const balanceMap = new Map(balances.map(b => [
+        b.bank_account_id,
+        { income: parseFloat(String(b.income)), expense: parseFloat(String(b.expense)) }
+      ]));
+
+      const enriched = bankAccounts.map(ba => {
+        const txBalance = balanceMap.get(ba.id) || { income: 0, expense: 0 };
+        const currentBalance = parseFloat(ba.initialBalance || '0') + txBalance.income - txBalance.expense;
+        return { ...ba, currentBalance: currentBalance.toFixed(2) };
+      });
+
+      res.json(enriched);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch bank accounts' });
     }
