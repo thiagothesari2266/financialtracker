@@ -13,6 +13,7 @@ import BankAccountModal from '@/components/Modals/BankAccountModal';
 import { useToast } from '@/hooks/use-toast';
 import type { BankAccount, InsertBankAccount } from '@shared/schema';
 import { AppShell } from '@/components/Layout/AppShell';
+import { formatCurrency } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
 
 export default function BankAccounts() {
@@ -123,7 +124,7 @@ export default function BankAccounts() {
                   <CardContent>
                     <div className="mb-2 text-xs text-muted-foreground">Pix: {ba.pix}</div>
                     <div className="mb-2 text-xs text-muted-foreground">
-                      Saldo Atual: R$ {parseFloat((ba as any).currentBalance || ba.initialBalance || '0').toFixed(2)}
+                      Saldo Atual: {formatCurrency((ba as any).currentBalance || ba.initialBalance || '0')}
                     </div>
                     {ba.accountId === currentAccount?.id && (
                       <div className="mt-4 flex gap-2">
