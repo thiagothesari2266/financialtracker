@@ -4,15 +4,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar, CreditCard, Receipt, Eye } from 'lucide-react';
+import { Calendar, CreditCard, Receipt, Eye, Landmark } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, parse } from 'date-fns';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { useAccount } from '@/contexts/AccountContext';
 import { useCreditCards } from '@/hooks/useCreditCards';
+import { useBankAccounts } from '@/hooks/useBankAccounts';
 import type { TransactionWithCategory } from '@shared/schema';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils';
 
 interface InvoiceTransactionModalProps {
@@ -33,10 +35,12 @@ export default function InvoiceTransactionModal({
 
   // Buscar dados dos cartões de crédito para calcular data de vencimento
   const { data: creditCards = [] } = useCreditCards(currentAccount?.id || 0);
+  const { data: bankAccounts = [] } = useBankAccounts(currentAccount?.id || 0);
 
   // Estados locais
   const [paymentDate, setPaymentDate] = useState('');
   const [localPaid, setLocalPaid] = useState<boolean>(false);
+  const [bankAccountId, setBankAccountId] = useState<string>('');
 
   // Buscar transação atualizada do cache quando modal abre
   useEffect(() => {
@@ -59,6 +63,10 @@ export default function InvoiceTransactionModal({
 
       // Fallback: usar transaction prop se não encontrar no cache
       setLocalPaid(!!transaction.paid);
+    }
+
+    if (transaction) {
+      setBankAccountId(transaction.bankAccountId ? String(transaction.bankAccountId) : '');
     }
   }, [isOpen, transaction?.id, currentAccount?.id, queryClient]); // Dependências corretas
 
@@ -110,11 +118,11 @@ export default function InvoiceTransactionModal({
 
   // Mutação para atualizar data de pagamento
   const updateTransactionMutation = useMutation({
-    mutationFn: async (data: { id: number; date: string }) => {
+    mutationFn: async (data: { id: number; date: string; bankAccountId?: number }) => {
       const response = await fetch(`/api/transactions/${data.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: data.date }),
+        body: JSON.stringify({ date: data.date, bankAccountId: data.bankAccountId }),
       });
       if (!response.ok) throw new Error('Erro ao atualizar transação');
       return response.json();
@@ -140,11 +148,11 @@ export default function InvoiceTransactionModal({
 
   // Mutação para atualizar status de pago
   const updatePaidStatusMutation = useMutation({
-    mutationFn: async (data: { id: number; paid: boolean }) => {
+    mutationFn: async (data: { id: number; paid: boolean; bankAccountId?: number }) => {
       const response = await fetch(`/api/transactions/${data.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paid: data.paid }),
+        body: JSON.stringify({ paid: data.paid, bankAccountId: data.bankAccountId }),
       });
       if (!response.ok) throw new Error('Erro ao atualizar status de pagamento');
       return response.json();
@@ -209,6 +217,7 @@ export default function InvoiceTransactionModal({
     updatePaidStatusMutation.mutate({
       id: transaction.id,
       paid: newPaidStatus,
+      bankAccountId: bankAccountId ? Number(bankAccountId) : undefined,
     });
   };
 
@@ -218,6 +227,7 @@ export default function InvoiceTransactionModal({
     updateTransactionMutation.mutate({
       id: transaction.id,
       date: paymentDate,
+      bankAccountId: bankAccountId ? Number(bankAccountId) : undefined,
     });
   };
 
@@ -331,6 +341,27 @@ export default function InvoiceTransactionModal({
             {updatePaidStatusMutation.isPending && (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
             )}
+          </div>
+
+          {/* Conta Bancária */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Landmark className="h-4 w-4" />
+              Conta Bancária de Pagamento
+            </Label>
+            <Select value={bankAccountId} onValueChange={setBankAccountId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a conta" />
+              </SelectTrigger>
+              <SelectContent>
+                {bankAccounts.map((ba) => (
+                  <SelectItem key={ba.id} value={ba.id.toString()}>
+                    {ba.name}
+                    {ba.shared && ba.accountId !== currentAccount?.id && ' (compartilhada)'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Data de Pagamento */}
