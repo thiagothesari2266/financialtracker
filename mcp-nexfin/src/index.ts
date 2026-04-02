@@ -441,7 +441,7 @@ server.tool(
 // === Tool: nexfin_saldos ===
 server.tool(
   "nexfin_saldos",
-  "Saldo de cada conta bancária (campo initialBalance, mesmo valor que o frontend mostra). Use nexfin_atualizar_conta_bancaria para atualizar o saldo.",
+  "Saldo atual de cada conta bancária (saldo inicial + transações pagas até hoje)",
   {
     accountId: z.number().describe("ID da conta"),
   },
@@ -455,12 +455,19 @@ server.tool(
     );
     const accountIds = userAccounts.rows.map((r: any) => r.id);
 
-    // Contas bancárias (próprias + compartilhadas)
+    // Contas bancárias (próprias + compartilhadas) com saldo calculado
     const bankAccounts = await pool.query(
-      `SELECT id, name, initial_balance, pix, shared, account_id
-       FROM bank_accounts
-       WHERE account_id = $1 OR (shared = true AND account_id = ANY($2))
-       ORDER BY name ASC`,
+      `SELECT ba.id, ba.name, ba.initial_balance, ba.pix, ba.shared, ba.account_id,
+              ba.initial_balance + COALESCE(SUM(
+                CASE WHEN t.type = 'income' AND t.paid = true AND t.date <= CURRENT_DATE AND t.account_id = $1 THEN t.amount
+                     WHEN t.type = 'expense' AND t.paid = true AND t.date <= CURRENT_DATE AND t.account_id = $1 THEN -t.amount
+                     ELSE 0 END
+              ), 0) AS current_balance
+       FROM bank_accounts ba
+       LEFT JOIN transactions t ON t.bank_account_id = ba.id
+       WHERE ba.account_id = $1 OR (ba.shared = true AND ba.account_id = ANY($2))
+       GROUP BY ba.id
+       ORDER BY ba.name ASC`,
       [accountId, accountIds]
     );
 
@@ -476,7 +483,7 @@ server.tool(
     let totalGeral = 0;
 
     for (const ba of bankAccounts.rows) {
-      const saldo = parseFloat(decimalToString(ba.initial_balance));
+      const saldo = parseFloat(decimalToString(ba.current_balance));
       totalGeral += saldo;
       const shared = ba.shared ? " (compartilhada)" : "";
       const pix = ba.pix ? ` | PIX: ${ba.pix}` : "";
