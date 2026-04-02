@@ -441,7 +441,7 @@ server.tool(
 // === Tool: nexfin_saldos ===
 server.tool(
   "nexfin_saldos",
-  "Saldo atual de cada conta bancária (saldo inicial + movimentações pagas)",
+  "Saldo de cada conta bancária (campo initialBalance, mesmo valor que o frontend mostra). Use nexfin_atualizar_conta_bancaria para atualizar o saldo.",
   {
     accountId: z.number().describe("ID da conta"),
   },
@@ -472,33 +472,15 @@ server.tool(
       };
     }
 
-    // Movimentações por conta bancária
-    const baIds = bankAccounts.rows.map((r: any) => r.id);
-    const movements = await pool.query(
-      `SELECT bank_account_id,
-              SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END) as net
-       FROM transactions
-       WHERE bank_account_id = ANY($1) AND paid = true
-       GROUP BY bank_account_id`,
-      [baIds]
-    );
-    const movMap = new Map(
-      movements.rows.map((r: any) => [r.bank_account_id, parseFloat(r.net ?? "0")])
-    );
-
     let output = `## Saldos Bancários (Conta ID: ${accountId})\n\n`;
     let totalGeral = 0;
 
     for (const ba of bankAccounts.rows) {
-      const initial = parseFloat(decimalToString(ba.initial_balance));
-      const mov = movMap.get(ba.id) ?? 0;
-      const current = initial + mov;
-      totalGeral += current;
+      const saldo = parseFloat(decimalToString(ba.initial_balance));
+      totalGeral += saldo;
       const shared = ba.shared ? " (compartilhada)" : "";
-      output += `- **${ba.name}** (ID: ${ba.id})${shared}: ${formatBRL(current)}`;
-      if (mov !== 0)
-        output += ` (inicial: ${formatBRL(initial)}, mov: ${formatBRL(mov)})`;
-      output += "\n";
+      const pix = ba.pix ? ` | PIX: ${ba.pix}` : "";
+      output += `- **${ba.name}** (ID: ${ba.id})${shared}: ${formatBRL(saldo)}${pix}\n`;
     }
 
     output += `\n**Saldo total**: ${formatBRL(totalGeral)}\n`;
