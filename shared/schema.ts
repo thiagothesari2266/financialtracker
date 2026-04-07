@@ -96,6 +96,7 @@ export const insertTransactionSchema = z.object({
   paid: z.boolean().optional(),
   isException: z.boolean().optional().default(false),
   exceptionForDate: z.string().optional(), // Data original que está sendo sobrescrita
+  externalId: z.string().optional().nullable(),
 });
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 
@@ -136,6 +137,8 @@ export const insertBankAccountSchema = z.object({
   pix: z.string().optional().nullable(),
   shared: z.boolean().optional().default(false),
   accountId: z.number(),
+  asaasApiKey: z.string().optional().nullable(),
+  asaasWebhookToken: z.string().optional().nullable(),
 });
 export type InsertBankAccount = z.infer<typeof insertBankAccountSchema>;
 
@@ -276,6 +279,7 @@ export interface Transaction {
   paid: boolean;
   isException: boolean;
   exceptionForDate: string | null;
+  externalId: string | null;
 }
 
 export interface CreditCard {
@@ -318,6 +322,8 @@ export interface BankAccount {
   pix: string | null;
   shared: boolean;
   accountId: number;
+  asaasApiKey: string | null;
+  asaasWebhookToken: string | null;
   createdAt: string;
 }
 

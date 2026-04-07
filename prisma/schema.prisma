@@ -153,6 +153,7 @@ model Transaction {
   receiptPath          String?   @map("receipt_path")
   isException          Boolean   @default(false) @map("is_exception")
   exceptionForDate     DateTime? @db.Date @map("exception_for_date")
+  externalId           String?   @map("external_id")
 
   account        Account        @relation(fields: [accountId], references: [id])
   category       Category       @relation(fields: [categoryId], references: [id])
@@ -221,7 +222,9 @@ model BankAccount {
   pix            String    @default("")
   shared         Boolean   @default(false)
   accountId      Int       @map("account_id")
-  createdAt      DateTime  @default(now()) @map("created_at")
+  asaasApiKey       String?   @map("asaas_api_key")
+  asaasWebhookToken String?   @map("asaas_webhook_token")
+  createdAt         DateTime  @default(now()) @map("created_at")
 
   account      Account      @relation(fields: [accountId], references: [id])
   transactions Transaction[]

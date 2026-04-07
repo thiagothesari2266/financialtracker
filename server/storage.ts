@@ -219,6 +219,7 @@ const mapTransaction = (
   paid: transaction.paid ?? false,
   isException: transaction.isException ?? false,
   exceptionForDate: ensureDateString(transaction.exceptionForDate),
+  externalId: (transaction as any).externalId ?? null,
   category: category ? mapCategory(category) : null,
 });
 
@@ -286,6 +287,8 @@ const mapBankAccount = (bankAccount: PrismaBankAccount): BankAccount => ({
   pix: bankAccount.pix ?? null,
   shared: bankAccount.shared,
   accountId: bankAccount.accountId,
+  asaasApiKey: (bankAccount as any).asaasApiKey ?? null,
+  asaasWebhookToken: (bankAccount as any).asaasWebhookToken ?? null,
   createdAt: ensureDateTimeString(bankAccount.createdAt) ?? '',
 });
 
@@ -396,6 +399,8 @@ export interface IStorage {
     endDate: string
   ): Promise<TransactionWithCategory[]>;
   getTransaction(id: number): Promise<TransactionWithCategory | undefined>;
+  getBankAccountByWebhookToken(token: string): Promise<BankAccount | undefined>;
+  findTransactionByExternalId(externalId: string, accountId: number): Promise<TransactionWithCategory | undefined>;
   updateTransaction(
     id: number,
     transaction: Partial<InsertTransaction>
@@ -717,6 +722,7 @@ export class DatabaseStorage implements IStorage {
       creditCardId: insertTransaction.creditCardId ?? null,
       isInvoiceTransaction: insertTransaction.isInvoiceTransaction ?? false,
       paid: insertTransaction.paid ?? false,
+      externalId: insertTransaction.externalId ?? null,
     };
 
     if (
@@ -2130,6 +2136,19 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBankAccount(id: number): Promise<void> {
     await prisma.bankAccount.delete({ where: { id } });
+  }
+
+  async getBankAccountByWebhookToken(token: string): Promise<BankAccount | undefined> {
+    const ba = await prisma.bankAccount.findFirst({ where: { asaasWebhookToken: token } });
+    return ba ? mapBankAccount(ba) : undefined;
+  }
+
+  async findTransactionByExternalId(externalId: string, accountId: number): Promise<TransactionWithCategory | undefined> {
+    const tx = await prisma.transaction.findFirst({
+      where: { externalId, accountId },
+      include: { category: true },
+    });
+    return tx ? mapTransaction(tx, tx.category) : undefined;
   }
 
   // Debt methods
