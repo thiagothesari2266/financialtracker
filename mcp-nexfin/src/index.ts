@@ -12,20 +12,50 @@ const DATABASE_URL =
 const pool = new pg.Pool({ connectionString: DATABASE_URL, max: 5 });
 
 // === User cache (single-tenant) ===
-// MCP_USER_ID env permite forçar o user; senão pega o user mais antigo (id=1).
+// MCP_USER_ID env é a fonte de verdade. Sem ela:
+//   - Banco com 1 user → usa esse user (dev local OK)
+//   - Banco com N users → recusa iniciar e lista os IDs disponíveis
 // Tenant isolation: TODA query write deve validar que account.user_id = currentUserId.
 let cachedUserId: number | null = null;
 async function getUserId(): Promise<number> {
   if (cachedUserId !== null) return cachedUserId;
+
   const envUser = process.env.MCP_USER_ID;
   if (envUser) {
-    cachedUserId = parseInt(envUser, 10);
+    const id = parseInt(envUser, 10);
+    if (isNaN(id) || id <= 0) {
+      throw new Error(`MCP_USER_ID inválido: '${envUser}' (esperado: número inteiro positivo)`);
+    }
+    const check = await pool.query("SELECT id, email FROM users WHERE id = $1", [id]);
+    if (check.rows.length === 0) {
+      throw new Error(`MCP_USER_ID=${id} não existe na tabela users.`);
+    }
+    cachedUserId = id;
+    console.error(`mcp-nexfin: tenant resolvido via MCP_USER_ID = ${id} (${check.rows[0].email})`);
     return cachedUserId!;
   }
-  const res = await pool.query("SELECT id FROM users ORDER BY id LIMIT 1");
-  if (res.rows.length === 0) throw new Error("Nenhum usuário encontrado");
-  cachedUserId = res.rows[0].id as number;
-  return cachedUserId!
+
+  // Sem env: aceitar somente se houver exatamente 1 user (dev local)
+  const all = await pool.query("SELECT id, email FROM users ORDER BY id");
+  if (all.rows.length === 0) {
+    throw new Error("Nenhum usuário encontrado no banco. Configure MCP_USER_ID ou crie um user.");
+  }
+  if (all.rows.length > 1) {
+    const userList = all.rows.map((u: any) => `  - ID ${u.id}: ${u.email}`).join("\n");
+    throw new Error(
+      `MCP_USER_ID não setado e o banco contém ${all.rows.length} users (ambíguo).\n` +
+      `Configure a env var MCP_USER_ID com um destes IDs:\n${userList}\n\n` +
+      `Exemplo no .mcp.json:\n` +
+      `  "nexfin": {\n` +
+      `    "command": "node",\n` +
+      `    "args": ["...mcp-nexfin/build/index.js", "<DATABASE_URL>"],\n` +
+      `    "env": { "MCP_USER_ID": "1" }\n` +
+      `  }`
+    );
+  }
+  cachedUserId = all.rows[0].id as number;
+  console.error(`mcp-nexfin: tenant resolvido (single-user DB) = ${cachedUserId} (${all.rows[0].email})`);
+  return cachedUserId!;
 }
 
 // === Tenant-isolated transaction lookup ===
@@ -2239,6 +2269,15 @@ async function main() {
     console.error("mcp-nexfin: conectado ao banco de dados");
   } catch (err) {
     console.error("mcp-nexfin: falha ao conectar ao banco:", err);
+    process.exit(1);
+  }
+
+  // Resolver tenant no startup. Falha aqui = MCP recusa iniciar.
+  try {
+    await getUserId();
+  } catch (err) {
+    console.error("mcp-nexfin: falha ao resolver tenant:");
+    console.error(err instanceof Error ? err.message : err);
     process.exit(1);
   }
 
