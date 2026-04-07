@@ -1457,34 +1457,302 @@ export class DatabaseStorage implements IStorage {
 
   async updateCreditCardTransaction(
     id: number,
-    transaction: Partial<InsertCreditCardTransaction>
+    transaction: Partial<InsertCreditCardTransaction> & {
+      editScope?: 'single' | 'all' | 'future';
+      exceptionForDate?: string;
+      installmentsGroupId?: string;
+      recurrenceGroupId?: string;
+    }
   ): Promise<CreditCardTransaction | undefined> {
-    const updated = await prisma.creditCardTransaction.update({
-      where: { id },
+    const { editScope, exceptionForDate, ...rest } = transaction;
+    const scope = editScope ?? 'single';
+
+    let current = await prisma.creditCardTransaction.findUnique({ where: { id } });
+    if (!current) return undefined;
+
+    const card = await prisma.creditCard.findUnique({
+      where: { id: current.creditCardId },
+      select: { closingDay: true },
+    });
+    const closingDay = card?.closingDay ?? 1;
+
+    // CASO 0: row já é exceção → UPDATE direto
+    if (current.isException) {
+      const updated = await prisma.creditCardTransaction.update({
+        where: { id },
+        data: {
+          ...rest,
+          date: rest.date ? parseDateInput(rest.date) : undefined,
+          recurrenceEndDate: rest.recurrenceEndDate
+            ? parseDateInput(rest.recurrenceEndDate)
+            : undefined,
+        },
+      });
+      await this.updateAllInvoiceTransactions(updated.accountId);
+      return stripCategoryFromCardTx(mapCreditCardTransaction(updated));
+    }
+
+    // CASO 1: edição "single" de recorrente → criar/atualizar exceção
+    const isRecurrent =
+      current.launchType === 'recorrente' ||
+      !!current.recurrenceFrequency ||
+      !!current.recurrenceGroupId;
+
+    if (scope === 'single' && isRecurrent) {
+      // Lazy: criar recurrenceGroupId se ainda não existe
+      if (!current.recurrenceGroupId) {
+        const newGroupId = randomUUID();
+        current = await prisma.creditCardTransaction.update({
+          where: { id: current.id },
+          data: { recurrenceGroupId: newGroupId },
+        });
+      }
+
+      const originalDate = exceptionForDate
+        ? parseDateInput(exceptionForDate)
+        : current.date;
+
+      // Verificar se já existe exceção para esta data
+      const existingException = await prisma.creditCardTransaction.findFirst({
+        where: {
+          accountId: current.accountId,
+          recurrenceGroupId: current.recurrenceGroupId,
+          isException: true,
+          exceptionForDate: originalDate,
+        },
+      });
+
+      if (existingException) {
+        const updated = await prisma.creditCardTransaction.update({
+          where: { id: existingException.id },
+          data: {
+            description: rest.description ?? existingException.description,
+            amount: rest.amount ?? existingException.amount,
+            date: rest.date ? parseDateInput(rest.date) : existingException.date,
+            categoryId: rest.categoryId ?? existingException.categoryId,
+            creditCardId: rest.creditCardId ?? existingException.creditCardId,
+          },
+        });
+        await this.updateAllInvoiceTransactions(updated.accountId);
+        return stripCategoryFromCardTx(mapCreditCardTransaction(updated));
+      }
+
+      // Criar nova exceção
+      const newDate = rest.date ? parseDateInput(rest.date) : originalDate;
+      const newInvoiceMonth = calculateInvoiceMonth(newDate, closingDay);
+
+      const exception = await prisma.creditCardTransaction.create({
+        data: {
+          description: rest.description ?? current.description,
+          amount: rest.amount ?? current.amount,
+          date: newDate,
+          installments: 1,
+          currentInstallment: 1,
+          categoryId: rest.categoryId ?? current.categoryId,
+          creditCardId: rest.creditCardId ?? current.creditCardId,
+          accountId: current.accountId,
+          invoiceMonth: newInvoiceMonth,
+          clientName: current.clientName,
+          projectName: current.projectName,
+          costCenter: current.costCenter,
+
+          // Campos de exceção
+          isException: true,
+          exceptionForDate: originalDate,
+          recurrenceGroupId: current.recurrenceGroupId,
+
+          // Não é mais recorrente
+          launchType: 'unica',
+          recurrenceFrequency: null,
+          recurrenceEndDate: null,
+        },
+      });
+
+      await this.updateAllInvoiceTransactions(exception.accountId);
+      return stripCategoryFromCardTx(mapCreditCardTransaction(exception));
+    }
+
+    // CASO 2: single em não-recorrente OU sem editScope → UPDATE direto
+    if (scope === 'single') {
+      const updated = await prisma.creditCardTransaction.update({
+        where: { id },
+        data: {
+          ...rest,
+          date: rest.date ? parseDateInput(rest.date) : undefined,
+          recurrenceEndDate: rest.recurrenceEndDate
+            ? parseDateInput(rest.recurrenceEndDate)
+            : undefined,
+        },
+      });
+      await this.updateAllInvoiceTransactions(updated.accountId);
+      return stripCategoryFromCardTx(mapCreditCardTransaction(updated));
+    }
+
+    // CASO 3: all/future → UPDATE batch no grupo
+    const groupId =
+      transaction.installmentsGroupId ??
+      transaction.recurrenceGroupId ??
+      current.installmentsGroupId ??
+      current.recurrenceGroupId;
+    const isInstallmentGroup = Boolean(
+      transaction.installmentsGroupId ?? current.installmentsGroupId
+    );
+
+    if (!groupId) {
+      // Sem grupo, fallback para single
+      const updated = await prisma.creditCardTransaction.update({
+        where: { id },
+        data: {
+          ...rest,
+          date: rest.date ? parseDateInput(rest.date) : undefined,
+          recurrenceEndDate: rest.recurrenceEndDate
+            ? parseDateInput(rest.recurrenceEndDate)
+            : undefined,
+        },
+      });
+      await this.updateAllInvoiceTransactions(updated.accountId);
+      return stripCategoryFromCardTx(mapCreditCardTransaction(updated));
+    }
+
+    const where: Prisma.CreditCardTransactionWhereInput = isInstallmentGroup
+      ? { installmentsGroupId: groupId }
+      : { recurrenceGroupId: groupId, isException: false };
+
+    if (scope === 'future') {
+      if (isInstallmentGroup) {
+        where.currentInstallment = { gte: current.currentInstallment };
+      } else {
+        // CCT é organizado por fatura, não por date
+        where.invoiceMonth = { gte: current.invoiceMonth };
+      }
+    }
+
+    await prisma.creditCardTransaction.updateMany({
+      where,
       data: {
-        ...transaction,
-        date: transaction.date ? parseDateInput(transaction.date) : undefined,
-        recurrenceEndDate: transaction.recurrenceEndDate
-          ? parseDateInput(transaction.recurrenceEndDate)
+        description: rest.description,
+        amount: rest.amount,
+        categoryId: rest.categoryId,
+        creditCardId: rest.creditCardId,
+        clientName: rest.clientName,
+        projectName: rest.projectName,
+        costCenter: rest.costCenter,
+        recurrenceFrequency: rest.recurrenceFrequency,
+        recurrenceEndDate: rest.recurrenceEndDate
+          ? parseDateInput(rest.recurrenceEndDate)
           : undefined,
       },
     });
 
-    await this.updateAllInvoiceTransactions(updated.accountId);
-    return stripCategoryFromCardTx(mapCreditCardTransaction(updated));
+    await this.updateAllInvoiceTransactions(current.accountId);
+    return this.getCreditCardTransaction(id).then((tx) =>
+      tx ? stripCategoryFromCardTx(tx) : undefined
+    );
   }
 
-  async deleteCreditCardTransaction(id: number): Promise<void> {
-    const transaction = await prisma.creditCardTransaction.findUnique({
-      where: { id },
-      select: { accountId: true },
-    });
+  async deleteCreditCardTransaction(
+    id: number,
+    options?: { editScope?: 'single' | 'all' | 'future'; exceptionForDate?: string }
+  ): Promise<void> {
+    const scope = options?.editScope ?? 'single';
+    const current = await prisma.creditCardTransaction.findUnique({ where: { id } });
+    if (!current) return;
 
-    await prisma.creditCardTransaction.delete({ where: { id } });
+    // Recorrente em scope=single → criar tombstone (amount=0, is_exception=true)
+    // Não pode DELETE direto porque a próxima query de virtuais regenera a row.
+    const isRecurrent =
+      current.launchType === 'recorrente' ||
+      !!current.recurrenceFrequency ||
+      !!current.recurrenceGroupId;
 
-    if (transaction) {
-      await this.updateAllInvoiceTransactions(transaction.accountId);
+    if (scope === 'single' && isRecurrent && !current.isException) {
+      // Lazy recurrenceGroupId
+      let groupId = current.recurrenceGroupId;
+      if (!groupId) {
+        groupId = randomUUID();
+        await prisma.creditCardTransaction.update({
+          where: { id },
+          data: { recurrenceGroupId: groupId },
+        });
+      }
+
+      const originalDate = options?.exceptionForDate
+        ? parseDateInput(options.exceptionForDate)
+        : current.date;
+
+      // Se já existe exceção, removê-la (não recriar tombstone)
+      const existing = await prisma.creditCardTransaction.findFirst({
+        where: {
+          accountId: current.accountId,
+          recurrenceGroupId: groupId,
+          isException: true,
+          exceptionForDate: originalDate,
+        },
+      });
+
+      if (existing) {
+        // Substituir por tombstone (amount=0)
+        await prisma.creditCardTransaction.update({
+          where: { id: existing.id },
+          data: { amount: 0, description: '[deleted]' },
+        });
+      } else {
+        const card = await prisma.creditCard.findUnique({
+          where: { id: current.creditCardId },
+          select: { closingDay: true },
+        });
+        const closingDay = card?.closingDay ?? 1;
+        const tombstoneInvoiceMonth = calculateInvoiceMonth(originalDate, closingDay);
+
+        await prisma.creditCardTransaction.create({
+          data: {
+            description: '[deleted]',
+            amount: 0,
+            date: originalDate,
+            installments: 1,
+            currentInstallment: 1,
+            categoryId: current.categoryId,
+            creditCardId: current.creditCardId,
+            accountId: current.accountId,
+            invoiceMonth: tombstoneInvoiceMonth,
+            isException: true,
+            exceptionForDate: originalDate,
+            recurrenceGroupId: groupId,
+            launchType: 'unica',
+          },
+        });
+      }
+
+      await this.updateAllInvoiceTransactions(current.accountId);
+      return;
     }
+
+    // scope=all/future em grupo
+    if (scope !== 'single') {
+      const groupId = current.installmentsGroupId ?? current.recurrenceGroupId;
+      if (groupId) {
+        const isInstallmentGroup = Boolean(current.installmentsGroupId);
+        const where: Prisma.CreditCardTransactionWhereInput = isInstallmentGroup
+          ? { installmentsGroupId: groupId }
+          : { recurrenceGroupId: groupId };
+
+        if (scope === 'future') {
+          if (isInstallmentGroup) {
+            where.currentInstallment = { gte: current.currentInstallment };
+          } else {
+            where.invoiceMonth = { gte: current.invoiceMonth };
+          }
+        }
+
+        await prisma.creditCardTransaction.deleteMany({ where });
+        await this.updateAllInvoiceTransactions(current.accountId);
+        return;
+      }
+    }
+
+    // Default: DELETE direto (single em não-recorrente, ou exceção)
+    await prisma.creditCardTransaction.delete({ where: { id } });
+    await this.updateAllInvoiceTransactions(current.accountId);
   }
 
   private async updateAllInvoiceTransactions(accountId: number): Promise<void> {
@@ -1682,18 +1950,33 @@ export class DatabaseStorage implements IStorage {
       }
     };
 
-    // 1. Adicionar transações físicas
+    // 0. Construir set de exceções por (recurrenceGroupId, invoiceMonth) para
+    //    suprimir geração de virtuais cobertos por exceções
+    const exceptionKeys = new Set<string>();
     for (const tx of transactions) {
+      if (tx.isException && tx.recurrenceGroupId) {
+        exceptionKeys.add(`${tx.recurrenceGroupId}:${tx.invoiceMonth}`);
+      }
+    }
+
+    // 1. Adicionar transações físicas (exceto tombstones)
+    for (const tx of transactions) {
+      // Tombstones (amount=0 + isException) não aparecem na fatura
+      const amtNum = Number.parseFloat(tx.amount.toString());
+      if (tx.isException && amtNum === 0) continue;
+
       const mapped = mapCreditCardTransaction(tx, tx.category);
       const dateStr = ensureDateString(tx.date) ?? todayBR();
-      const amt = Number.parseFloat(tx.amount.toString());
       const isIncome = tx.category?.type === 'income';
-      addToInvoice(tx.creditCardId, tx.invoiceMonth, mapped, amt, dateStr, isIncome);
+      addToInvoice(tx.creditCardId, tx.invoiceMonth, mapped, amtNum, dateStr, isIncome);
     }
 
     // 2. Gerar instâncias virtuais de transações recorrentes para meses futuros
     const recurrents = transactions.filter(
-      (tx) => tx.launchType === 'recorrente' && tx.recurrenceFrequency === 'mensal'
+      (tx) =>
+        tx.launchType === 'recorrente' &&
+        tx.recurrenceFrequency === 'mensal' &&
+        !tx.isException
     );
 
     const currentMonth = currentMonthBR(); // 'YYYY-MM'
@@ -1718,21 +2001,30 @@ export class DatabaseStorage implements IStorage {
         // Respeitar recurrenceEndDate
         if (recurrenceEnd && futureMonth > recurrenceEnd.slice(0, 7)) break;
 
-        // Não gerar se já existe transação física com mesma descrição neste mês/cartão
-        const alreadyExists = transactions.some(
-          (existing) =>
-            existing.creditCardId === tx.creditCardId &&
-            existing.invoiceMonth === futureMonth &&
-            existing.description === tx.description
-        );
-        if (alreadyExists) continue;
+        // Pular se há exceção (incluindo tombstone) para este mês
+        if (tx.recurrenceGroupId && exceptionKeys.has(`${tx.recurrenceGroupId}:${futureMonth}`)) {
+          continue;
+        }
+
+        // Fallback legado: pular se já existe outra física com mesma descrição
+        // (cobre recorrentes pré-migração sem recurrenceGroupId)
+        if (!tx.recurrenceGroupId) {
+          const alreadyExists = transactions.some(
+            (existing) =>
+              existing.creditCardId === tx.creditCardId &&
+              existing.invoiceMonth === futureMonth &&
+              existing.description === tx.description
+          );
+          if (alreadyExists) continue;
+        }
 
         const mapped = mapCreditCardTransaction(tx, tx.category);
-        // Marcar como virtual com o mês correto
+        // Marcar como virtual com o mês correto + groupId para edição via escopo single
         const virtualMapped = {
           ...mapped,
           invoiceMonth: futureMonth,
           isVirtual: true,
+          recurrenceGroupId: tx.recurrenceGroupId,
         } as CreditCardTransactionWithCategory;
 
         const dateStr = ensureDateString(tx.date) ?? todayBR();

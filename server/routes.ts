@@ -865,8 +865,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/credit-card-transactions/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const validatedData = insertCreditCardTransactionSchema.partial().parse(req.body);
-      const transaction = await storage.updateCreditCardTransaction(id, validatedData);
+      const { editScope, exceptionForDate, ...body } = req.body ?? {};
+      const validatedData = insertCreditCardTransactionSchema.partial().parse(body);
+      const transaction = await storage.updateCreditCardTransaction(id, {
+        ...validatedData,
+        editScope,
+        exceptionForDate,
+      });
       if (!transaction) {
         return res.status(404).json({ message: 'Credit card transaction not found' });
       }
@@ -881,8 +886,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/credit-card-transactions/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      console.log('[DELETE /api/credit-card-transactions/:id] id:', id);
-      await storage.deleteCreditCardTransaction(id);
+      const editScope = (req.query.editScope ?? req.body?.editScope) as
+        | 'single'
+        | 'all'
+        | 'future'
+        | undefined;
+      const exceptionForDate = (req.query.exceptionForDate ?? req.body?.exceptionForDate) as
+        | string
+        | undefined;
+      console.log('[DELETE /api/credit-card-transactions/:id] id:', id, { editScope });
+      await storage.deleteCreditCardTransaction(id, { editScope, exceptionForDate });
       console.log('[DELETE /api/credit-card-transactions/:id] Transação excluída com sucesso');
       res.status(204).send();
     } catch (error) {

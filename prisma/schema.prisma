@@ -185,23 +185,27 @@ model CreditCard {
 }
 
 model CreditCardTransaction {
-  id                 Int       @id @default(autoincrement())
-  description        String
-  amount             Decimal   @db.Decimal(12, 2)
-  date               DateTime  @db.Date
-  installments       Int       @default(1)
-  currentInstallment Int       @default(1) @map("current_installment")
-  categoryId         Int       @map("category_id")
-  creditCardId       Int       @map("credit_card_id")
-  accountId          Int       @map("account_id")
-  invoiceMonth       String    @map("invoice_month")
-  clientName         String?   @map("client_name")
-  projectName        String?   @map("project_name")
-  costCenter         String?   @map("cost_center")
-  launchType         String?   @map("launch_type")
-  recurrenceFrequency String?  @map("recurrence_frequency")
-  recurrenceEndDate  DateTime? @db.Date @map("recurrence_end_date")
-  createdAt          DateTime  @default(now()) @map("created_at")
+  id                  Int       @id @default(autoincrement())
+  description         String
+  amount              Decimal   @db.Decimal(12, 2)
+  date                DateTime  @db.Date
+  installments        Int       @default(1)
+  currentInstallment  Int       @default(1) @map("current_installment")
+  installmentsGroupId String?   @map("installments_group_id")
+  categoryId          Int       @map("category_id")
+  creditCardId        Int       @map("credit_card_id")
+  accountId           Int       @map("account_id")
+  invoiceMonth        String    @map("invoice_month")
+  clientName          String?   @map("client_name")
+  projectName         String?   @map("project_name")
+  costCenter          String?   @map("cost_center")
+  launchType          String?   @map("launch_type")
+  recurrenceFrequency String?   @map("recurrence_frequency")
+  recurrenceEndDate   DateTime? @db.Date @map("recurrence_end_date")
+  recurrenceGroupId   String?   @map("recurrence_group_id")
+  isException         Boolean   @default(false) @map("is_exception")
+  exceptionForDate    DateTime? @db.Date @map("exception_for_date")
+  createdAt           DateTime  @default(now()) @map("created_at")
 
   account    Account   @relation(fields: [accountId], references: [id])
   category   Category  @relation(fields: [categoryId], references: [id])

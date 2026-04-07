@@ -15,7 +15,7 @@ const pool = new pg.Pool({ connectionString: DATABASE_URL, max: 5 });
 let cachedUserId: number | null = null;
 async function getUserId(): Promise<number> {
   if (cachedUserId !== null) return cachedUserId;
-  const res = await pool.query("SELECT id FROM users LIMIT 1");
+  const res = await pool.query("SELECT id FROM users ORDER BY id LIMIT 1");
   if (res.rows.length === 0) throw new Error("Nenhum usuário encontrado");
   cachedUserId = res.rows[0].id as number;
   return cachedUserId!
@@ -191,8 +191,8 @@ async function getTransactionsByDateRange(
        AND t.date >= $2::date AND t.date <= $3::date
        AND COALESCE(t.is_exception, false) = false
        AND NOT (
-         t.launch_type = 'recorrente'
-         AND t.recurrence_frequency = 'mensal'
+         COALESCE(t.launch_type, '') = 'recorrente'
+         AND COALESCE(t.recurrence_frequency, '') = 'mensal'
        )
      ORDER BY t.date ASC, t.created_at ASC`,
     [accountId, startDate, endDate]
@@ -315,7 +315,363 @@ function txLine(tx: MappedTx, viewMonth?: string): string {
     }
   }
 
-  return `| ${tx.date} | ${tx.description}${installment}${virtual}${originTag} | ${formatBRL(tx.amount)} | ${status} | ${cat} |`;
+  const idCol = tx.isVirtual ? `${tx.id}*` : `${tx.id}`;
+  return `| ${idCol} | ${tx.date} | ${tx.description}${installment}${virtual}${originTag} | ${formatBRL(tx.amount)} | ${status} | ${cat} |`;
+}
+
+// ============================================
+// CCT Update/Delete helpers
+// ============================================
+
+interface CctUpdateArgs {
+  current: any;
+  id: number;
+  escopo: "single" | "all" | "future";
+  exceptionForDate?: string;
+  descricao?: string;
+  valor?: number;
+  tipo?: "income" | "expense";
+  data?: string;
+  categoriaId?: number;
+  pago?: boolean;
+  bankAccountId?: number;
+  creditCardId?: number;
+}
+
+async function updateCreditCardTransactionMcp(args: CctUpdateArgs) {
+  const { current, escopo, exceptionForDate, descricao, valor, data, categoriaId, pago, bankAccountId, creditCardId } = args;
+
+  // Rejeitar campos não suportados em CCT
+  if (pago !== undefined) {
+    return {
+      content: [{
+        type: "text" as const,
+        text: "Erro: cartão de crédito usa pagamento por fatura inteira. Use nexfin_faturas para pagar/quitar a fatura.",
+      }],
+    };
+  }
+  if (bankAccountId !== undefined) {
+    return {
+      content: [{
+        type: "text" as const,
+        text: "Erro: credit_card_transactions não tem bank_account_id (pagamento é via fatura).",
+      }],
+    };
+  }
+
+  const isRecurrent = current.launch_type === "recorrente" || current.recurrence_frequency || current.recurrence_group_id;
+
+  // Buscar closing_day para calcular invoice_month em exceções
+  const cardRes = await pool.query(`SELECT closing_day FROM credit_cards WHERE id = $1`, [current.credit_card_id]);
+  const closingDay = cardRes.rows[0]?.closing_day ?? 1;
+
+  // === CASO 0: row já é exceção → UPDATE direto ===
+  if (current.is_exception) {
+    const sets: string[] = [];
+    const params: any[] = [];
+    let pi = 1;
+    if (descricao !== undefined) { sets.push(`description = $${pi++}`); params.push(descricao); }
+    if (valor !== undefined) { sets.push(`amount = $${pi++}`); params.push(valor); }
+    if (data !== undefined) { sets.push(`date = $${pi++}::date`); params.push(data); }
+    if (categoriaId !== undefined) { sets.push(`category_id = $${pi++}`); params.push(categoriaId); }
+    if (creditCardId !== undefined) { sets.push(`credit_card_id = $${pi++}`); params.push(creditCardId); }
+
+    if (sets.length === 0) {
+      return { content: [{ type: "text" as const, text: "Nenhum campo fornecido para atualizar." }] };
+    }
+    params.push(current.id);
+    const res = await pool.query(
+      `UPDATE credit_card_transactions SET ${sets.join(", ")}
+       WHERE id = $${pi}
+       RETURNING id, description, amount, date, invoice_month`,
+      params
+    );
+    const row = res.rows[0];
+    let output = `## Exceção CCT Atualizada (update direto)\n\n`;
+    output += `- **ID:** ${row.id}\n`;
+    output += `- **Descrição:** ${row.description}\n`;
+    output += `- **Valor:** ${formatBRL(row.amount)}\n`;
+    output += `- **Data:** ${ensureDateString(row.date)}\n`;
+    output += `- **Fatura:** ${row.invoice_month}\n`;
+    return { content: [{ type: "text" as const, text: output }] };
+  }
+
+  // === CASO 1: single em recorrente → criar/atualizar exceção ===
+  if (escopo === "single" && isRecurrent) {
+    let groupId = current.recurrence_group_id;
+    if (!groupId) {
+      groupId = crypto.randomUUID();
+      await pool.query(
+        `UPDATE credit_card_transactions SET recurrence_group_id = $1 WHERE id = $2`,
+        [groupId, current.id]
+      );
+    }
+
+    const originalDate = exceptionForDate ?? ensureDateString(current.date)!;
+
+    // Verificar se já existe exceção para esta data
+    const existingExc = await pool.query(
+      `SELECT id FROM credit_card_transactions
+       WHERE account_id = $1 AND recurrence_group_id = $2
+         AND is_exception = true AND exception_for_date = $3::date`,
+      [current.account_id, groupId, originalDate]
+    );
+
+    if (existingExc.rows.length > 0) {
+      const excId = existingExc.rows[0].id;
+      const sets: string[] = [];
+      const params: any[] = [];
+      let pi = 1;
+      if (descricao !== undefined) { sets.push(`description = $${pi++}`); params.push(descricao); }
+      if (valor !== undefined) { sets.push(`amount = $${pi++}`); params.push(valor); }
+      if (data !== undefined) { sets.push(`date = $${pi++}::date`); params.push(data); }
+      if (categoriaId !== undefined) { sets.push(`category_id = $${pi++}`); params.push(categoriaId); }
+      if (creditCardId !== undefined) { sets.push(`credit_card_id = $${pi++}`); params.push(creditCardId); }
+
+      if (sets.length === 0) {
+        return { content: [{ type: "text" as const, text: "Nenhum campo fornecido para atualizar." }] };
+      }
+      params.push(excId);
+      const res = await pool.query(
+        `UPDATE credit_card_transactions SET ${sets.join(", ")}
+         WHERE id = $${pi}
+         RETURNING id, description, amount, date, invoice_month`,
+        params
+      );
+      const row = res.rows[0];
+      let output = `## Exceção CCT Atualizada (single)\n\n`;
+      output += `- **ID:** ${row.id}\n`;
+      output += `- **Descrição:** ${row.description}\n`;
+      output += `- **Valor:** ${formatBRL(row.amount)}\n`;
+      output += `- **Data:** ${ensureDateString(row.date)}\n`;
+      output += `- **Fatura:** ${row.invoice_month}\n`;
+      return { content: [{ type: "text" as const, text: output }] };
+    }
+
+    // Criar nova exceção
+    const newDateStr = data ?? originalDate;
+    const newDate = parseDateInput(newDateStr);
+    const newInvoiceMonth = calculateInvoiceMonth(newDate, closingDay);
+
+    const res = await pool.query(
+      `INSERT INTO credit_card_transactions
+        (description, amount, date, installments, current_installment,
+         category_id, credit_card_id, account_id, invoice_month,
+         client_name, project_name, cost_center,
+         is_exception, exception_for_date, recurrence_group_id,
+         launch_type, recurrence_frequency, recurrence_end_date)
+       VALUES (
+         $1, $2, $3::date, 1, 1,
+         $4, $5, $6, $7,
+         $8, $9, $10,
+         true, $11::date, $12,
+         'unica', null, null
+       )
+       RETURNING id, description, amount, date, invoice_month`,
+      [
+        descricao ?? current.description,
+        valor ?? current.amount,
+        newDateStr,
+        categoriaId ?? current.category_id,
+        creditCardId ?? current.credit_card_id,
+        current.account_id,
+        newInvoiceMonth,
+        current.client_name,
+        current.project_name,
+        current.cost_center,
+        originalDate,
+        groupId,
+      ]
+    );
+
+    const row = res.rows[0];
+    let output = `## Exceção CCT Criada (single)\n\n`;
+    output += `Ocorrência original de ${originalDate} substituída:\n`;
+    output += `- **ID:** ${row.id}\n`;
+    output += `- **Descrição:** ${row.description}\n`;
+    output += `- **Valor:** ${formatBRL(row.amount)}\n`;
+    output += `- **Data:** ${ensureDateString(row.date)}\n`;
+    output += `- **Fatura:** ${row.invoice_month}\n`;
+    return { content: [{ type: "text" as const, text: output }] };
+  }
+
+  // === CASO 2: single em não-recorrente → UPDATE direto ===
+  if (escopo === "single") {
+    const sets: string[] = [];
+    const params: any[] = [];
+    let pi = 1;
+    if (descricao !== undefined) { sets.push(`description = $${pi++}`); params.push(descricao); }
+    if (valor !== undefined) { sets.push(`amount = $${pi++}`); params.push(valor); }
+    if (data !== undefined) { sets.push(`date = $${pi++}::date`); params.push(data); }
+    if (categoriaId !== undefined) { sets.push(`category_id = $${pi++}`); params.push(categoriaId); }
+    if (creditCardId !== undefined) { sets.push(`credit_card_id = $${pi++}`); params.push(creditCardId); }
+
+    if (sets.length === 0) {
+      return { content: [{ type: "text" as const, text: "Nenhum campo fornecido para atualizar." }] };
+    }
+    params.push(current.id);
+    const res = await pool.query(
+      `UPDATE credit_card_transactions SET ${sets.join(", ")}
+       WHERE id = $${pi}
+       RETURNING id, description, amount, date, invoice_month`,
+      params
+    );
+    const row = res.rows[0];
+    let output = `## Transação CCT Atualizada\n\n`;
+    output += `- **ID:** ${row.id}\n`;
+    output += `- **Descrição:** ${row.description}\n`;
+    output += `- **Valor:** ${formatBRL(row.amount)}\n`;
+    output += `- **Data:** ${ensureDateString(row.date)}\n`;
+    output += `- **Fatura:** ${row.invoice_month}\n`;
+    return { content: [{ type: "text" as const, text: output }] };
+  }
+
+  // === CASO 3: all/future → UPDATE batch no grupo ===
+  const groupId = current.installments_group_id || current.recurrence_group_id;
+  if (!groupId) {
+    return { content: [{ type: "text" as const, text: "Transação CCT não pertence a um grupo. Use escopo 'single'." }] };
+  }
+  const isInstallment = Boolean(current.installments_group_id);
+  const groupCol = isInstallment ? "installments_group_id" : "recurrence_group_id";
+
+  let whereClause = `${groupCol} = $1`;
+  const whereParams: any[] = [groupId];
+  if (!isInstallment) {
+    whereClause += ` AND is_exception = false`;
+  }
+  if (escopo === "future") {
+    if (isInstallment) {
+      whereClause += ` AND current_installment >= $${whereParams.length + 1}`;
+      whereParams.push(current.current_installment);
+    } else {
+      whereClause += ` AND invoice_month >= $${whereParams.length + 1}`;
+      whereParams.push(current.invoice_month);
+    }
+  }
+
+  const sets: string[] = [];
+  const setParams: any[] = [];
+  let pi = whereParams.length + 1;
+  if (descricao !== undefined) { sets.push(`description = $${pi++}`); setParams.push(descricao); }
+  if (valor !== undefined) { sets.push(`amount = $${pi++}`); setParams.push(valor); }
+  if (categoriaId !== undefined) { sets.push(`category_id = $${pi++}`); setParams.push(categoriaId); }
+  if (creditCardId !== undefined) { sets.push(`credit_card_id = $${pi++}`); setParams.push(creditCardId); }
+
+  if (sets.length === 0) {
+    return { content: [{ type: "text" as const, text: "Nenhum campo fornecido para atualizar." }] };
+  }
+
+  const allParams = [...whereParams, ...setParams];
+  const result = await pool.query(
+    `UPDATE credit_card_transactions SET ${sets.join(", ")}
+     WHERE ${whereClause}`,
+    allParams
+  );
+
+  const label = escopo === "all" ? "todas" : "esta e próximas";
+  return {
+    content: [{
+      type: "text" as const,
+      text: `## Grupo CCT Atualizado (${label})\n\n**${result.rowCount}** transação(ões) atualizadas no grupo.`,
+    }],
+  };
+}
+
+async function deleteCreditCardTransactionMcp(
+  current: any,
+  escopo: "single" | "all" | "future",
+  exceptionForDate?: string
+) {
+  const isRecurrent = current.launch_type === "recorrente" || current.recurrence_frequency || current.recurrence_group_id;
+
+  // single em recorrente (não-exceção) → criar/atualizar tombstone
+  if (escopo === "single" && isRecurrent && !current.is_exception) {
+    let groupId = current.recurrence_group_id;
+    if (!groupId) {
+      groupId = crypto.randomUUID();
+      await pool.query(
+        `UPDATE credit_card_transactions SET recurrence_group_id = $1 WHERE id = $2`,
+        [groupId, current.id]
+      );
+    }
+
+    const originalDate = exceptionForDate ?? ensureDateString(current.date)!;
+
+    const existing = await pool.query(
+      `SELECT id FROM credit_card_transactions
+       WHERE account_id = $1 AND recurrence_group_id = $2
+         AND is_exception = true AND exception_for_date = $3::date`,
+      [current.account_id, groupId, originalDate]
+    );
+
+    if (existing.rows.length > 0) {
+      await pool.query(
+        `UPDATE credit_card_transactions SET amount = 0, description = '[deleted]' WHERE id = $1`,
+        [existing.rows[0].id]
+      );
+    } else {
+      const cardRes = await pool.query(`SELECT closing_day FROM credit_cards WHERE id = $1`, [current.credit_card_id]);
+      const closingDay = cardRes.rows[0]?.closing_day ?? 1;
+      const tombstoneInvoiceMonth = calculateInvoiceMonth(parseDateInput(originalDate), closingDay);
+
+      await pool.query(
+        `INSERT INTO credit_card_transactions
+          (description, amount, date, installments, current_installment,
+           category_id, credit_card_id, account_id, invoice_month,
+           is_exception, exception_for_date, recurrence_group_id, launch_type)
+         VALUES ('[deleted]', 0, $1::date, 1, 1, $2, $3, $4, $5, true, $1::date, $6, 'unica')`,
+        [originalDate, current.category_id, current.credit_card_id, current.account_id, tombstoneInvoiceMonth, groupId]
+      );
+    }
+
+    return {
+      content: [{
+        type: "text" as const,
+        text: `Tombstone criado para ocorrência ${originalDate} (recorrente CCT).`,
+      }],
+    };
+  }
+
+  // all/future em grupo
+  if (escopo !== "single") {
+    const groupId = current.installments_group_id || current.recurrence_group_id;
+    if (groupId) {
+      const isInstallment = Boolean(current.installments_group_id);
+      const groupCol = isInstallment ? "installments_group_id" : "recurrence_group_id";
+      let whereClause = `${groupCol} = $1`;
+      const params: any[] = [groupId];
+      if (escopo === "future") {
+        if (isInstallment) {
+          whereClause += ` AND current_installment >= $2`;
+          params.push(current.current_installment);
+        } else {
+          whereClause += ` AND invoice_month >= $2`;
+          params.push(current.invoice_month);
+        }
+      }
+      const result = await pool.query(`DELETE FROM credit_card_transactions WHERE ${whereClause}`, params);
+      const label = escopo === "all" ? "todas" : "esta e próximas";
+      return {
+        content: [{
+          type: "text" as const,
+          text: `## Grupo CCT Deletado (${label})\n\n**${result.rowCount}** transação(ões) removidas.`,
+        }],
+      };
+    }
+  }
+
+  // Default: DELETE direto (single em não-recorrente, ou exceção)
+  const res = await pool.query(
+    `DELETE FROM credit_card_transactions WHERE id = $1 RETURNING id, description`,
+    [current.id]
+  );
+  const row = res.rows[0];
+  return {
+    content: [{
+      type: "text" as const,
+      text: `Transação CCT deletada: **${row.description}** (ID: ${row.id})`,
+    }],
+  };
 }
 
 // ============================================
@@ -355,7 +711,7 @@ server.tool(
   "nexfin_transacoes",
   "Transações do mês com rollforward de recorrências, flag de atraso, e dados idênticos ao frontend",
   {
-    accountId: z.number().describe("ID da conta"),
+    accountId: z.coerce.number().describe("ID da conta"),
     month: z
       .string()
       .optional()
@@ -377,20 +733,22 @@ server.tool(
     let output = `## Transações ${String(mon).padStart(2, "0")}/${year} (Conta ID: ${accountId})\n\n`;
     output += `**Total**: ${txs.length} transações | **Em atraso**: ${overdue.length}\n\n`;
 
+    const tblHeader = `| ID | Data | Descrição | Valor | Status | Categoria |\n|-----|------|-----------|-------|--------|----------|\n`;
+
     if (expense.length > 0) {
       output += `### Despesas (${expense.length})\n`;
-      output += `| Data | Descrição | Valor | Status | Categoria |\n`;
-      output += `|------|-----------|-------|--------|----------|\n`;
+      output += tblHeader;
       for (const tx of expense) output += txLine(tx, targetMonth) + "\n";
       output += "\n";
     }
 
     if (income.length > 0) {
       output += `### Receitas (${income.length})\n`;
-      output += `| Data | Descrição | Valor | Status | Categoria |\n`;
-      output += `|------|-----------|-------|--------|----------|\n`;
+      output += tblHeader;
       for (const tx of income) output += txLine(tx, targetMonth) + "\n";
     }
+
+    output += `\n> *ID com asterisco = recorrência virtual (usar ID da definição + data para atualizar)*\n`;
 
     return { content: [{ type: "text" as const, text: output }] };
   }
@@ -401,7 +759,7 @@ server.tool(
   "nexfin_atrasados",
   "Lista todas as contas em atraso (não pagas com data anterior a hoje), incluindo recorrências virtuais",
   {
-    accountId: z.number().describe("ID da conta"),
+    accountId: z.coerce.number().describe("ID da conta"),
   },
   async ({ accountId }) => {
     const today = todayBR();
@@ -420,17 +778,18 @@ server.tool(
         0
       );
       output += `**${overdue.length} contas em atraso** | Total: ${formatBRL(totalOverdue)}\n\n`;
-      output += `| Mês | Data | Descrição | Valor | Categoria |\n`;
-      output += `|-----|------|-----------|-------|----------|\n`;
+      output += `| ID | Mês | Data | Descrição | Valor | Categoria |\n`;
+      output += `|-----|-----|------|-----------|-------|----------|\n`;
       for (const tx of overdue) {
         const cat = tx.categoryName ?? "Sem categoria";
         const virtual = tx.isVirtual ? " [rec]" : "";
+        const idCol = tx.isVirtual ? `${tx.id}*` : `${tx.id}`;
         const installment =
           tx.installments && tx.installments > 1
             ? ` (${tx.currentInstallment}/${tx.installments})`
             : "";
         const origMonth = monthAbbr(tx.exceptionForDate ?? tx.date);
-        output += `| ${origMonth} | ${tx.date} | ${tx.description}${installment}${virtual} | ${formatBRL(tx.amount)} | ${cat} |\n`;
+        output += `| ${idCol} | ${origMonth} | ${tx.date} | ${tx.description}${installment}${virtual} | ${formatBRL(tx.amount)} | ${cat} |\n`;
       }
     }
 
@@ -443,7 +802,7 @@ server.tool(
   "nexfin_saldos",
   "Saldo atual de cada conta bancária (saldo inicial + transações pagas até hoje)",
   {
-    accountId: z.number().describe("ID da conta"),
+    accountId: z.coerce.number().describe("ID da conta"),
   },
   async ({ accountId }) => {
     const userId = await getUserId();
@@ -505,7 +864,7 @@ server.tool(
   "nexfin_resumo",
   "Resumo financeiro do mês: receitas, despesas e saldo (pagas) + previsão (pagas + pendentes)",
   {
-    accountId: z.number().describe("ID da conta"),
+    accountId: z.coerce.number().describe("ID da conta"),
     month: z
       .string()
       .optional()
@@ -571,7 +930,7 @@ server.tool(
   "nexfin_faturas",
   "Faturas de cartão de crédito com status (paga/pendente/atrasada), valor total e detalhes",
   {
-    accountId: z.number().describe("ID da conta"),
+    accountId: z.coerce.number().describe("ID da conta"),
     month: z
       .string()
       .optional()
@@ -783,7 +1142,7 @@ server.tool(
   "nexfin_categorias",
   "Lista todas as categorias com IDs (necessário para criar transações)",
   {
-    accountId: z.number().describe("ID da conta"),
+    accountId: z.coerce.number().describe("ID da conta"),
   },
   async ({ accountId }) => {
     const res = await pool.query(
@@ -804,12 +1163,43 @@ server.tool(
   }
 );
 
+// === Tool: nexfin_criar_categoria ===
+server.tool(
+  "nexfin_criar_categoria",
+  "Cria uma nova categoria de receita ou despesa",
+  {
+    nome: z.string().describe("Nome da categoria"),
+    tipo: z.enum(["income", "expense"]).default("expense").describe("Tipo: income ou expense (padrão: expense)"),
+    accountId: z.coerce.number().describe("ID da conta (use nexfin_contas)"),
+    cor: z.string().default("#6B7280").describe("Cor hex (padrão: #6B7280)"),
+    icone: z.string().default("circle").describe("Nome do ícone (padrão: circle)"),
+  },
+  async ({ nome, tipo, accountId, cor, icone }) => {
+    const res = await pool.query(
+      `INSERT INTO categories (name, type, account_id, color, icon)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, type`,
+      [nome, tipo, accountId, cor, icone]
+    );
+
+    const row = res.rows[0];
+    if (!row) {
+      return { content: [{ type: "text" as const, text: "Erro: resposta inesperada do banco." }] };
+    }
+
+    const tipoLabel = row.type === "income" ? "Receita" : "Despesa";
+    return {
+      content: [{ type: "text" as const, text: `Categoria criada: **${row.name}** (ID: ${row.id}, ${tipoLabel})` }],
+    };
+  }
+);
+
 // === Tool: nexfin_fluxo_fixo ===
 server.tool(
   "nexfin_fluxo_fixo",
   "Receitas e despesas fixas cadastradas (fluxo de caixa fixo mensal)",
   {
-    accountId: z.number().describe("ID da conta"),
+    accountId: z.coerce.number().describe("ID da conta"),
   },
   async ({ accountId }) => {
     const curMonth = currentMonthBR();
@@ -836,7 +1226,7 @@ server.tool(
         const valor = parseFloat(decimalToString(r.amount));
         totalReceitas += valor;
         const due = r.due_day ? ` (dia ${r.due_day})` : "";
-        output += `- ${r.description}: ${formatBRL(valor)}${due}\n`;
+        output += `- [ID: ${r.id}] ${r.description}: ${formatBRL(valor)}${due}\n`;
       }
       output += "\n";
     }
@@ -847,7 +1237,7 @@ server.tool(
         const valor = parseFloat(decimalToString(d.amount));
         totalDespesas += valor;
         const due = d.due_day ? ` (dia ${d.due_day})` : "";
-        output += `- ${d.description}: ${formatBRL(valor)}${due}\n`;
+        output += `- [ID: ${d.id}] ${d.description}: ${formatBRL(valor)}${due}\n`;
       }
       output += "\n";
     }
@@ -872,7 +1262,7 @@ server.tool(
   "Cria uma transação simples (sem parcelamento/recorrência)",
   {
     descricao: z.string().describe("Descrição da transação"),
-    valor: z.number().positive().describe("Valor da transação"),
+    valor: z.coerce.number().positive().describe("Valor da transação"),
     tipo: z
       .enum(["income", "expense"])
       .describe("Tipo: income (receita) ou expense (despesa)"),
@@ -880,7 +1270,7 @@ server.tool(
     categoriaId: z
       .number()
       .describe("ID da categoria (use nexfin_categorias)"),
-    accountId: z.number().describe("ID da conta (use nexfin_contas)"),
+    accountId: z.coerce.number().describe("ID da conta (use nexfin_contas)"),
     pago: z.boolean().default(false).describe("Se já foi pago (padrão: false)"),
     bankAccountId: z
       .number()
@@ -925,7 +1315,7 @@ server.tool(
   "nexfin_atualizar_transacao",
   "Atualiza uma transação. Para recorrentes, suporta escopo: single (só esta, cria exceção), all (todas do grupo), future (esta e próximas)",
   {
-    id: z.number().describe("ID da transação (para virtuais, usar o ID da definição recorrente)"),
+    id: z.coerce.number().describe("ID da transação (para virtuais, usar o ID da definição recorrente)"),
     escopo: z
       .enum(["single", "all", "future"])
       .default("single")
@@ -935,25 +1325,42 @@ server.tool(
       .optional()
       .describe("Data da ocorrência virtual sendo editada YYYY-MM-DD (obrigatório para escopo single em recorrentes)"),
     descricao: z.string().optional().describe("Nova descrição"),
-    valor: z.number().positive().optional().describe("Novo valor"),
+    valor: z.coerce.number().positive().optional().describe("Novo valor"),
     tipo: z.enum(["income", "expense"]).optional().describe("Novo tipo"),
     data: z.string().optional().describe("Nova data YYYY-MM-DD"),
-    categoriaId: z.number().optional().describe("Novo ID da categoria"),
+    categoriaId: z.coerce.number().optional().describe("Novo ID da categoria"),
     pago: z.boolean().optional().describe("Marcar como pago/não pago"),
-    bankAccountId: z.number().optional().describe("ID da conta bancária"),
-    creditCardId: z.number().optional().describe("ID do cartão de crédito"),
+    bankAccountId: z.coerce.number().optional().describe("ID da conta bancária"),
+    creditCardId: z.coerce.number().optional().describe("ID do cartão de crédito"),
   },
   async ({ id, escopo, exceptionForDate, descricao, valor, tipo, data, categoriaId, pago, bankAccountId, creditCardId }) => {
-    // Buscar transação atual
-    const currentRes = await pool.query(
-      `SELECT * FROM transactions WHERE id = $1`,
-      [id]
-    );
-    const current = currentRes.rows[0];
-    if (!current) {
-      return { content: [{ type: "text" as const, text: `Transação ID ${id} não encontrada.` }] };
+    // Buscar primeiro em transactions; se não achar, tentar credit_card_transactions
+    const txRes = await pool.query(`SELECT * FROM transactions WHERE id = $1`, [id]);
+    if (txRes.rows.length === 0) {
+      const cctRes = await pool.query(
+        `SELECT * FROM credit_card_transactions WHERE id = $1`,
+        [id]
+      );
+      if (cctRes.rows.length === 0) {
+        return { content: [{ type: "text" as const, text: `Transação ID ${id} não encontrada (procurada em transactions e credit_card_transactions).` }] };
+      }
+      return await updateCreditCardTransactionMcp({
+        current: cctRes.rows[0],
+        id,
+        escopo,
+        exceptionForDate,
+        descricao,
+        valor,
+        tipo,
+        data,
+        categoriaId,
+        pago,
+        bankAccountId,
+        creditCardId,
+      });
     }
 
+    const current = txRes.rows[0];
     const isRecurrent = current.launch_type === "recorrente";
 
     // === CASO 0: row já é exceção → UPDATE direto (nunca criar exceção de exceção) ===
@@ -1197,36 +1604,46 @@ server.tool(
 // === Tool: nexfin_deletar_transacao ===
 server.tool(
   "nexfin_deletar_transacao",
-  "Deleta transação(ões). Para recorrentes/parceladas, suporta escopo: single, all, future",
+  "Deleta transação(ões). Para recorrentes/parceladas, suporta escopo: single, all, future. Detecta automaticamente se a transação está em transactions ou credit_card_transactions.",
   {
-    id: z.number().describe("ID da transação"),
+    id: z.coerce.number().describe("ID da transação"),
     escopo: z
       .enum(["single", "all", "future"])
       .default("single")
       .describe("Escopo: single (só esta), all (todas do grupo), future (esta e próximas)"),
+    exceptionForDate: z
+      .string()
+      .optional()
+      .describe("Data da ocorrência virtual sendo deletada YYYY-MM-DD (para CCT recorrente em escopo single, cria tombstone)"),
   },
-  async ({ id, escopo }) => {
+  async ({ id, escopo, exceptionForDate }) => {
+    // Buscar primeiro em transactions; se não achar, tentar credit_card_transactions
+    const txRes = await pool.query(`SELECT * FROM transactions WHERE id = $1`, [id]);
+    if (txRes.rows.length === 0) {
+      const cctRes = await pool.query(
+        `SELECT * FROM credit_card_transactions WHERE id = $1`,
+        [id]
+      );
+      if (cctRes.rows.length === 0) {
+        return { content: [{ type: "text" as const, text: `Transação ID ${id} não encontrada (procurada em transactions e credit_card_transactions).` }] };
+      }
+      return await deleteCreditCardTransactionMcp(cctRes.rows[0], escopo, exceptionForDate);
+    }
+
+    const current = txRes.rows[0];
+
     if (escopo === "single") {
       const res = await pool.query(
         `DELETE FROM transactions WHERE id = $1 RETURNING id, description`,
         [id]
       );
       const row = res.rows[0];
-      if (!row) {
-        return { content: [{ type: "text" as const, text: `Transação ID ${id} não encontrada.` }] };
-      }
       return {
         content: [{ type: "text" as const, text: `Transação deletada: **${row.description}** (ID: ${row.id})` }],
       };
     }
 
     // all ou future: buscar grupo
-    const currentRes = await pool.query(`SELECT * FROM transactions WHERE id = $1`, [id]);
-    const current = currentRes.rows[0];
-    if (!current) {
-      return { content: [{ type: "text" as const, text: `Transação ID ${id} não encontrada.` }] };
-    }
-
     const groupId = current.installments_group_id || current.recurrence_group_id;
     if (!groupId) {
       // Sem grupo, deleta só esta
@@ -1267,11 +1684,11 @@ server.tool(
   "Cria um item de fluxo de caixa fixo (receita ou despesa recorrente mensal)",
   {
     descricao: z.string().describe("Descrição do fluxo fixo"),
-    valor: z.number().positive().describe("Valor mensal"),
+    valor: z.coerce.number().positive().describe("Valor mensal"),
     tipo: z
       .enum(["income", "expense"])
       .describe("Tipo: income (receita) ou expense (despesa)"),
-    accountId: z.number().describe("ID da conta"),
+    accountId: z.coerce.number().describe("ID da conta"),
     mesInicio: z
       .string()
       .optional()
@@ -1322,7 +1739,7 @@ server.tool(
   "nexfin_deletar_fluxo_fixo",
   "Deleta um item de fluxo de caixa fixo pelo ID",
   {
-    id: z.number().describe("ID do fluxo fixo a deletar"),
+    id: z.coerce.number().describe("ID do fluxo fixo a deletar"),
   },
   async ({ id }) => {
     const res = await pool.query(
@@ -1363,11 +1780,11 @@ server.tool(
   "Cria transação de cartão de crédito (única, parcelada ou recorrente mensal)",
   {
     descricao: z.string().describe("Descrição da compra"),
-    valor: z.number().positive().describe("Valor da compra"),
+    valor: z.coerce.number().positive().describe("Valor da compra"),
     data: z.string().describe("Data da compra YYYY-MM-DD"),
-    categoriaId: z.number().describe("ID da categoria (use nexfin_categorias)"),
-    creditCardId: z.number().describe("ID do cartão de crédito"),
-    accountId: z.number().describe("ID da conta financeira"),
+    categoriaId: z.coerce.number().describe("ID da categoria (use nexfin_categorias)"),
+    creditCardId: z.coerce.number().describe("ID do cartão de crédito"),
+    accountId: z.coerce.number().describe("ID da conta financeira"),
     invoiceMonth: z
       .string()
       .optional()
@@ -1396,6 +1813,7 @@ server.tool(
 
     // === Parcelada: criar N registros ===
     if (launchType === "parcelada" && installments > 1) {
+      const installmentsGroupId = crypto.randomUUID();
       const ids: number[] = [];
       for (let i = 1; i <= installments; i++) {
         const installDate = addMonthsPreserveDay(baseDate, i - 1);
@@ -1404,12 +1822,13 @@ server.tool(
           `INSERT INTO credit_card_transactions
             (description, amount, date, installments, current_installment,
              category_id, credit_card_id, account_id, invoice_month,
-             launch_type, recurrence_frequency)
-           VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9, 'parcelada', null)
+             launch_type, recurrence_frequency, installments_group_id)
+           VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9, 'parcelada', null, $10)
            RETURNING id`,
           [
             descricao, valor, ensureDateString(installDate),
             installments, i, categoriaId, creditCardId, accountId, invMonth,
+            installmentsGroupId,
           ]
         );
         ids.push(res.rows[0].id);
@@ -1421,6 +1840,7 @@ server.tool(
       output += `- **Total:** ${formatBRL(valor * installments)}\n`;
       output += `- **Cartão ID:** ${creditCardId}\n`;
       output += `- **IDs criados:** ${ids.join(", ")}\n`;
+      output += `- **Group ID:** ${installmentsGroupId}\n`;
       return { content: [{ type: "text" as const, text: output }] };
     }
 
@@ -1459,8 +1879,8 @@ server.tool(
   "nexfin_transacoes_cartao",
   "Lista transações de cartão de crédito por fatura (mês) e/ou cartão",
   {
-    accountId: z.number().describe("ID da conta"),
-    creditCardId: z.number().optional().describe("ID do cartão (opcional, todos se omitido)"),
+    accountId: z.coerce.number().describe("ID da conta"),
+    creditCardId: z.coerce.number().optional().describe("ID do cartão (opcional, todos se omitido)"),
     invoiceMonth: z
       .string()
       .optional()
@@ -1477,16 +1897,19 @@ server.tool(
       params.push(creditCardId);
     }
 
+    // Filtra tombstones (amount=0 + is_exception=true)
     const res = await pool.query(
       `SELECT cct.id, cct.description, cct.amount, cct.date, cct.invoice_month,
               cct.credit_card_id, cct.installments, cct.current_installment,
               cct.launch_type, cct.recurrence_frequency,
+              cct.is_exception, cct.recurrence_group_id,
               cc.name as card_name,
               c.name as category_name, c.type as category_type
        FROM credit_card_transactions cct
        LEFT JOIN categories c ON cct.category_id = c.id
        LEFT JOIN credit_cards cc ON cct.credit_card_id = cc.id
        WHERE ${where}
+         AND NOT (cct.is_exception = true AND cct.amount = 0)
        ORDER BY cct.date ASC`,
       params
     );
@@ -1499,8 +1922,8 @@ server.tool(
 
     let total = 0;
     let output = `## Transações de Cartão - Fatura ${targetMonth}\n\n`;
-    output += `| Data | Descrição | Valor | Cartão | Categoria |\n`;
-    output += `|------|-----------|-------|--------|----------|\n`;
+    output += `| ID | Data | Descrição | Valor | Cartão | Categoria |\n`;
+    output += `|----|------|-----------|-------|--------|-----------|\n`;
 
     for (const row of res.rows) {
       const amt = parseFloat(String(row.amount));
@@ -1508,9 +1931,12 @@ server.tool(
       total += isIncome ? -amt : amt;
       const installment =
         row.installments > 1 ? ` (${row.current_installment}/${row.installments})` : "";
-      const rec = row.launch_type === "recorrente" ? " [rec]" : "";
+      const tags: string[] = [];
+      if (row.launch_type === "recorrente") tags.push("rec");
+      if (row.is_exception) tags.push("exc");
+      const tagStr = tags.length > 0 ? ` [${tags.join(",")}]` : "";
       const cat = row.category_name ?? "Sem categoria";
-      output += `| ${ensureDateString(row.date)} | ${row.description}${installment}${rec} | ${formatBRL(amt)} | ${row.card_name} | ${cat} |\n`;
+      output += `| ${row.id} | ${ensureDateString(row.date)} | ${row.description}${installment}${tagStr} | ${formatBRL(amt)} | ${row.card_name} | ${cat} |\n`;
     }
 
     output += `\n**Total fatura:** ${formatBRL(total)} (${res.rows.length} transações)\n`;
@@ -1529,8 +1955,8 @@ server.tool(
   "Cria uma nova conta bancária",
   {
     nome: z.string().describe("Nome da conta bancária (ex: Nubank, Inter, Caixa)"),
-    accountId: z.number().describe("ID da conta financeira (use nexfin_contas)"),
-    saldoInicial: z.number().default(0).describe("Saldo inicial (padrão: 0)"),
+    accountId: z.coerce.number().describe("ID da conta financeira (use nexfin_contas)"),
+    saldoInicial: z.coerce.number().default(0).describe("Saldo inicial (padrão: 0)"),
     pix: z.string().optional().describe("Chave PIX (opcional)"),
     compartilhada: z.boolean().default(false).describe("Compartilhada entre contas do mesmo usuário (padrão: false)"),
   },
@@ -1565,9 +1991,9 @@ server.tool(
   "nexfin_atualizar_conta_bancaria",
   "Atualiza dados de uma conta bancária existente",
   {
-    id: z.number().describe("ID da conta bancária"),
+    id: z.coerce.number().describe("ID da conta bancária"),
     nome: z.string().optional().describe("Novo nome"),
-    saldoInicial: z.number().optional().describe("Novo saldo inicial"),
+    saldoInicial: z.coerce.number().optional().describe("Novo saldo inicial"),
     pix: z.string().optional().describe("Nova chave PIX"),
     compartilhada: z.boolean().optional().describe("Compartilhada entre contas"),
   },
@@ -1630,7 +2056,7 @@ server.tool(
   "nexfin_deletar_conta_bancaria",
   "Deleta uma conta bancária pelo ID (falha se houver transações vinculadas)",
   {
-    id: z.number().describe("ID da conta bancária a deletar"),
+    id: z.coerce.number().describe("ID da conta bancária a deletar"),
   },
   async ({ id }) => {
     // Verificar se tem transações vinculadas

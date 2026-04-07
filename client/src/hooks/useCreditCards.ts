@@ -87,11 +87,18 @@ export function useUpdateCreditCardTransaction() {
     mutationFn: async ({
       id,
       data,
+      editScope,
+      exceptionForDate,
     }: {
       id: number;
       data: Partial<InsertCreditCardTransaction>;
+      editScope?: 'single' | 'all' | 'future';
+      exceptionForDate?: string;
     }) => {
-      const response = await apiRequest('PUT', `/api/credit-card-transactions/${id}`, data);
+      const payload: Record<string, unknown> = { ...data };
+      if (editScope) payload.editScope = editScope;
+      if (exceptionForDate) payload.exceptionForDate = exceptionForDate;
+      const response = await apiRequest('PUT', `/api/credit-card-transactions/${id}`, payload);
       return response.json();
     },
     onSuccess: (transaction: CreditCardTransaction) => {
@@ -109,7 +116,12 @@ export function useDeleteCreditCardTransaction() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (
+      arg: number | { id: number; editScope?: 'single' | 'all' | 'future'; exceptionForDate?: string }
+    ) => {
+      const id = typeof arg === 'number' ? arg : arg.id;
+      const editScope = typeof arg === 'number' ? undefined : arg.editScope;
+      const exceptionForDate = typeof arg === 'number' ? undefined : arg.exceptionForDate;
       // Busca todas as transações de cartão de crédito no cache para encontrar o accountId
       const allQueries = queryClient.getQueriesData({ queryKey: ['/api/accounts'] });
       let accountId: number | null = null;
@@ -147,7 +159,11 @@ export function useDeleteCreditCardTransaction() {
         }
       }
 
-      await apiRequest('DELETE', `/api/credit-card-transactions/${id}`);
+      const qs = new URLSearchParams();
+      if (editScope) qs.set('editScope', editScope);
+      if (exceptionForDate) qs.set('exceptionForDate', exceptionForDate);
+      const suffix = qs.toString() ? `?${qs.toString()}` : '';
+      await apiRequest('DELETE', `/api/credit-card-transactions/${id}${suffix}`);
       return { id, accountId };
     },
     onSuccess: ({ accountId }) => {
