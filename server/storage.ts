@@ -1959,11 +1959,21 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // 1. Adicionar transações físicas (exceto tombstones)
+    // 1. Adicionar transações físicas (exceto tombstones e templates cobertos por exceção)
     for (const tx of transactions) {
       // Tombstones (amount=0 + isException) não aparecem na fatura
       const amtNum = Number.parseFloat(tx.amount.toString());
       if (tx.isException && amtNum === 0) continue;
+
+      // Templates recorrentes cobertos por exceção/tombstone no mesmo mês
+      // não devem aparecer fisicamente — a exceção substitui.
+      if (
+        !tx.isException &&
+        tx.recurrenceGroupId &&
+        exceptionKeys.has(`${tx.recurrenceGroupId}:${tx.invoiceMonth}`)
+      ) {
+        continue;
+      }
 
       const mapped = mapCreditCardTransaction(tx, tx.category);
       const dateStr = ensureDateString(tx.date) ?? todayBR();

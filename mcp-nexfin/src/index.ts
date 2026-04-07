@@ -2034,7 +2034,10 @@ server.tool(
       params.push(creditCardId);
     }
 
-    // Filtra tombstones (amount=0 + is_exception=true)
+    // Filtros:
+    // 1. Tombstones (amount=0 + is_exception=true) — não aparecem
+    // 2. Templates recorrentes COBERTOS por exceção/tombstone no mesmo
+    //    (recurrence_group_id, invoice_month) — substituídos pela exceção
     const res = await pool.query(
       `SELECT cct.id, cct.description, cct.amount, cct.date, cct.invoice_month,
               cct.credit_card_id, cct.installments, cct.current_installment,
@@ -2047,6 +2050,16 @@ server.tool(
        LEFT JOIN credit_cards cc ON cct.credit_card_id = cc.id
        WHERE ${where}
          AND NOT (cct.is_exception = true AND cct.amount = 0)
+         AND NOT (
+           cct.is_exception = false
+           AND cct.recurrence_group_id IS NOT NULL
+           AND EXISTS (
+             SELECT 1 FROM credit_card_transactions cct2
+             WHERE cct2.recurrence_group_id = cct.recurrence_group_id
+               AND cct2.invoice_month = cct.invoice_month
+               AND cct2.is_exception = true
+           )
+         )
        ORDER BY cct.date ASC`,
       params
     );
