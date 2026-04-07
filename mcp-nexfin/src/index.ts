@@ -12,13 +12,101 @@ const DATABASE_URL =
 const pool = new pg.Pool({ connectionString: DATABASE_URL, max: 5 });
 
 // === User cache (single-tenant) ===
+// MCP_USER_ID env permite forçar o user; senão pega o user mais antigo (id=1).
+// Tenant isolation: TODA query write deve validar que account.user_id = currentUserId.
 let cachedUserId: number | null = null;
 async function getUserId(): Promise<number> {
   if (cachedUserId !== null) return cachedUserId;
+  const envUser = process.env.MCP_USER_ID;
+  if (envUser) {
+    cachedUserId = parseInt(envUser, 10);
+    return cachedUserId!;
+  }
   const res = await pool.query("SELECT id FROM users ORDER BY id LIMIT 1");
   if (res.rows.length === 0) throw new Error("Nenhum usuário encontrado");
   cachedUserId = res.rows[0].id as number;
   return cachedUserId!
+}
+
+// === Tenant-isolated transaction lookup ===
+// Procura `id` em transactions e/ou credit_card_transactions, filtrando por
+// user_id via JOIN com accounts. Retorna a row + nome da tabela, ou erro
+// estruturado se não-encontrado/ambíguo/cross-tenant.
+type LookupTable = "transactions" | "credit_card_transactions";
+type LookupResult =
+  | { ok: true; table: LookupTable; row: any }
+  | { ok: false; error: string };
+
+async function lookupOwnedTransaction(
+  id: number,
+  preferredTable?: LookupTable
+): Promise<LookupResult> {
+  const userId = await getUserId();
+
+  // Se preferredTable foi especificada, busca só nela
+  if (preferredTable === "transactions") {
+    const res = await pool.query(
+      `SELECT t.* FROM transactions t
+       JOIN accounts a ON a.id = t.account_id
+       WHERE t.id = $1 AND a.user_id = $2`,
+      [id, userId]
+    );
+    if (res.rows.length === 0) {
+      return { ok: false, error: `Transação ID ${id} não encontrada em transactions (ou pertence a outro usuário).` };
+    }
+    return { ok: true, table: "transactions", row: res.rows[0] };
+  }
+  if (preferredTable === "credit_card_transactions") {
+    const res = await pool.query(
+      `SELECT cct.* FROM credit_card_transactions cct
+       JOIN accounts a ON a.id = cct.account_id
+       WHERE cct.id = $1 AND a.user_id = $2`,
+      [id, userId]
+    );
+    if (res.rows.length === 0) {
+      return { ok: false, error: `Transação ID ${id} não encontrada em credit_card_transactions (ou pertence a outro usuário).` };
+    }
+    return { ok: true, table: "credit_card_transactions", row: res.rows[0] };
+  }
+
+  // Auto-detect: buscar nas duas tabelas FILTRANDO por user_id
+  const txRes = await pool.query(
+    `SELECT t.* FROM transactions t
+     JOIN accounts a ON a.id = t.account_id
+     WHERE t.id = $1 AND a.user_id = $2`,
+    [id, userId]
+  );
+  const cctRes = await pool.query(
+    `SELECT cct.* FROM credit_card_transactions cct
+     JOIN accounts a ON a.id = cct.account_id
+     WHERE cct.id = $1 AND a.user_id = $2`,
+    [id, userId]
+  );
+
+  if (txRes.rows.length === 0 && cctRes.rows.length === 0) {
+    return { ok: false, error: `Transação ID ${id} não encontrada em transactions nem credit_card_transactions (ou pertence a outro usuário).` };
+  }
+  if (txRes.rows.length > 0 && cctRes.rows.length > 0) {
+    return {
+      ok: false,
+      error: `ID ${id} existe em AMBAS as tabelas (transactions E credit_card_transactions). Especifique tabela='conta' ou tabela='cartao' para desambiguar.`,
+    };
+  }
+  if (txRes.rows.length > 0) {
+    return { ok: true, table: "transactions", row: txRes.rows[0] };
+  }
+  return { ok: true, table: "credit_card_transactions", row: cctRes.rows[0] };
+}
+
+// Validar que um accountId pertence ao user atual (defesa em profundidade
+// para INSERTs onde o agente fornece o accountId direto).
+async function assertAccountOwnership(accountId: number): Promise<boolean> {
+  const userId = await getUserId();
+  const res = await pool.query(
+    `SELECT 1 FROM accounts WHERE id = $1 AND user_id = $2`,
+    [accountId, userId]
+  );
+  return res.rows.length > 0;
 }
 
 // === Date Helpers ===
@@ -379,10 +467,10 @@ async function updateCreditCardTransactionMcp(args: CctUpdateArgs) {
     if (sets.length === 0) {
       return { content: [{ type: "text" as const, text: "Nenhum campo fornecido para atualizar." }] };
     }
-    params.push(current.id);
+    params.push(current.id, current.account_id);
     const res = await pool.query(
       `UPDATE credit_card_transactions SET ${sets.join(", ")}
-       WHERE id = $${pi}
+       WHERE id = $${pi} AND account_id = $${pi + 1}
        RETURNING id, description, amount, date, invoice_month`,
       params
     );
@@ -402,8 +490,8 @@ async function updateCreditCardTransactionMcp(args: CctUpdateArgs) {
     if (!groupId) {
       groupId = crypto.randomUUID();
       await pool.query(
-        `UPDATE credit_card_transactions SET recurrence_group_id = $1 WHERE id = $2`,
-        [groupId, current.id]
+        `UPDATE credit_card_transactions SET recurrence_group_id = $1 WHERE id = $2 AND account_id = $3`,
+        [groupId, current.id, current.account_id]
       );
     }
 
@@ -431,10 +519,10 @@ async function updateCreditCardTransactionMcp(args: CctUpdateArgs) {
       if (sets.length === 0) {
         return { content: [{ type: "text" as const, text: "Nenhum campo fornecido para atualizar." }] };
       }
-      params.push(excId);
+      params.push(excId, current.account_id);
       const res = await pool.query(
         `UPDATE credit_card_transactions SET ${sets.join(", ")}
-         WHERE id = $${pi}
+         WHERE id = $${pi} AND account_id = $${pi + 1}
          RETURNING id, description, amount, date, invoice_month`,
         params
       );
@@ -509,10 +597,10 @@ async function updateCreditCardTransactionMcp(args: CctUpdateArgs) {
     if (sets.length === 0) {
       return { content: [{ type: "text" as const, text: "Nenhum campo fornecido para atualizar." }] };
     }
-    params.push(current.id);
+    params.push(current.id, current.account_id);
     const res = await pool.query(
       `UPDATE credit_card_transactions SET ${sets.join(", ")}
-       WHERE id = $${pi}
+       WHERE id = $${pi} AND account_id = $${pi + 1}
        RETURNING id, description, amount, date, invoice_month`,
       params
     );
@@ -534,8 +622,8 @@ async function updateCreditCardTransactionMcp(args: CctUpdateArgs) {
   const isInstallment = Boolean(current.installments_group_id);
   const groupCol = isInstallment ? "installments_group_id" : "recurrence_group_id";
 
-  let whereClause = `${groupCol} = $1`;
-  const whereParams: any[] = [groupId];
+  let whereClause = `${groupCol} = $1 AND account_id = $2`;
+  const whereParams: any[] = [groupId, current.account_id];
   if (!isInstallment) {
     whereClause += ` AND is_exception = false`;
   }
@@ -590,8 +678,8 @@ async function deleteCreditCardTransactionMcp(
     if (!groupId) {
       groupId = crypto.randomUUID();
       await pool.query(
-        `UPDATE credit_card_transactions SET recurrence_group_id = $1 WHERE id = $2`,
-        [groupId, current.id]
+        `UPDATE credit_card_transactions SET recurrence_group_id = $1 WHERE id = $2 AND account_id = $3`,
+        [groupId, current.id, current.account_id]
       );
     }
 
@@ -606,8 +694,8 @@ async function deleteCreditCardTransactionMcp(
 
     if (existing.rows.length > 0) {
       await pool.query(
-        `UPDATE credit_card_transactions SET amount = 0, description = '[deleted]' WHERE id = $1`,
-        [existing.rows[0].id]
+        `UPDATE credit_card_transactions SET amount = 0, description = '[deleted]' WHERE id = $1 AND account_id = $2`,
+        [existing.rows[0].id, current.account_id]
       );
     } else {
       const cardRes = await pool.query(`SELECT closing_day FROM credit_cards WHERE id = $1`, [current.credit_card_id]);
@@ -638,14 +726,14 @@ async function deleteCreditCardTransactionMcp(
     if (groupId) {
       const isInstallment = Boolean(current.installments_group_id);
       const groupCol = isInstallment ? "installments_group_id" : "recurrence_group_id";
-      let whereClause = `${groupCol} = $1`;
-      const params: any[] = [groupId];
+      let whereClause = `${groupCol} = $1 AND account_id = $2`;
+      const params: any[] = [groupId, current.account_id];
       if (escopo === "future") {
         if (isInstallment) {
-          whereClause += ` AND current_installment >= $2`;
+          whereClause += ` AND current_installment >= $${params.length + 1}`;
           params.push(current.current_installment);
         } else {
-          whereClause += ` AND invoice_month >= $2`;
+          whereClause += ` AND invoice_month >= $${params.length + 1}`;
           params.push(current.invoice_month);
         }
       }
@@ -662,8 +750,8 @@ async function deleteCreditCardTransactionMcp(
 
   // Default: DELETE direto (single em não-recorrente, ou exceção)
   const res = await pool.query(
-    `DELETE FROM credit_card_transactions WHERE id = $1 RETURNING id, description`,
-    [current.id]
+    `DELETE FROM credit_card_transactions WHERE id = $1 AND account_id = $2 RETURNING id, description`,
+    [current.id, current.account_id]
   );
   const row = res.rows[0];
   return {
@@ -1175,6 +1263,9 @@ server.tool(
     icone: z.string().default("circle").describe("Nome do ícone (padrão: circle)"),
   },
   async ({ nome, tipo, accountId, cor, icone }) => {
+    if (!(await assertAccountOwnership(accountId))) {
+      return { content: [{ type: "text" as const, text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
+    }
     const res = await pool.query(
       `INSERT INTO categories (name, type, account_id, color, icon)
        VALUES ($1, $2, $3, $4, $5)
@@ -1278,6 +1369,9 @@ server.tool(
       .describe("ID da conta bancária (opcional)"),
   },
   async ({ descricao, valor, tipo, data, categoriaId, accountId, pago, bankAccountId }) => {
+    if (!(await assertAccountOwnership(accountId))) {
+      return { content: [{ type: "text" as const, text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
+    }
     const res = await pool.query(
       `INSERT INTO transactions
         (description, amount, type, date, category_id, account_id, paid,
@@ -1313,9 +1407,13 @@ server.tool(
 // === Tool: nexfin_atualizar_transacao ===
 server.tool(
   "nexfin_atualizar_transacao",
-  "Atualiza uma transação. Para recorrentes, suporta escopo: single (só esta, cria exceção), all (todas do grupo), future (esta e próximas)",
+  "Atualiza uma transação. Para recorrentes, suporta escopo: single (só esta, cria exceção), all (todas do grupo), future (esta e próximas). Use tabela='conta'|'cartao' para desambiguar quando o ID existe em ambas as tabelas.",
   {
     id: z.coerce.number().describe("ID da transação (para virtuais, usar o ID da definição recorrente)"),
+    tabela: z
+      .enum(["conta", "cartao"])
+      .optional()
+      .describe("Tabela alvo: 'conta' (transactions) ou 'cartao' (credit_card_transactions). Omitir para auto-detect; se ID existir em ambas, retorna erro de ambiguidade."),
     escopo: z
       .enum(["single", "all", "future"])
       .default("single")
@@ -1333,19 +1431,17 @@ server.tool(
     bankAccountId: z.coerce.number().optional().describe("ID da conta bancária"),
     creditCardId: z.coerce.number().optional().describe("ID do cartão de crédito"),
   },
-  async ({ id, escopo, exceptionForDate, descricao, valor, tipo, data, categoriaId, pago, bankAccountId, creditCardId }) => {
-    // Buscar primeiro em transactions; se não achar, tentar credit_card_transactions
-    const txRes = await pool.query(`SELECT * FROM transactions WHERE id = $1`, [id]);
-    if (txRes.rows.length === 0) {
-      const cctRes = await pool.query(
-        `SELECT * FROM credit_card_transactions WHERE id = $1`,
-        [id]
-      );
-      if (cctRes.rows.length === 0) {
-        return { content: [{ type: "text" as const, text: `Transação ID ${id} não encontrada (procurada em transactions e credit_card_transactions).` }] };
-      }
+  async ({ id, tabela, escopo, exceptionForDate, descricao, valor, tipo, data, categoriaId, pago, bankAccountId, creditCardId }) => {
+    const preferred: LookupTable | undefined =
+      tabela === "conta" ? "transactions" : tabela === "cartao" ? "credit_card_transactions" : undefined;
+    const lookup = await lookupOwnedTransaction(id, preferred);
+    if (!lookup.ok) {
+      return { content: [{ type: "text" as const, text: `Erro: ${lookup.error}` }] };
+    }
+
+    if (lookup.table === "credit_card_transactions") {
       return await updateCreditCardTransactionMcp({
-        current: cctRes.rows[0],
+        current: lookup.row,
         id,
         escopo,
         exceptionForDate,
@@ -1360,7 +1456,7 @@ server.tool(
       });
     }
 
-    const current = txRes.rows[0];
+    const current = lookup.row;
     const isRecurrent = current.launch_type === "recorrente";
 
     // === CASO 0: row já é exceção → UPDATE direto (nunca criar exceção de exceção) ===
@@ -1381,10 +1477,10 @@ server.tool(
         return { content: [{ type: "text" as const, text: "Nenhum campo fornecido para atualizar." }] };
       }
 
-      params.push(id);
+      params.push(id, current.account_id);
       const res = await pool.query(
         `UPDATE transactions SET ${sets.join(", ")}
-         WHERE id = $${pi}
+         WHERE id = $${pi} AND account_id = $${pi + 1}
          RETURNING id, description, amount, type, date, paid`,
         params
       );
@@ -1400,13 +1496,13 @@ server.tool(
 
     // === CASO 1: single em recorrente → criar/atualizar exceção ===
     if (escopo === "single" && isRecurrent) {
-      // Garantir recurrence_group_id
+      // Garantir recurrence_group_id (lazy backfill com filtro por account_id)
       let groupId = current.recurrence_group_id;
       if (!groupId) {
         groupId = crypto.randomUUID();
         await pool.query(
-          `UPDATE transactions SET recurrence_group_id = $1 WHERE id = $2`,
-          [groupId, id]
+          `UPDATE transactions SET recurrence_group_id = $1 WHERE id = $2 AND account_id = $3`,
+          [groupId, id, current.account_id]
         );
       }
 
@@ -1439,10 +1535,10 @@ server.tool(
           return { content: [{ type: "text" as const, text: "Nenhum campo fornecido para atualizar." }] };
         }
 
-        params.push(excId);
+        params.push(excId, current.account_id);
         const res = await pool.query(
           `UPDATE transactions SET ${sets.join(", ")}
-           WHERE id = $${pi}
+           WHERE id = $${pi} AND account_id = $${pi + 1}
            RETURNING id, description, amount, type, date, paid`,
           params
         );
@@ -1524,10 +1620,10 @@ server.tool(
         return { content: [{ type: "text" as const, text: "Nenhum campo fornecido para atualizar." }] };
       }
 
-      params.push(id);
+      params.push(id, current.account_id);
       const res = await pool.query(
         `UPDATE transactions SET ${sets.join(", ")}
-         WHERE id = $${pi}
+         WHERE id = $${pi} AND account_id = $${pi + 1}
          RETURNING id, description, amount, type, date, paid`,
         params
       );
@@ -1555,15 +1651,15 @@ server.tool(
     const isInstallment = Boolean(current.installments_group_id);
     const groupCol = isInstallment ? "installments_group_id" : "recurrence_group_id";
 
-    // Montar WHERE
-    let whereClause = `${groupCol} = $1`;
-    const whereParams: any[] = [groupId];
+    // Montar WHERE (sempre filtrando por account_id como defesa em profundidade)
+    let whereClause = `${groupCol} = $1 AND account_id = $2`;
+    const whereParams: any[] = [groupId, current.account_id];
     if (escopo === "future") {
       if (isInstallment) {
-        whereClause += ` AND current_installment >= $2`;
+        whereClause += ` AND current_installment >= $${whereParams.length + 1}`;
         whereParams.push(current.current_installment);
       } else {
-        whereClause += ` AND date >= $2::date`;
+        whereClause += ` AND date >= $${whereParams.length + 1}::date`;
         whereParams.push(ensureDateString(current.date));
       }
     }
@@ -1604,9 +1700,13 @@ server.tool(
 // === Tool: nexfin_deletar_transacao ===
 server.tool(
   "nexfin_deletar_transacao",
-  "Deleta transação(ões). Para recorrentes/parceladas, suporta escopo: single, all, future. Detecta automaticamente se a transação está em transactions ou credit_card_transactions.",
+  "Deleta transação(ões). Suporta escopo single/all/future. Use tabela='conta'|'cartao' para desambiguar quando o ID existe em ambas. Tenant-isolated por user_id.",
   {
     id: z.coerce.number().describe("ID da transação"),
+    tabela: z
+      .enum(["conta", "cartao"])
+      .optional()
+      .describe("Tabela alvo: 'conta' (transactions) ou 'cartao' (credit_card_transactions). Omitir para auto-detect."),
     escopo: z
       .enum(["single", "all", "future"])
       .default("single")
@@ -1616,26 +1716,24 @@ server.tool(
       .optional()
       .describe("Data da ocorrência virtual sendo deletada YYYY-MM-DD (para CCT recorrente em escopo single, cria tombstone)"),
   },
-  async ({ id, escopo, exceptionForDate }) => {
-    // Buscar primeiro em transactions; se não achar, tentar credit_card_transactions
-    const txRes = await pool.query(`SELECT * FROM transactions WHERE id = $1`, [id]);
-    if (txRes.rows.length === 0) {
-      const cctRes = await pool.query(
-        `SELECT * FROM credit_card_transactions WHERE id = $1`,
-        [id]
-      );
-      if (cctRes.rows.length === 0) {
-        return { content: [{ type: "text" as const, text: `Transação ID ${id} não encontrada (procurada em transactions e credit_card_transactions).` }] };
-      }
-      return await deleteCreditCardTransactionMcp(cctRes.rows[0], escopo, exceptionForDate);
+  async ({ id, tabela, escopo, exceptionForDate }) => {
+    const preferred: LookupTable | undefined =
+      tabela === "conta" ? "transactions" : tabela === "cartao" ? "credit_card_transactions" : undefined;
+    const lookup = await lookupOwnedTransaction(id, preferred);
+    if (!lookup.ok) {
+      return { content: [{ type: "text" as const, text: `Erro: ${lookup.error}` }] };
     }
 
-    const current = txRes.rows[0];
+    if (lookup.table === "credit_card_transactions") {
+      return await deleteCreditCardTransactionMcp(lookup.row, escopo, exceptionForDate);
+    }
+
+    const current = lookup.row;
 
     if (escopo === "single") {
       const res = await pool.query(
-        `DELETE FROM transactions WHERE id = $1 RETURNING id, description`,
-        [id]
+        `DELETE FROM transactions WHERE id = $1 AND account_id = $2 RETURNING id, description`,
+        [id, current.account_id]
       );
       const row = res.rows[0];
       return {
@@ -1643,26 +1741,25 @@ server.tool(
       };
     }
 
-    // all ou future: buscar grupo
+    // all ou future: buscar grupo (com filtro por account_id como defesa em profundidade)
     const groupId = current.installments_group_id || current.recurrence_group_id;
     if (!groupId) {
-      // Sem grupo, deleta só esta
-      await pool.query(`DELETE FROM transactions WHERE id = $1`, [id]);
+      await pool.query(`DELETE FROM transactions WHERE id = $1 AND account_id = $2`, [id, current.account_id]);
       return { content: [{ type: "text" as const, text: `Transação deletada: **${current.description}** (ID: ${id})` }] };
     }
 
     const isInstallment = Boolean(current.installments_group_id);
     const groupCol = isInstallment ? "installments_group_id" : "recurrence_group_id";
 
-    let whereClause = `${groupCol} = $1`;
-    const params: any[] = [groupId];
+    let whereClause = `${groupCol} = $1 AND account_id = $2`;
+    const params: any[] = [groupId, current.account_id];
 
     if (escopo === "future") {
       if (isInstallment) {
-        whereClause += ` AND current_installment >= $2`;
+        whereClause += ` AND current_installment >= $${params.length + 1}`;
         params.push(current.current_installment);
       } else {
-        whereClause += ` AND date >= $2::date`;
+        whereClause += ` AND date >= $${params.length + 1}::date`;
         params.push(ensureDateString(current.date));
       }
     }
@@ -1705,6 +1802,9 @@ server.tool(
       .describe("Dia do vencimento (1-31)"),
   },
   async ({ descricao, valor, tipo, accountId, mesInicio, mesFim, diaVencimento }) => {
+    if (!(await assertAccountOwnership(accountId))) {
+      return { content: [{ type: "text" as const, text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
+    }
     const startMonth = mesInicio || currentMonthBR();
 
     const res = await pool.query(
@@ -1737,14 +1837,18 @@ server.tool(
 // === Tool: nexfin_deletar_fluxo_fixo ===
 server.tool(
   "nexfin_deletar_fluxo_fixo",
-  "Deleta um item de fluxo de caixa fixo pelo ID",
+  "Deleta um item de fluxo de caixa fixo pelo ID. Tenant-isolated.",
   {
     id: z.coerce.number().describe("ID do fluxo fixo a deletar"),
   },
   async ({ id }) => {
+    const userId = await getUserId();
     const res = await pool.query(
-      `DELETE FROM fixed_cashflow WHERE id = $1 RETURNING id, description`,
-      [id]
+      `DELETE FROM fixed_cashflow ff
+       USING accounts a
+       WHERE ff.id = $1 AND ff.account_id = a.id AND a.user_id = $2
+       RETURNING ff.id, ff.description`,
+      [id, userId]
     );
 
     const row = res.rows[0];
@@ -1753,7 +1857,7 @@ server.tool(
         content: [
           {
             type: "text" as const,
-            text: `Fluxo fixo ID ${id} não encontrado.`,
+            text: `Fluxo fixo ID ${id} não encontrado (ou pertence a outro usuário).`,
           },
         ],
       };
@@ -1800,13 +1904,16 @@ server.tool(
       .describe("Número de parcelas (só para parcelada, padrão: 1)"),
   },
   async ({ descricao, valor, data, categoriaId, creditCardId, accountId, invoiceMonth, launchType, installments }) => {
-    // Buscar closingDay do cartão
+    if (!(await assertAccountOwnership(accountId))) {
+      return { content: [{ type: "text" as const, text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
+    }
+    // Buscar closingDay do cartão (e validar ownership do cartão pela account)
     const cardRes = await pool.query(
-      `SELECT closing_day FROM credit_cards WHERE id = $1`,
-      [creditCardId]
+      `SELECT closing_day FROM credit_cards WHERE id = $1 AND account_id = $2`,
+      [creditCardId, accountId]
     );
     if (cardRes.rows.length === 0) {
-      return { content: [{ type: "text" as const, text: `Cartão ID ${creditCardId} não encontrado.` }] };
+      return { content: [{ type: "text" as const, text: `Cartão ID ${creditCardId} não encontrado ou não pertence à conta ${accountId}.` }] };
     }
     const closingDay = cardRes.rows[0].closing_day;
     const baseDate = parseDateInput(data);
@@ -1961,6 +2068,9 @@ server.tool(
     compartilhada: z.boolean().default(false).describe("Compartilhada entre contas do mesmo usuário (padrão: false)"),
   },
   async ({ nome, accountId, saldoInicial, pix, compartilhada }) => {
+    if (!(await assertAccountOwnership(accountId))) {
+      return { content: [{ type: "text" as const, text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
+    }
     const res = await pool.query(
       `INSERT INTO bank_accounts (name, account_id, initial_balance, pix, shared)
        VALUES ($1, $2, $3, $4, $5)
@@ -1998,6 +2108,18 @@ server.tool(
     compartilhada: z.boolean().optional().describe("Compartilhada entre contas"),
   },
   async ({ id, nome, saldoInicial, pix, compartilhada }) => {
+    // Validar ownership: bank_account.account_id deve pertencer ao user
+    const userId = await getUserId();
+    const ownerCheck = await pool.query(
+      `SELECT ba.id FROM bank_accounts ba
+       JOIN accounts a ON a.id = ba.account_id
+       WHERE ba.id = $1 AND a.user_id = $2`,
+      [id, userId]
+    );
+    if (ownerCheck.rows.length === 0) {
+      return { content: [{ type: "text" as const, text: `Conta bancária ID ${id} não encontrada (ou pertence a outro usuário).` }] };
+    }
+
     const sets: string[] = [];
     const params: any[] = [];
     let paramIdx = 1;
@@ -2059,6 +2181,18 @@ server.tool(
     id: z.coerce.number().describe("ID da conta bancária a deletar"),
   },
   async ({ id }) => {
+    // Validar ownership: bank_account.account_id deve pertencer ao user
+    const userId = await getUserId();
+    const ownerCheck = await pool.query(
+      `SELECT ba.id FROM bank_accounts ba
+       JOIN accounts a ON a.id = ba.account_id
+       WHERE ba.id = $1 AND a.user_id = $2`,
+      [id, userId]
+    );
+    if (ownerCheck.rows.length === 0) {
+      return { content: [{ type: "text" as const, text: `Conta bancária ID ${id} não encontrada (ou pertence a outro usuário).` }] };
+    }
+
     // Verificar se tem transações vinculadas
     const txCheck = await pool.query(
       `SELECT COUNT(*) as count FROM transactions WHERE bank_account_id = $1`,
