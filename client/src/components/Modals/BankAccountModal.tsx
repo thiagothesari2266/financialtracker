@@ -125,7 +125,12 @@ export default function BankAccountModal({
           </div>
           <div>
             <p className="text-xs text-muted-foreground mb-1">
-              Asaas Webhook Token (opcional - configure este mesmo valor no painel Asaas ao criar o webhook, para receber lançamentos automaticamente)
+              Asaas Webhook Token (opcional)
+            </p>
+            <p className="text-xs text-muted-foreground mb-2">
+              No painel Asaas: Integrações &gt; Webhooks &gt; Novo Webhook. URL:{' '}
+              <code className="bg-muted px-1 rounded text-xs">https://nexfinpro.com.br/api/webhooks/asaas</code>
+              {' '}— Token de autenticação: o mesmo valor informado aqui.
             </p>
             <Input placeholder="token-secreto-webhook" {...form.register('asaasWebhookToken')} />
           </div>
