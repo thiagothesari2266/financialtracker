@@ -934,7 +934,7 @@ server.tool(
 
     // Contas bancárias (próprias + compartilhadas) com saldo calculado
     const bankAccounts = await pool.query(
-      `SELECT ba.id, ba.name, ba.initial_balance, ba.pix, ba.shared, ba.account_id,
+      `SELECT ba.id, ba.name, ba.initial_balance, ba.pix, ba.shared, ba.account_id, ba.asaas_api_key,
               ba.initial_balance + COALESCE(SUM(
                 CASE WHEN t.type = 'income' AND t.paid = true AND t.date <= CURRENT_DATE AND t.account_id = $1
                           AND NOT (COALESCE(t.launch_type, '') = 'recorrente' AND COALESCE(t.recurrence_frequency, '') = 'mensal' AND t.is_exception = false)
@@ -960,15 +960,44 @@ server.tool(
       };
     }
 
+    // Função para buscar saldo real do Asaas
+    async function fetchAsaasBalance(apiKey: string): Promise<number | null> {
+      try {
+        const resp = await fetch("https://api.asaas.com/v3/finance/balance", {
+          headers: { access_token: apiKey },
+        });
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        return typeof data.balance === "number" ? data.balance : null;
+      } catch {
+        return null;
+      }
+    }
+
     let output = `## Saldos Bancários (Conta ID: ${accountId})\n\n`;
     let totalGeral = 0;
 
     for (const ba of bankAccounts.rows) {
-      const saldo = parseFloat(decimalToString(ba.current_balance));
+      let saldo: number;
+      let fonte = "";
+
+      if (ba.asaas_api_key) {
+        const asaasSaldo = await fetchAsaasBalance(ba.asaas_api_key);
+        if (asaasSaldo !== null) {
+          saldo = asaasSaldo;
+          fonte = " *(Asaas)*";
+        } else {
+          saldo = parseFloat(decimalToString(ba.current_balance));
+          fonte = " *(Asaas indisponível - calculado)*";
+        }
+      } else {
+        saldo = parseFloat(decimalToString(ba.current_balance));
+      }
+
       totalGeral += saldo;
       const shared = ba.shared ? " (compartilhada)" : "";
       const pix = ba.pix ? ` | PIX: ${ba.pix}` : "";
-      output += `- **${ba.name}** (ID: ${ba.id})${shared}: ${formatBRL(saldo)}${pix}\n`;
+      output += `- **${ba.name}** (ID: ${ba.id})${shared}${fonte}: ${formatBRL(saldo)}${pix}\n`;
     }
 
     output += `\n**Saldo total**: ${formatBRL(totalGeral)}\n`;

@@ -31,6 +31,8 @@ export default function BankAccountModal({
       pix: '',
       shared: false,
       accountId,
+      asaasApiKey: '',
+      asaasWebhookToken: '',
     },
     values: bankAccount
       ? {
@@ -39,6 +41,8 @@ export default function BankAccountModal({
           pix: bankAccount.pix,
           shared: bankAccount.shared ?? false,
           accountId: bankAccount.accountId,
+          asaasApiKey: bankAccount.asaasApiKey || '',
+          asaasWebhookToken: bankAccount.asaasWebhookToken || '',
         }
       : undefined,
   });
@@ -51,6 +55,8 @@ export default function BankAccountModal({
         pix: bankAccount.pix,
         shared: bankAccount.shared ?? false,
         accountId: bankAccount.accountId,
+        asaasApiKey: bankAccount.asaasApiKey || '',
+        asaasWebhookToken: bankAccount.asaasWebhookToken || '',
       });
     } else {
       form.reset({
@@ -59,6 +65,8 @@ export default function BankAccountModal({
         pix: '',
         shared: false,
         accountId,
+        asaasApiKey: '',
+        asaasWebhookToken: '',
       });
     }
   }, [bankAccount, accountId, form]);
@@ -72,6 +80,8 @@ export default function BankAccountModal({
         pix: data.pix,
         shared: data.shared ?? false,
         accountId: data.accountId,
+        asaasApiKey: data.asaasApiKey || null,
+        asaasWebhookToken: data.asaasWebhookToken || null,
       } as any);
   };
 
@@ -107,6 +117,18 @@ export default function BankAccountModal({
               </div>
             )}
           />
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">
+              Asaas API Key (opcional - se informada, o saldo será buscado diretamente na API do Asaas)
+            </p>
+            <Input placeholder="$aact_..." {...form.register('asaasApiKey')} />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">
+              Asaas Webhook Token (opcional - configure este mesmo valor no painel Asaas ao criar o webhook, para receber lançamentos automaticamente)
+            </p>
+            <Input placeholder="token-secreto-webhook" {...form.register('asaasWebhookToken')} />
+          </div>
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
