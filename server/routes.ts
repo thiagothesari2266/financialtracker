@@ -16,6 +16,7 @@ import {
   getInvoiceImportDetail,
   retryInvoiceImport,
 } from './routes/invoice-upload.routes';
+import { handleAsaasWebhook } from './routes/asaas-webhook.routes';
 import { AIFinancialAdvisor } from './services/ai-financial-advisor';
 import { aiChatRateLimit, createRateLimitMiddleware } from './middleware/rate-limit';
 import {
@@ -1412,6 +1413,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/invoice-imports/:creditCardId', getCardInvoiceImports);
   app.get('/api/invoice-import/:importId', getInvoiceImportDetail);
   app.post('/api/invoice-import/:importId/retry', retryInvoiceImport);
+
+  // Webhook externo do Asaas - sem autenticação de sessão
+  app.post('/api/webhooks/asaas', handleAsaasWebhook);
 
   const httpServer = createServer(app);
   return httpServer;
