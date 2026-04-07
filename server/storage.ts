@@ -1975,6 +1975,16 @@ export class DatabaseStorage implements IStorage {
         continue;
       }
 
+      // Recorrentes físicos além do recurrenceEndDate não aparecem
+      if (
+        !tx.isException &&
+        tx.launchType === 'recorrente' &&
+        tx.recurrenceEndDate &&
+        tx.invoiceMonth > ensureDateString(tx.recurrenceEndDate)!.slice(0, 7)
+      ) {
+        continue;
+      }
+
       const mapped = mapCreditCardTransaction(tx, tx.category);
       const dateStr = ensureDateString(tx.date) ?? todayBR();
       const isIncome = tx.category?.type === 'income';

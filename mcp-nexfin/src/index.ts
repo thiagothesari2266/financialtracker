@@ -2060,6 +2060,12 @@ server.tool(
                AND cct2.is_exception = true
            )
          )
+         AND NOT (
+           cct.is_exception = false
+           AND cct.launch_type = 'recorrente'
+           AND cct.recurrence_end_date IS NOT NULL
+           AND cct.invoice_month > TO_CHAR(cct.recurrence_end_date, 'YYYY-MM')
+         )
        ORDER BY cct.date ASC`,
       params
     );
