@@ -1,6 +1,15 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
+import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
+import type { OAuthServerProvider, AuthorizationParams } from "@modelcontextprotocol/sdk/server/auth/provider.js";
+import type { OAuthRegisteredClientsStore } from "@modelcontextprotocol/sdk/server/auth/clients.js";
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import type { OAuthClientInformationFull, OAuthTokens, OAuthTokenRevocationRequest } from "@modelcontextprotocol/sdk/shared/auth.js";
+import express from "express";
+import cors from "cors";
 import pg from "pg";
 import crypto from "crypto";
 import { z } from "zod";
@@ -796,10 +805,11 @@ async function deleteCreditCardTransactionMcp(
 // MCP SERVER
 // ============================================
 
-const server = new McpServer({
-  name: "mcp-nexfin",
-  version: "2.0.0",
-});
+function createServer() {
+  const server = new McpServer({
+    name: "mcp-nexfin",
+    version: "2.0.0",
+  });
 
 // ==========================================
 // LEITURA - Tools com lógica de negócio
@@ -2307,6 +2317,188 @@ server.tool(
   }
 );
 
+  return server;
+}
+
+// ==========================================
+// OAUTH PROVIDER
+// ==========================================
+
+class NexfinOAuthProvider implements OAuthServerProvider {
+  private clients = new Map<string, OAuthClientInformationFull>();
+  private codes = new Map<string, { clientId: string; codeChallenge: string; redirectUri: string }>();
+  private tokens = new Map<string, AuthInfo>();
+  private refreshTokens = new Map<string, string>();
+
+  constructor(private staticApiKey: string) {}
+
+  get clientsStore(): OAuthRegisteredClientsStore {
+    return {
+      getClient: (id) => Promise.resolve(this.clients.get(id)),
+      registerClient: (client) => {
+        // Gotcha: remover client_secret para cliente público PKCE (claude.ai)
+        const { client_secret: _cs, client_secret_expires_at: _cse, ...rest } = client as any;
+        const full = {
+          ...rest,
+          client_id: crypto.randomUUID(),
+          client_id_issued_at: Math.floor(Date.now() / 1000),
+          token_endpoint_auth_method: "none",
+        } as OAuthClientInformationFull;
+        this.clients.set(full.client_id, full);
+        return Promise.resolve(full);
+      },
+    };
+  }
+
+  async authorize(client: OAuthClientInformationFull, params: AuthorizationParams, res: express.Response): Promise<void> {
+    const code = crypto.randomUUID();
+    this.codes.set(code, {
+      clientId: client.client_id,
+      codeChallenge: params.codeChallenge ?? "",
+      redirectUri: params.redirectUri,
+    });
+    const url = new URL(params.redirectUri);
+    url.searchParams.set("code", code);
+    if (params.state) url.searchParams.set("state", params.state);
+    res.redirect(url.toString());
+  }
+
+  async challengeForAuthorizationCode(_client: OAuthClientInformationFull, code: string): Promise<string> {
+    const stored = this.codes.get(code);
+    if (!stored) throw new Error("Invalid authorization code");
+    return stored.codeChallenge;
+  }
+
+  async exchangeAuthorizationCode(client: OAuthClientInformationFull, code: string): Promise<OAuthTokens> {
+    const stored = this.codes.get(code);
+    if (!stored) throw new Error("Invalid authorization code");
+    this.codes.delete(code);
+    const accessToken = crypto.randomUUID();
+    const refreshToken = crypto.randomUUID();
+    this.tokens.set(accessToken, {
+      token: accessToken,
+      clientId: client.client_id,
+      scopes: ["mcp:tools"],
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
+    this.refreshTokens.set(refreshToken, client.client_id);
+    return { access_token: accessToken, token_type: "Bearer", expires_in: 3600, refresh_token: refreshToken };
+  }
+
+  async exchangeRefreshToken(client: OAuthClientInformationFull, refreshToken: string): Promise<OAuthTokens> {
+    const clientId = this.refreshTokens.get(refreshToken);
+    if (!clientId || clientId !== client.client_id) throw new Error("Invalid refresh token");
+    this.refreshTokens.delete(refreshToken);
+    const accessToken = crypto.randomUUID();
+    const newRefresh = crypto.randomUUID();
+    this.tokens.set(accessToken, {
+      token: accessToken,
+      clientId: client.client_id,
+      scopes: ["mcp:tools"],
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
+    this.refreshTokens.set(newRefresh, client.client_id);
+    return { access_token: accessToken, token_type: "Bearer", expires_in: 3600, refresh_token: newRefresh };
+  }
+
+  async verifyAccessToken(token: string): Promise<AuthInfo> {
+    if (this.staticApiKey && token === this.staticApiKey) {
+      return { token, clientId: "static", scopes: ["mcp:tools"], expiresAt: Math.floor(Date.now() / 1000) + 31536000 };
+    }
+    const info = this.tokens.get(token);
+    if (!info) throw new Error("Invalid access token");
+    if (info.expiresAt && Date.now() / 1000 > info.expiresAt) {
+      this.tokens.delete(token);
+      throw new Error("Token expired");
+    }
+    return info;
+  }
+
+  async revokeToken(_client: OAuthClientInformationFull, request: OAuthTokenRevocationRequest): Promise<void> {
+    this.tokens.delete(request.token);
+    this.refreshTokens.delete(request.token);
+  }
+}
+
+// ==========================================
+// HTTP SERVER
+// ==========================================
+
+async function startHttpServer() {
+  const port = parseInt(process.env.MCP_PORT || "3015", 10);
+  const apiKey = process.env.MCP_API_KEY || "";
+  const issuerUrl = new URL(process.env.MCP_ISSUER_URL || "https://nexfinpro.com.br/mcp");
+  const base = issuerUrl.href.replace(/\/$/, "");
+
+  const oauthProvider = new NexfinOAuthProvider(apiKey);
+
+  const app = express();
+  app.set("trust proxy", 1);
+  app.use(express.json());
+  app.use(cors({ origin: true, exposedHeaders: ["Mcp-Session-Id"] }));
+
+  // Gotcha 1: oauth-protected-resource não é montado pelo SDK — montar manualmente
+  app.get("/.well-known/oauth-protected-resource", (_req, res) => {
+    res.json({ resource: base, authorization_servers: [base] });
+  });
+
+  // Gotcha 2: SDK ignora o path do issuerUrl — sobrescrever com endpoints completos
+  app.get("/.well-known/oauth-authorization-server", (_req, res) => {
+    res.json({
+      issuer: base,
+      authorization_endpoint: `${base}/authorize`,
+      token_endpoint: `${base}/token`,
+      registration_endpoint: `${base}/register`,
+      revocation_endpoint: `${base}/revoke`,
+      response_types_supported: ["code"],
+      code_challenge_methods_supported: ["S256"],
+      grant_types_supported: ["authorization_code", "refresh_token"],
+      token_endpoint_auth_methods_supported: ["client_secret_post", "none"],
+      revocation_endpoint_auth_methods_supported: ["client_secret_post"],
+    });
+  });
+
+  app.use(mcpAuthRouter({ provider: oauthProvider, issuerUrl }));
+
+  const auth = requireBearerAuth({
+    verifier: oauthProvider,
+    resourceMetadataUrl: `${base}/.well-known/oauth-protected-resource`,
+    requiredScopes: ["mcp:tools"],
+  });
+
+  // Sessões stateful: um McpServer por sessão
+  const transports: Record<string, StreamableHTTPServerTransport> = {};
+
+  // Gotcha 4 (no Nginx): POST sem trailing slash perde o método — tratado via 308 no Nginx
+  // Gotcha: rota Express em "/" pois Nginx stripa o prefixo /mcp
+  for (const method of ["post", "get", "delete"] as const) {
+    app[method]("/", auth, async (req: any, res: any) => {
+      const sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+      if (sessionId && transports[sessionId]) {
+        await transports[sessionId].handleRequest(req, res, req.body);
+        return;
+      }
+
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => crypto.randomUUID(),
+        onsessioninitialized: (id) => { transports[id] = transport; },
+      });
+      transport.onclose = () => {
+        if (transport.sessionId) delete transports[transport.sessionId];
+      };
+
+      const server = createServer();
+      await server.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+    });
+  }
+
+  app.listen(port, () => {
+    console.error(`mcp-nexfin: HTTP iniciado na porta ${port} | MCP URL: ${base}`);
+  });
+}
+
 // ==========================================
 // MAIN
 // ==========================================
@@ -2329,9 +2521,16 @@ async function main() {
     process.exit(1);
   }
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("mcp-nexfin: servidor MCP v2.0 iniciado via stdio");
+  const useHttp = process.argv.includes("--http");
+
+  if (useHttp) {
+    await startHttpServer();
+  } else {
+    const server = createServer();
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("mcp-nexfin: servidor MCP v2.0 iniciado via stdio");
+  }
 }
 
 main().catch((err) => {
