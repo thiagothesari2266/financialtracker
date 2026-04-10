@@ -2330,23 +2330,23 @@ class NexfinOAuthProvider implements OAuthServerProvider {
   private codes = new Map<string, { clientId: string; codeChallenge: string; redirectUri: string }>();
   private tokens = new Map<string, AuthInfo>();
   private refreshTokens = new Map<string, string>();
+  private staticApiKey: string;
 
-  constructor(private staticApiKey: string) {}
+  constructor(staticApiKey: string) {
+    this.staticApiKey = staticApiKey;
+  }
 
   get clientsStore(): OAuthRegisteredClientsStore {
     return {
-      getClient: (id) => Promise.resolve(this.clients.get(id)),
-      registerClient: (client) => {
-        // Gotcha: remover client_secret para cliente público PKCE (claude.ai)
-        const { client_secret: _cs, client_secret_expires_at: _cse, ...rest } = client as any;
-        const full = {
-          ...rest,
+      getClient: (clientId: string) => this.clients.get(clientId),
+      registerClient: (client: Omit<OAuthClientInformationFull, "client_id" | "client_id_issued_at">) => {
+        const full: OAuthClientInformationFull = {
+          ...client,
           client_id: crypto.randomUUID(),
           client_id_issued_at: Math.floor(Date.now() / 1000),
-          token_endpoint_auth_method: "none",
         } as OAuthClientInformationFull;
         this.clients.set(full.client_id, full);
-        return Promise.resolve(full);
+        return full;
       },
     };
   }
@@ -2355,25 +2355,25 @@ class NexfinOAuthProvider implements OAuthServerProvider {
     const code = crypto.randomUUID();
     this.codes.set(code, {
       clientId: client.client_id,
-      codeChallenge: params.codeChallenge ?? "",
+      codeChallenge: params.codeChallenge,
       redirectUri: params.redirectUri,
     });
-    const url = new URL(params.redirectUri);
-    url.searchParams.set("code", code);
-    if (params.state) url.searchParams.set("state", params.state);
-    res.redirect(url.toString());
+    const redirectUrl = new URL(params.redirectUri);
+    redirectUrl.searchParams.set("code", code);
+    if (params.state) redirectUrl.searchParams.set("state", params.state);
+    res.redirect(redirectUrl.toString());
   }
 
-  async challengeForAuthorizationCode(_client: OAuthClientInformationFull, code: string): Promise<string> {
-    const stored = this.codes.get(code);
+  async challengeForAuthorizationCode(_client: OAuthClientInformationFull, authorizationCode: string): Promise<string> {
+    const stored = this.codes.get(authorizationCode);
     if (!stored) throw new Error("Invalid authorization code");
     return stored.codeChallenge;
   }
 
-  async exchangeAuthorizationCode(client: OAuthClientInformationFull, code: string): Promise<OAuthTokens> {
-    const stored = this.codes.get(code);
+  async exchangeAuthorizationCode(client: OAuthClientInformationFull, authorizationCode: string): Promise<OAuthTokens> {
+    const stored = this.codes.get(authorizationCode);
     if (!stored) throw new Error("Invalid authorization code");
-    this.codes.delete(code);
+    this.codes.delete(authorizationCode);
     const accessToken = crypto.randomUUID();
     const refreshToken = crypto.randomUUID();
     this.tokens.set(accessToken, {
@@ -2391,15 +2391,15 @@ class NexfinOAuthProvider implements OAuthServerProvider {
     if (!clientId || clientId !== client.client_id) throw new Error("Invalid refresh token");
     this.refreshTokens.delete(refreshToken);
     const accessToken = crypto.randomUUID();
-    const newRefresh = crypto.randomUUID();
+    const newRefreshToken = crypto.randomUUID();
     this.tokens.set(accessToken, {
       token: accessToken,
       clientId: client.client_id,
       scopes: ["mcp:tools"],
       expiresAt: Math.floor(Date.now() / 1000) + 3600,
     });
-    this.refreshTokens.set(newRefresh, client.client_id);
-    return { access_token: accessToken, token_type: "Bearer", expires_in: 3600, refresh_token: newRefresh };
+    this.refreshTokens.set(newRefreshToken, client.client_id);
+    return { access_token: accessToken, token_type: "Bearer", expires_in: 3600, refresh_token: newRefreshToken };
   }
 
   async verifyAccessToken(token: string): Promise<AuthInfo> {
@@ -2428,75 +2428,56 @@ class NexfinOAuthProvider implements OAuthServerProvider {
 async function startHttpServer() {
   const port = parseInt(process.env.MCP_PORT || "3015", 10);
   const apiKey = process.env.MCP_API_KEY || "";
-  const issuerUrl = new URL(process.env.MCP_ISSUER_URL || "https://nexfinpro.com.br/mcp");
-  const base = issuerUrl.href.replace(/\/$/, "");
+  const issuerUrl = new URL(process.env.MCP_ISSUER_URL || "https://nexfinpro.com.br");
 
   const oauthProvider = new NexfinOAuthProvider(apiKey);
 
   const app = express();
   app.set("trust proxy", 1);
   app.use(express.json());
-  app.use(cors({ origin: true, exposedHeaders: ["Mcp-Session-Id"] }));
-
-  // Gotcha 1: oauth-protected-resource não é montado pelo SDK — montar manualmente
-  app.get("/.well-known/oauth-protected-resource", (_req, res) => {
-    res.json({ resource: base, authorization_servers: [base] });
-  });
-
-  // Gotcha 2: SDK ignora o path do issuerUrl — sobrescrever com endpoints completos
-  app.get("/.well-known/oauth-authorization-server", (_req, res) => {
-    res.json({
-      issuer: base,
-      authorization_endpoint: `${base}/authorize`,
-      token_endpoint: `${base}/token`,
-      registration_endpoint: `${base}/register`,
-      revocation_endpoint: `${base}/revoke`,
-      response_types_supported: ["code"],
-      code_challenge_methods_supported: ["S256"],
-      grant_types_supported: ["authorization_code", "refresh_token"],
-      token_endpoint_auth_methods_supported: ["client_secret_post", "none"],
-      revocation_endpoint_auth_methods_supported: ["client_secret_post"],
-    });
-  });
 
   app.use(mcpAuthRouter({ provider: oauthProvider, issuerUrl }));
 
   const auth = requireBearerAuth({
     verifier: oauthProvider,
-    resourceMetadataUrl: `${base}/.well-known/oauth-protected-resource`,
-    requiredScopes: ["mcp:tools"],
+    resourceMetadataUrl: `${issuerUrl.origin}/.well-known/oauth-protected-resource`,
   });
 
-  // Sessões stateful: um McpServer por sessão
-  const transports: Record<string, StreamableHTTPServerTransport> = {};
+  app.post("/mcp", auth, async (req, res) => {
+    const server = createServer();
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    await server.connect(transport);
+    try {
+      await transport.handleRequest(req as any, res as any, req.body);
+    } finally {
+      res.on("finish", () => { transport.close(); server.close(); });
+    }
+  });
 
-  // Gotcha 4 (no Nginx): POST sem trailing slash perde o método — tratado via 308 no Nginx
-  // Gotcha: rota Express em "/" pois Nginx stripa o prefixo /mcp
-  for (const method of ["post", "get", "delete"] as const) {
-    app[method]("/", auth, async (req: any, res: any) => {
-      const sessionId = req.headers["mcp-session-id"] as string | undefined;
+  app.get("/mcp", auth, async (req, res) => {
+    const server = createServer();
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    await server.connect(transport);
+    try {
+      await transport.handleRequest(req as any, res as any);
+    } finally {
+      res.on("finish", () => { transport.close(); server.close(); });
+    }
+  });
 
-      if (sessionId && transports[sessionId]) {
-        await transports[sessionId].handleRequest(req, res, req.body);
-        return;
-      }
-
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => crypto.randomUUID(),
-        onsessioninitialized: (id) => { transports[id] = transport; },
-      });
-      transport.onclose = () => {
-        if (transport.sessionId) delete transports[transport.sessionId];
-      };
-
-      const server = createServer();
-      await server.connect(transport);
-      await transport.handleRequest(req, res, req.body);
-    });
-  }
+  app.delete("/mcp", auth, async (req, res) => {
+    const server = createServer();
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    await server.connect(transport);
+    try {
+      await transport.handleRequest(req as any, res as any);
+    } finally {
+      res.on("finish", () => { transport.close(); server.close(); });
+    }
+  });
 
   app.listen(port, () => {
-    console.error(`mcp-nexfin: HTTP iniciado na porta ${port} | MCP URL: ${base}`);
+    console.error(`mcp-nexfin: HTTP iniciado na porta ${port} | issuer: ${issuerUrl.origin}`);
   });
 }
 
