@@ -43,8 +43,6 @@ export function registerTransactionRoutes(app: Express) {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const startDate = req.query.startDate as string;
       const endDate = req.query.endDate as string;
-      await storage.syncInvoiceTransactions(accountId);
-
       let transactions;
       if (startDate && endDate) {
         transactions = await storage.getTransactionsByDateRange(accountId, startDate, endDate);

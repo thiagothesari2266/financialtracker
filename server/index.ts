@@ -39,7 +39,7 @@ app.use(
 if (shouldLogRequests) {
   // Middleware global para logar todas as requisições recebidas
   app.use((req, res, next) => {
-    console.log(`[${req.method}] ${req.originalUrl} - body:`, req.body);
+    console.log(`[${req.method}] ${req.originalUrl}`);
     next();
   });
 

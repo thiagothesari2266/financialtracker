@@ -1,6 +1,7 @@
 import type { Express } from 'express';
 import { z } from 'zod';
 import { storage } from '../storage';
+import { prisma } from '../db';
 import { validateAccountOwnership } from '../middleware/account-ownership';
 import { insertBankAccountSchema } from '@shared/schema';
 
@@ -11,17 +12,23 @@ export function registerBankAccountRoutes(app: Express) {
       const userId = req.session.userId!;
       const bankAccounts = await storage.getBankAccounts(accountId, userId);
 
-      // Calcular saldo atual usando rollforward (inclui recorrências virtuais)
-      const today = new Date().toISOString().split('T')[0];
-      const allTxs = await storage.getTransactionsByDateRange(accountId, '1900-01-01', today);
-      const paidTxs = allTxs.filter(t => t.paid);
+      // Calcular saldo atual via aggregate SQL (apenas transações pagas físicas)
+      const aggregates = await prisma.transaction.groupBy({
+        by: ['bankAccountId', 'type'],
+        where: {
+          accountId,
+          paid: true,
+          bankAccountId: { not: null },
+        },
+        _sum: { amount: true },
+      });
 
       const balanceMap = new Map<number, number>();
-      for (const tx of paidTxs) {
-        if (!tx.bankAccountId) continue;
-        const current = balanceMap.get(tx.bankAccountId) || 0;
-        const amount = parseFloat(tx.amount);
-        balanceMap.set(tx.bankAccountId, current + (tx.type === 'income' ? amount : -amount));
+      for (const row of aggregates) {
+        if (!row.bankAccountId) continue;
+        const current = balanceMap.get(row.bankAccountId) || 0;
+        const amount = Number(row._sum.amount ?? 0);
+        balanceMap.set(row.bankAccountId, current + (row.type === 'income' ? amount : -amount));
       }
 
       const enriched = bankAccounts.map(ba => {

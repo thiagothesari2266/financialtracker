@@ -1,4 +1,4 @@
-import { type MouseEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { addMonths, endOfMonth, format, parse, startOfMonth, subMonths } from 'date-fns';
 import { todayBR } from '@/lib/date-br';
 import { ptBR } from 'date-fns/locale';
@@ -6,6 +6,7 @@ import { useAccount } from '@/contexts/AccountContext';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useBankAccounts } from '@/hooks/useBankAccounts';
 import { useCreditCards } from '@/hooks/useCreditCards';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { AppShell } from '@/components/Layout/AppShell';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -70,8 +71,7 @@ export default function Transactions() {
   );
   const [editScope, setEditScope] = useState<'single' | 'all' | 'future' | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
-  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+
   const [currentDate, setCurrentDate] = useState(() => todayBR());
   const [viewType, setViewType] = useState<ViewType>('month');
   const storageKey = currentAccount ? `transactions-period-${currentAccount.id}` : null;
@@ -355,41 +355,13 @@ export default function Transactions() {
     }
   };
 
-  const handleSelectTransaction = (
-    transactionId: number,
-    checked: boolean,
-    event?: MouseEvent,
-    index?: number
-  ) => {
-    const newSelected = new Set(selectedTransactions);
-
-    if (event?.shiftKey && lastSelectedIndex !== null && index !== undefined) {
-      const startIndex = Math.min(lastSelectedIndex, index);
-      const endIndex = Math.max(lastSelectedIndex, index);
-      for (let i = startIndex; i <= endIndex; i++) {
-        const transaction = filteredTransactions[i];
-        if (transaction) newSelected.add(transaction.id);
-      }
-    } else if (checked) {
-      newSelected.add(transactionId);
-    } else {
-      newSelected.delete(transactionId);
-    }
-
-    setSelectedTransactions(newSelected);
-    if (index !== undefined) setLastSelectedIndex(index);
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    setSelectedTransactions(
-      checked ? new Set(filteredTransactions.map((transaction) => transaction.id)) : new Set()
-    );
-  };
-
-  const handleCancelSelection = () => {
-    setSelectedTransactions(new Set());
-    setLastSelectedIndex(null);
-  };
+  const {
+    selected: selectedTransactions,
+    handleSelect: handleSelectTransaction,
+    handleSelectAll,
+    handleCancel: handleCancelSelection,
+    isAllSelected,
+  } = useBulkSelection(filteredTransactions);
 
   const deleteTransactionsMutation = useMutation({
     mutationFn: async (ids: number[]) => {
@@ -401,7 +373,8 @@ export default function Transactions() {
       );
     },
     onSuccess: (_, ids) => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', currentAccount?.id, 'transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', currentAccount?.id, 'bank-accounts'] });
       toast({
         title: 'Sucesso',
         description: `${ids.length} transação(ões) excluída(s).`,
@@ -416,10 +389,6 @@ export default function Transactions() {
       });
     },
   });
-
-  const isAllSelected =
-    filteredTransactions.length > 0 &&
-    filteredTransactions.every((transaction) => selectedTransactions.has(transaction.id));
 
   const headerActions =
     selectedTransactions.size > 0 ? (
@@ -718,7 +687,7 @@ export default function Transactions() {
                                   handleSelectTransaction(
                                     transaction.id,
                                     !selectedTransactions.has(transaction.id),
-                                    e as unknown as MouseEvent,
+                                    e,
                                     index
                                   );
                                 }}

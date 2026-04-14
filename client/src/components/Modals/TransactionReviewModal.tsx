@@ -166,8 +166,8 @@ export default function TransactionReviewModal({
     },
     onSuccess: (data) => {
       // Invalidate relevant queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['credit-card-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', currentAccount?.id, 'credit-card-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts', currentAccount?.id, 'transactions'] });
 
       toast({
         title: 'Sucesso',

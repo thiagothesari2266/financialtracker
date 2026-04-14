@@ -55,9 +55,7 @@ const upload = multer({
  * POST /api/invoice-paste
  * Processamento de imagem colada da área de transferência
  */
-export function pasteInvoiceImage(req: Request, res: Response) {
-  console.log('[Invoice Paste] Iniciando processamento de imagem colada...');
-
+export async function pasteInvoiceImage(req: Request, res: Response) {
   try {
     const { imageData, creditCardId, accountId } = req.body;
 
@@ -79,38 +77,28 @@ export function pasteInvoiceImage(req: Request, res: Response) {
     const base64Data = matches[2];
     const imageBuffer = Buffer.from(base64Data, 'base64');
 
-    console.log(`[Invoice Paste] Imagem recebida: ${imageType} (${imageBuffer.length} bytes)`);
-
-    // Process the image
-    processImageFromBuffer({
+    const result = await processImageFromBuffer({
       imageBuffer,
       filename: `pasted-image-${Date.now()}.${imageType}`,
       fileType: `image/${imageType}`,
       creditCardId: parseInt(creditCardId),
       accountId: parseInt(accountId),
-    })
-      .then((result) => {
-        if (result.success) {
-          res.json({
-            success: true,
-            importId: result.importId,
-            transactionsCount: result.transactionsCount,
-            transactions: result.extractedData?.transactions || [],
-            message: `${result.transactionsCount} transações importadas com sucesso`,
-          });
-        } else {
-          res.status(422).json({
-            success: false,
-            error: result.error || 'Erro no processamento da imagem',
-          });
-        }
-      })
-      .catch((error) => {
-        console.error('Erro no processamento de imagem colada:', error);
-        res.status(500).json({
-          error: error instanceof Error ? error.message : 'Erro interno do servidor',
-        });
+    });
+
+    if (result.success) {
+      res.json({
+        success: true,
+        importId: result.importId,
+        transactionsCount: result.transactionsCount,
+        transactions: result.extractedData?.transactions || [],
+        message: `${result.transactionsCount} transações importadas com sucesso`,
       });
+    } else {
+      res.status(422).json({
+        success: false,
+        error: result.error || 'Erro no processamento da imagem',
+      });
+    }
   } catch (error) {
     console.error('Erro ao processar imagem colada:', error);
     res.status(500).json({
@@ -124,8 +112,6 @@ export function pasteInvoiceImage(req: Request, res: Response) {
  * Upload e processamento de múltiplas imagens de fatura
  */
 export function uploadMultipleInvoiceImages(req: Request, res: Response) {
-  console.log('[Invoice Upload Multiple] Iniciando upload de múltiplas imagens...');
-
   // Aplicar middleware de upload para múltiplos arquivos
   upload.array('files', 10)(req, res, async (err) => {
     // máximo 10 arquivos
@@ -154,8 +140,6 @@ export function uploadMultipleInvoiceImages(req: Request, res: Response) {
         error: 'creditCardId e accountId são obrigatórios',
       });
     }
-
-    console.log(`[Upload Multiple] ${files.length} arquivos recebidos`);
 
     try {
       // Processar múltiplas imagens
@@ -204,8 +188,6 @@ export function uploadMultipleInvoiceImages(req: Request, res: Response) {
  * Upload e processamento de fatura
  */
 export function uploadInvoice(req: Request, res: Response) {
-  console.log('[Invoice Upload] Iniciando upload...');
-
   // Aplicar middleware de upload
   upload.single('file')(req, res, async (err) => {
     if (err) {
@@ -229,8 +211,6 @@ export function uploadInvoice(req: Request, res: Response) {
         error: 'creditCardId e accountId são obrigatórios',
       });
     }
-
-    console.log(`[Upload] Arquivo recebido: ${file.originalname} (${file.size} bytes)`);
 
     try {
       // Processar fatura

@@ -1,4 +1,4 @@
-import { type MouseEvent, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { todayBR, currentMonthBR } from '@/lib/date-br';
 import { useAccount } from '@/contexts/AccountContext';
 import { useCreditCards, useCreditCardInvoices } from '@/hooks/useCreditCards';
@@ -37,6 +37,20 @@ import { AppShell } from '@/components/Layout/AppShell';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SummaryCard } from '@/components/ui/summary-card';
 import { cn, formatCurrency } from '@/lib/utils';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
+import type { CreditCardTransactionWithCategory, InvoicePayment } from '@shared/schema';
+
+interface CreditCardInvoiceSummary {
+  creditCardId: number;
+  cardName: string;
+  month: string;
+  periodStart: string;
+  periodEnd: string;
+  total: string;
+  transactions: CreditCardTransactionWithCategory[];
+  invoicePayment: InvoicePayment | null;
+  dueDate: string;
+}
 
 export default function CreditCardInvoice() {
   const { currentAccount } = useAccount();
@@ -46,10 +60,9 @@ export default function CreditCardInvoice() {
   const search = useSearch();
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
-
-  const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
-  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<
+    CreditCardTransactionWithCategory | { creditCardId: number; type: string; date: string } | null
+  >(null);
 
   // Extrair parâmetros da URL (reativo via useSearch)
   const urlParams = new URLSearchParams(search);
@@ -59,9 +72,10 @@ export default function CreditCardInvoice() {
   const { data: creditCards = [], isLoading: loadingCreditCards } = useCreditCards(
     currentAccount?.id || 0
   );
-  const { data: invoices = [], isLoading: loadingInvoices } = useCreditCardInvoices(
+  const { data: rawInvoices = [], isLoading: loadingInvoices } = useCreditCardInvoices(
     currentAccount?.id || 0
   );
+  const invoices = rawInvoices as CreditCardInvoiceSummary[];
 
   const creditCard = useMemo(() => {
     if (!creditCardId || !creditCards.length) return null;
@@ -71,7 +85,7 @@ export default function CreditCardInvoice() {
   const invoice = useMemo(() => {
     if (!creditCardId || !month || !invoices.length) return null;
     return invoices.find(
-      (inv: any) => inv.creditCardId === Number(creditCardId) && inv.month === month
+      (inv) => inv.creditCardId === Number(creditCardId) && inv.month === month
     );
   }, [creditCardId, month, invoices]);
 
@@ -121,46 +135,9 @@ export default function CreditCardInvoice() {
     navigate(`/credit-card-invoice?creditCardId=${creditCardId}&month=${currentMonthStr}`);
   };
 
-  const handleEditTransaction = (transaction: any) => {
+  const handleEditTransaction = (transaction: CreditCardTransactionWithCategory) => {
     setSelectedTransaction(transaction);
     setIsTransactionModalOpen(true);
-  };
-
-  const handleSelectTransaction = (
-    transactionId: number,
-    checked: boolean,
-    event?: MouseEvent,
-    index?: number
-  ) => {
-    const newSelected = new Set(selectedTransactions);
-
-    if (event?.shiftKey && lastSelectedIndex !== null && index !== undefined) {
-      const startIndex = Math.min(lastSelectedIndex, index);
-      const endIndex = Math.max(lastSelectedIndex, index);
-      for (let i = startIndex; i <= endIndex; i++) {
-        if (filteredTransactions[i]) {
-          newSelected.add(filteredTransactions[i].id);
-        }
-      }
-    } else if (checked) {
-      newSelected.add(transactionId);
-    } else {
-      newSelected.delete(transactionId);
-    }
-
-    setSelectedTransactions(newSelected);
-    if (index !== undefined) setLastSelectedIndex(index);
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    setSelectedTransactions(
-      checked ? new Set(filteredTransactions.map((t) => t.id)) : new Set()
-    );
-  };
-
-  const handleCancelSelection = () => {
-    setSelectedTransactions(new Set());
-    setLastSelectedIndex(null);
   };
 
   // Mutation para deletar transações em massa
@@ -198,7 +175,7 @@ export default function CreditCardInvoice() {
       });
       handleCancelSelection();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: 'Erro',
         description: error.message || 'Erro ao excluir transações',
@@ -220,17 +197,21 @@ export default function CreditCardInvoice() {
   // Filtrar e ordenar transações
   const filteredTransactions = useMemo(() => {
     const transactions = invoice?.transactions?.filter(
-      (transaction: any) =>
+      (transaction) =>
         transaction.creditCardId === Number(creditCardId) &&
         (transaction?.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           transaction?.category?.name?.toLowerCase().includes(searchTerm.toLowerCase()))
     ) || [];
-    return [...transactions].sort((a: any, b: any) => a.date.localeCompare(b.date));
+    return [...transactions].sort((a, b) => a.date.localeCompare(b.date));
   }, [invoice, creditCardId, searchTerm]);
 
-  const isAllSelected =
-    filteredTransactions.length > 0 &&
-    filteredTransactions.every((t: any) => selectedTransactions.has(t.id));
+  const {
+    selected: selectedTransactions,
+    handleSelect: handleSelectTransaction,
+    handleSelectAll,
+    handleCancel: handleCancelSelection,
+    isAllSelected,
+  } = useBulkSelection(filteredTransactions);
 
   const handleCloseTransactionModal = () => {
     setIsTransactionModalOpen(false);
@@ -285,7 +266,7 @@ export default function CreditCardInvoice() {
     // Verifica se esta vencido
     if (invoice.dueDate) {
       const due = new Date(invoice.dueDate);
-      if (due < new Date(todayBR() + 'T23:59:59') && payment?.status !== 'paid') return 'overdue';
+      if (due < new Date(todayBR() + 'T23:59:59')) return 'overdue';
     }
     return 'pending';
   }, [invoice, invoiceTotal]);
@@ -503,7 +484,7 @@ export default function CreditCardInvoice() {
               <>
                 {/* Mobile view */}
                 <div className="divide-y divide-border/50 sm:hidden">
-                  {filteredTransactions.map((transaction: any, index: number) => (
+                  {filteredTransactions.map((transaction, index) => (
                     <div
                       key={transaction.id}
                       className={cn(
@@ -579,7 +560,7 @@ export default function CreditCardInvoice() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredTransactions.map((transaction: any, index: number) => (
+                      {filteredTransactions.map((transaction, index) => (
                         <TableRow
                           key={transaction.id}
                           className="cursor-pointer border-b border-border/50 hover:bg-muted/20"
@@ -596,7 +577,7 @@ export default function CreditCardInvoice() {
                                 handleSelectTransaction(
                                   transaction.id,
                                   !selectedTransactions.has(transaction.id),
-                                  e as unknown as MouseEvent,
+                                  e,
                                   index
                                 );
                               }}

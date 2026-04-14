@@ -57,10 +57,16 @@ export async function getCategoryStats(
     return [];
   }
 
+  const [year, monthStr] = month.split('-');
+  const monthNumber = Number.parseInt(monthStr, 10) - 1;
+  const yearNumber = Number.parseInt(year, 10);
+  const lastDay = new Date(Date.UTC(yearNumber, monthNumber + 1, 0));
+  const endDateStr = `${yearNumber}-${String(monthNumber + 1).padStart(2, '0')}-${String(lastDay.getUTCDate()).padStart(2, '0')}`;
+
   const transactions = await getTransactionsByDateRange(
     accountId,
     `${month}-01`,
-    `${month}-31`
+    endDateStr
   );
   const totals = new Map<number, number>();
 

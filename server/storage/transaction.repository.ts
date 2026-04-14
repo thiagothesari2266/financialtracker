@@ -339,14 +339,6 @@ export async function updateTransactionWithScope(
   }
 ): Promise<Transaction | undefined> {
   const scope = data.editScope ?? 'single';
-  console.log('[updateTransactionWithScope] start', {
-    id,
-    editScope: scope,
-    installmentsGroupId: data.installmentsGroupId,
-    recurrenceGroupId: data.recurrenceGroupId,
-    exceptionForDate: data.exceptionForDate,
-    hasRecurrenceFrequency: !!data.recurrenceFrequency,
-  });
 
   let current = await prisma.transaction.findUnique({ where: { id } });
   if (!current) return undefined;
@@ -358,12 +350,6 @@ export async function updateTransactionWithScope(
       !!current.recurrenceFrequency ||
       !!current.recurrenceGroupId)
   ) {
-    console.log('[updateTransactionWithScope] creating exception for recurrence', {
-      transactionId: id,
-      exceptionForDate: data.exceptionForDate,
-      targetDate: data.date,
-    });
-
     // Se não tem recurrenceGroupId, criar um primeiro
     if (!current.recurrenceGroupId) {
       const newGroupId = randomUUID();
@@ -371,7 +357,6 @@ export async function updateTransactionWithScope(
         where: { id: current.id },
         data: { recurrenceGroupId: newGroupId },
       });
-      console.log('[updateTransactionWithScope] created recurrenceGroupId', newGroupId);
     }
 
     // A data da ocorrência sendo editada vem do frontend
@@ -391,7 +376,6 @@ export async function updateTransactionWithScope(
 
     if (existingException) {
       // Atualiza a exceção existente
-      console.log('[updateTransactionWithScope] updating existing exception', existingException.id);
       const updated = await prisma.transaction.update({
         where: { id: existingException.id },
         data: {
@@ -409,7 +393,6 @@ export async function updateTransactionWithScope(
     }
 
     // Criar nova exceção
-    console.log('[updateTransactionWithScope] creating new exception');
     const exception = await prisma.transaction.create({
       data: {
         description: data.description ?? current.description,
@@ -448,7 +431,6 @@ export async function updateTransactionWithScope(
   }
 
   if (!data.editScope || data.editScope === 'single') {
-    console.log('[updateTransactionWithScope] fallback single update');
     return updateTransaction(id, data);
   }
 

@@ -8,16 +8,8 @@ export function registerCreditCardRoutes(app: Express) {
   app.get('/api/accounts/:accountId/credit-cards', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
-      console.log(
-        `[GET /api/accounts/${accountId}/credit-cards] Buscando cartões para accountId:`,
-        accountId
-      );
       const userId = req.session.userId!;
       const creditCards = await storage.getCreditCards(accountId, userId);
-      console.log(
-        `[GET /api/accounts/${accountId}/credit-cards] Encontrados ${creditCards.length} cartões:`,
-        creditCards
-      );
       res.json(creditCards);
     } catch (error) {
       console.error(`[GET /api/accounts/:accountId/credit-cards] Erro:`, error);
@@ -41,7 +33,6 @@ export function registerCreditCardRoutes(app: Express) {
   app.post('/api/accounts/:accountId/credit-cards', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
-      console.log('[POST /api/accounts/:accountId/credit-cards] Body recebido:', req.body);
       const rawData = {
         ...req.body,
         accountId,
@@ -60,7 +51,6 @@ export function registerCreditCardRoutes(app: Express) {
             ? validatedData.creditLimit
             : '0',
       };
-      console.log('[POST /api/accounts/:accountId/credit-cards] Dados validados:', validatedData);
       const card = await storage.createCreditCard(normalizedData);
       res.status(201).json(card);
     } catch (error) {
@@ -117,9 +107,7 @@ export function registerCreditCardRoutes(app: Express) {
   app.delete('/api/credit-cards/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      console.log('[DELETE /api/credit-cards/:id] Tentando excluir cartão ID:', id);
       await storage.deleteCreditCard(id);
-      console.log('[DELETE /api/credit-cards/:id] Cartão excluído com sucesso');
       res.status(204).send();
     } catch (error) {
       console.error('[DELETE /api/credit-cards/:id] Erro:', error);
@@ -197,9 +185,7 @@ export function registerCreditCardRoutes(app: Express) {
       const exceptionForDate = (req.query.exceptionForDate ?? req.body?.exceptionForDate) as
         | string
         | undefined;
-      console.log('[DELETE /api/credit-card-transactions/:id] id:', id, { editScope });
       await storage.deleteCreditCardTransaction(id, { editScope, exceptionForDate });
-      console.log('[DELETE /api/credit-card-transactions/:id] Transação excluída com sucesso');
       res.status(204).send();
     } catch (error) {
       console.error('[DELETE /api/credit-card-transactions/:id] error:', error);

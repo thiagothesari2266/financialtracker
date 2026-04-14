@@ -23,6 +23,7 @@ import FloatingChatButton from '@/components/Chat/FloatingChatButton';
 import LoginPage from '@/pages/Login';
 import AdminInvites from '@/pages/AdminInvites';
 import AdminUsers from '@/pages/AdminUsers';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function AuthenticatedRoutes() {
   const { accounts, isLoading } = useAccount();
@@ -124,7 +125,9 @@ function App() {
       <TooltipProvider>
         <AuthProvider>
           <Toaster />
-          <AppContent />
+          <ErrorBoundary>
+            <AppContent />
+          </ErrorBoundary>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

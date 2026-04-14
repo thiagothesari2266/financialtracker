@@ -10,7 +10,6 @@ export function registerInvoiceManagementRoutes(app: Express) {
     const accountId = Number(req.params.accountId);
     if (!accountId) return res.status(400).json({ error: 'accountId obrigatório' });
     try {
-      await storage.syncInvoiceTransactions(accountId);
       const invoices = await storage.getCreditCardInvoices(accountId);
       res.json(invoices);
     } catch (error) {

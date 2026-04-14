@@ -57,23 +57,10 @@ export default function InvoiceUploadModal({
       formData.append('creditCardId', creditCard?.id.toString() || '');
       formData.append('accountId', currentAccount?.id.toString() || '');
 
-      console.log('[Upload Multiple] Enviando requisição para:', '/api/invoice-upload-multiple');
-      console.log(
-        '[Upload Multiple] Arquivos:',
-        files.map((f) => f.name)
-      );
-      console.log('[Upload Multiple] FormData:', {
-        fileCount: files.length,
-        creditCardId: formData.get('creditCardId'),
-        accountId: formData.get('accountId'),
-      });
-
       const response = await fetch('/api/invoice-upload-multiple', {
         method: 'POST',
         body: formData,
       });
-
-      console.log('[Upload Multiple] Status da resposta:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -82,7 +69,6 @@ export default function InvoiceUploadModal({
       }
 
       const result = await response.json();
-      console.log('[Upload Multiple] Resultado:', result);
       return result;
     },
     onSuccess: (data, files) => {
@@ -143,8 +129,6 @@ export default function InvoiceUploadModal({
 
   const pasteMutation = useMutation({
     mutationFn: async (imageData: string) => {
-      console.log('[Paste] Enviando imagem colada para:', '/api/invoice-paste');
-
       const response = await fetch('/api/invoice-paste', {
         method: 'POST',
         headers: {
@@ -157,8 +141,6 @@ export default function InvoiceUploadModal({
         }),
       });
 
-      console.log('[Paste] Status da resposta:', response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
         console.error('[Paste] Erro na resposta:', errorText);
@@ -166,7 +148,6 @@ export default function InvoiceUploadModal({
       }
 
       const result = await response.json();
-      console.log('[Paste] Resultado:', result);
       return result;
     },
     onSuccess: (data) => {

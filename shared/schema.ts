@@ -71,6 +71,9 @@ export const insertCategorySchema = z.object({
 });
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 
+export const launchTypeEnum = z.enum(['unica', 'recorrente', 'parcelada']);
+export const recurrenceFrequencyEnum = z.enum(['mensal', 'semanal', 'anual']);
+
 export const insertTransactionSchema = z.object({
   description: z.string().min(1),
   amount: z.string().min(1),
@@ -86,9 +89,9 @@ export const insertTransactionSchema = z.object({
   installments: z.number().optional(),
   currentInstallment: z.number().optional(),
   installmentsGroupId: z.string().optional().nullable(),
-  recurrenceFrequency: z.string().optional(),
+  recurrenceFrequency: recurrenceFrequencyEnum.or(z.literal('')).optional(),
   recurrenceEndDate: z.string().optional(),
-  launchType: z.string().optional(),
+  launchType: launchTypeEnum.or(z.literal('')).optional(),
   recurrenceGroupId: z.string().optional(),
   creditCardInvoiceId: z.string().optional().nullable(),
   creditCardId: z.number().optional().nullable(),
@@ -125,8 +128,8 @@ export const insertCreditCardTransactionSchema = z.object({
   currentInstallment: z.number().optional(),
   creditCardId: z.number(),
   invoiceMonth: z.string().min(1),
-  launchType: z.string().optional(),
-  recurrenceFrequency: z.string().optional(),
+  launchType: launchTypeEnum.or(z.literal('')).optional(),
+  recurrenceFrequency: recurrenceFrequencyEnum.or(z.literal('')).optional(),
   recurrenceEndDate: z.string().optional(),
 });
 export type InsertCreditCardTransaction = z.infer<typeof insertCreditCardTransactionSchema>;
