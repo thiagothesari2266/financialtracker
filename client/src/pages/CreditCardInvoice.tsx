@@ -36,7 +36,7 @@ import { useLocation, useSearch } from 'wouter';
 import { AppShell } from '@/components/Layout/AppShell';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SummaryCard } from '@/components/ui/summary-card';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency, formatDateBR, formatMonth } from '@/lib/utils';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import type { CreditCardTransactionWithCategory, InvoicePayment } from '@shared/schema';
 
@@ -90,18 +90,6 @@ export default function CreditCardInvoice() {
   }, [creditCardId, month, invoices]);
 
   const formatCurrencyAbs = (amount: string) => formatCurrency(Math.abs(parseFloat(amount)));
-
-  const formatMonth = (monthStr: string) => {
-    const [year, m] = monthStr.split('-');
-    const date = new Date(parseInt(year), parseInt(m) - 1);
-    return date
-      .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
-      .replace(/^\w/, (c) => c.toUpperCase());
-  };
-
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('pt-BR');
-  };
 
   // Navegação de mês
   const handlePreviousMonth = () => {
@@ -396,7 +384,7 @@ export default function CreditCardInvoice() {
                 </p>
                 {invoice?.dueDate && (
                   <p className="text-sm text-muted-foreground">
-                    Vencimento: {formatDate(invoice.dueDate)}
+                    Vencimento: {formatDateBR(invoice.dueDate)}
                   </p>
                 )}
               </div>
@@ -536,7 +524,7 @@ export default function CreditCardInvoice() {
                               {transaction.category?.type === 'income' ? '+ ' : ''}{formatCurrencyAbs(transaction.amount)}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {formatDate(transaction.date)}
+                              {formatDateBR(transaction.date)}
                             </p>
                           </div>
                         </div>
@@ -609,7 +597,7 @@ export default function CreditCardInvoice() {
                           <TableCell>
                             <div className="flex items-center gap-2 text-muted-foreground">
                               <Calendar className="h-4 w-4" />
-                              {formatDate(transaction.date)}
+                              {formatDateBR(transaction.date)}
                             </div>
                           </TableCell>
                           <TableCell className="text-right">

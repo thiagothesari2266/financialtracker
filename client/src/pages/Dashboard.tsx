@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { formatMonth } from '@/lib/utils';
 import { addMonths, format, subMonths } from 'date-fns';
 import { todayBR } from '@/lib/date-br';
 import { AppShell } from '@/components/Layout/AppShell';
@@ -26,18 +27,6 @@ export default function Dashboard() {
   const currentMonth = useMemo(() => {
     return currentDate.substring(0, 7);
   }, [currentDate]);
-
-  const formattedMonth = useMemo(() => {
-    try {
-      const [year, month] = currentDate.split('-').map(Number);
-      const date = new Date(year, month - 1, 1);
-      return date
-        .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
-        .replace(/^\w/, (c) => c.toUpperCase());
-    } catch {
-      return currentMonth;
-    }
-  }, [currentDate, currentMonth]);
 
   if (!currentAccount) {
     return (
@@ -87,7 +76,7 @@ export default function Dashboard() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="text-xs sm:text-sm font-medium px-1.5 h-7">
-                      {formattedMonth}
+                      {formatMonth(currentDate)}
                       <ChevronDown className="h-3 w-3 ml-0.5" />
                     </Button>
                   </DropdownMenuTrigger>

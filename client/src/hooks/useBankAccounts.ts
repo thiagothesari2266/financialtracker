@@ -19,6 +19,11 @@ export function useBankAccount(id: number) {
   return useQuery<BankAccount>({
     queryKey: ['/api/bank-accounts', id],
     enabled: !!id,
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/bank-accounts/${id}`);
+      if (!response.ok) throw new Error('Erro ao buscar conta bancária');
+      return response.json();
+    },
   });
 }
 
