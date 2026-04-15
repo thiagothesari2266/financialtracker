@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { Debt } from '@shared/schema';
-import { CurrencyInput } from '@/components/ui/currency-input';
+import { CurrencyFormField } from '@/components/ui/currency-form-field';
 
 const debtSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -153,23 +153,7 @@ export function DebtModal({
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="balance"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Saldo atual</FormLabel>
-                    <FormControl>
-                      <CurrencyInput
-                        placeholder="0,00"
-                        value={field.value ? Number(field.value) : null}
-                        onValueChange={(val) => field.onChange(val == null ? '' : val.toString())}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <CurrencyFormField control={form.control} name="balance" label="Saldo atual" />
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <FormField

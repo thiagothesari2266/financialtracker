@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { CurrencyInput } from '@/components/ui/currency-input';
+import { CurrencyFormField } from '@/components/ui/currency-form-field';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -210,26 +210,7 @@ export default function ProjectModal({ isOpen, onClose, accountId, project }: Pr
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="budget"
-                render={({ field }) => {
-                  const numericValue =
-                    field.value && !isNaN(Number(field.value)) ? Number(field.value) : null;
-                  return (
-                    <FormItem>
-                      <FormLabel>Orçamento</FormLabel>
-                      <FormControl>
-                        <CurrencyInput
-                          placeholder="0,00"
-                          value={numericValue}
-                          onValueChange={(val) => field.onChange(val == null ? '' : val.toString())}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  );
-                }}
-              />
+              <CurrencyFormField control={form.control} name="budget" label="Orçamento" />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
