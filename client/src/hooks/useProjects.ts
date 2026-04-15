@@ -1,6 +1,23 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { createEntityCrud } from './useEntityCrud';
 import type { Project, InsertProject, ProjectWithClient, ProjectWithStats } from '@shared/schema';
 
+const crud = createEntityCrud<Project, InsertProject>({
+  listKey: (accountId) => ['/api/accounts', accountId, 'projects'],
+  singleKey: (id) => ['/api/projects', id],
+  listPath: (accountId) => `/api/accounts/${accountId}/projects`,
+  singlePath: (id) => `/api/projects/${id}`,
+  onUpdateExtraInvalidations: (project, qc) => {
+    qc.invalidateQueries({ queryKey: ['/api/projects', project.id] });
+    qc.invalidateQueries({ queryKey: ['/api/projects', project.id, 'stats'] });
+  },
+});
+
+export const useCreateProject = crud.useCreate;
+export const useUpdateProject = crud.useUpdate;
+export const useDeleteProject = crud.useDelete;
+
+// useProjects retorna ProjectWithClient[], não Project[] — query separada para preservar o tipo
 export function useProjects(accountId: number) {
   return useQuery({
     queryKey: ['/api/accounts', accountId, 'projects'],
@@ -34,65 +51,5 @@ export function useProjectStats(id: number) {
       return (await response.json()) as ProjectWithStats;
     },
     enabled: !!id,
-  });
-}
-
-export function useCreateProject(accountId: number) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: InsertProject) => {
-      const response = await fetch(`/api/accounts/${accountId}/projects`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to create project');
-      return (await response.json()) as Project;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'projects'] });
-    },
-  });
-}
-
-export function useUpdateProject() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertProject> }) => {
-      const response = await fetch(`/api/projects/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to update project');
-      return (await response.json()) as Project;
-    },
-    onSuccess: (project: Project) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', project.accountId, 'projects'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', project.id] });
-      queryClient.invalidateQueries({ queryKey: ['/api/projects', project.id, 'stats'] });
-    },
-  });
-}
-
-export function useDeleteProject(accountId: number) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (id: number) => {
-      const response = await fetch(`/api/projects/${id}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) throw new Error('Failed to delete project');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'projects'] });
-    },
   });
 }

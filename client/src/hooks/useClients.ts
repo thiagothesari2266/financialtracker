@@ -1,6 +1,23 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { createEntityCrud } from './useEntityCrud';
 import type { Client, InsertClient, ClientWithProjects } from '@shared/schema';
 
+const crud = createEntityCrud<Client, InsertClient>({
+  listKey: (accountId) => ['/api/accounts', accountId, 'clients'],
+  singleKey: (id) => ['/api/clients', id],
+  listPath: (accountId) => `/api/accounts/${accountId}/clients`,
+  singlePath: (id) => `/api/clients/${id}`,
+  onUpdateExtraInvalidations: (client, qc) => {
+    qc.invalidateQueries({ queryKey: ['/api/clients', client.id] });
+    qc.invalidateQueries({ queryKey: ['/api/clients', client.id, 'with-projects'] });
+  },
+});
+
+export const useCreateClient = crud.useCreate;
+export const useUpdateClient = crud.useUpdate;
+export const useDeleteClient = crud.useDelete;
+
+// useClients retorna Client[] — query preservada diretamente
 export function useClients(accountId: number) {
   return useQuery({
     queryKey: ['/api/accounts', accountId, 'clients'],
@@ -34,65 +51,5 @@ export function useClientWithProjects(id: number) {
       return (await response.json()) as ClientWithProjects;
     },
     enabled: !!id,
-  });
-}
-
-export function useCreateClient(accountId: number) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: InsertClient) => {
-      const response = await fetch(`/api/accounts/${accountId}/clients`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to create client');
-      return (await response.json()) as Client;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'clients'] });
-    },
-  });
-}
-
-export function useUpdateClient() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertClient> }) => {
-      const response = await fetch(`/api/clients/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to update client');
-      return (await response.json()) as Client;
-    },
-    onSuccess: (client: Client) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', client.accountId, 'clients'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/clients', client.id] });
-      queryClient.invalidateQueries({ queryKey: ['/api/clients', client.id, 'with-projects'] });
-    },
-  });
-}
-
-export function useDeleteClient(accountId: number) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (id: number) => {
-      const response = await fetch(`/api/clients/${id}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) throw new Error('Failed to delete client');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'clients'] });
-    },
   });
 }

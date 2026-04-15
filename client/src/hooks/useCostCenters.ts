@@ -1,29 +1,23 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { createEntityCrud } from './useEntityCrud';
 import type { CostCenter, InsertCostCenter, CostCenterWithStats } from '@shared/schema';
 
-export function useCostCenters(accountId: number) {
-  return useQuery({
-    queryKey: ['/api/accounts', accountId, 'cost-centers'],
-    queryFn: async () => {
-      const response = await fetch(`/api/accounts/${accountId}/cost-centers`);
-      if (!response.ok) throw new Error('Failed to fetch cost centers');
-      return (await response.json()) as CostCenter[];
-    },
-    enabled: !!accountId,
-  });
-}
+const crud = createEntityCrud<CostCenter, InsertCostCenter>({
+  listKey: (accountId) => ['/api/accounts', accountId, 'cost-centers'],
+  singleKey: (id) => ['/api/cost-centers', id],
+  listPath: (accountId) => `/api/accounts/${accountId}/cost-centers`,
+  singlePath: (id) => `/api/cost-centers/${id}`,
+  onUpdateExtraInvalidations: (cc, qc) => {
+    qc.invalidateQueries({ queryKey: ['/api/cost-centers', cc.id] });
+    qc.invalidateQueries({ queryKey: ['/api/cost-centers', cc.id, 'stats'] });
+  },
+});
 
-export function useCostCenter(id: number) {
-  return useQuery({
-    queryKey: ['/api/cost-centers', id],
-    queryFn: async () => {
-      const response = await fetch(`/api/cost-centers/${id}`);
-      if (!response.ok) throw new Error('Failed to fetch cost center');
-      return (await response.json()) as CostCenter;
-    },
-    enabled: !!id,
-  });
-}
+export const useCostCenters = crud.useList;
+export const useCostCenter = crud.useSingle;
+export const useCreateCostCenter = crud.useCreate;
+export const useUpdateCostCenter = crud.useUpdate;
+export const useDeleteCostCenter = crud.useDelete;
 
 export function useCostCenterStats(id: number) {
   return useQuery({
@@ -34,67 +28,5 @@ export function useCostCenterStats(id: number) {
       return (await response.json()) as CostCenterWithStats;
     },
     enabled: !!id,
-  });
-}
-
-export function useCreateCostCenter(accountId: number) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: InsertCostCenter) => {
-      const response = await fetch(`/api/accounts/${accountId}/cost-centers`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to create cost center');
-      return (await response.json()) as CostCenter;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'cost-centers'] });
-    },
-  });
-}
-
-export function useUpdateCostCenter() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertCostCenter> }) => {
-      const response = await fetch(`/api/cost-centers/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to update cost center');
-      return (await response.json()) as CostCenter;
-    },
-    onSuccess: (costCenter: CostCenter) => {
-      queryClient.invalidateQueries({
-        queryKey: ['/api/accounts', costCenter.accountId, 'cost-centers'],
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/cost-centers', costCenter.id] });
-      queryClient.invalidateQueries({ queryKey: ['/api/cost-centers', costCenter.id, 'stats'] });
-    },
-  });
-}
-
-export function useDeleteCostCenter(accountId: number) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (id: number) => {
-      const response = await fetch(`/api/cost-centers/${id}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) throw new Error('Failed to delete cost center');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'cost-centers'] });
-    },
   });
 }
