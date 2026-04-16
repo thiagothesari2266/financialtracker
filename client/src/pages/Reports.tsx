@@ -29,6 +29,7 @@ import {
   Line,
 } from 'recharts';
 import { AppShell } from '@/components/Layout/AppShell';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { SummaryCard } from '@/components/ui/summary-card';
 import { formatCurrency } from '@/lib/utils';
 
@@ -60,14 +61,7 @@ export default function Reports() {
   });
 
   if (!currentAccount) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando conta...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen message="Carregando conta..." />;
   }
 
   // Prepare chart data

@@ -18,6 +18,7 @@ import { DebtModal, type DebtFormValues } from '@/components/Modals/DebtModal';
 import { useToast } from '@/hooks/use-toast';
 import { useCreateDebt, useDebts, useDeleteDebt, useUpdateDebt } from '@/hooks/useDebts';
 import { EmptyState } from '@/components/ui/empty-state';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { formatCurrency } from '@/lib/utils';
 
 const toNumber = (value: string): number => {
@@ -49,6 +50,7 @@ export default function Debts() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
+  const [deletingDebt, setDeletingDebt] = useState<Debt | null>(null);
 
   const accountId = currentAccount?.id ?? 0;
   const { data: debts = [], isLoading } = useDebts(accountId);
@@ -110,15 +112,19 @@ export default function Debts() {
     }
   };
 
-  const handleDelete = async (debt: Debt) => {
-    const confirm = window.confirm(`Remover "${debt.name}"?`);
-    if (!confirm) return;
+  const handleDelete = (debt: Debt) => {
+    setDeletingDebt(debt);
+  };
 
+  const confirmDelete = async () => {
+    if (!deletingDebt) return;
     try {
-      await deleteMutation.mutateAsync(debt.id);
+      await deleteMutation.mutateAsync(deletingDebt.id);
       toast({ title: 'Dívida removida' });
-    } catch (error) {
+    } catch (_error) {
       toast({ title: 'Erro ao remover', variant: 'destructive' });
+    } finally {
+      setDeletingDebt(null);
     }
   };
 
@@ -379,6 +385,12 @@ export default function Debts() {
         onSubmit={handleSubmit}
         editing={editingDebt}
         isSaving={createMutation.isPending || updateMutation.isPending}
+      />
+      <DeleteConfirmDialog
+        open={deletingDebt !== null}
+        description={`Remover "${deletingDebt?.name}"? Esta ação não pode ser desfeita.`}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletingDebt(null)}
       />
     </>
   );

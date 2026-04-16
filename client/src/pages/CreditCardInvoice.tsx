@@ -35,6 +35,7 @@ import TransactionModal from '@/components/Modals/TransactionModal';
 import { useLocation, useSearch } from 'wouter';
 import { AppShell } from '@/components/Layout/AppShell';
 import { EmptyState } from '@/components/ui/empty-state';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { SummaryCard } from '@/components/ui/summary-card';
 import { cn, formatCurrency, formatDateBR, formatMonth } from '@/lib/utils';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
@@ -59,6 +60,7 @@ export default function CreditCardInvoice() {
   const [, navigate] = useLocation();
   const search = useSearch();
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTransaction, setSelectedTransaction] = useState<
     CreditCardTransactionWithCategory | { creditCardId: number; type: string; date: string } | null
@@ -174,12 +176,12 @@ export default function CreditCardInvoice() {
 
   const handleDeleteSelected = () => {
     if (selectedTransactions.size === 0) return;
-    const confirmDelete = window.confirm(
-      `Tem certeza que deseja excluir ${selectedTransactions.size} transação(ões) selecionada(s)?`
-    );
-    if (confirmDelete) {
-      deleteTransactionsMutation.mutate(Array.from(selectedTransactions));
-    }
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteSelected = () => {
+    deleteTransactionsMutation.mutate(Array.from(selectedTransactions));
+    setIsDeleteConfirmOpen(false);
   };
 
   // Filtrar e ordenar transações
@@ -633,6 +635,12 @@ export default function CreditCardInvoice() {
         isOpen={isTransactionModalOpen}
         onClose={handleCloseTransactionModal}
         transaction={selectedTransaction}
+      />
+      <DeleteConfirmDialog
+        open={isDeleteConfirmOpen}
+        description={`Excluir ${selectedTransactions.size} transação(ões) selecionada(s)? Esta ação não pode ser desfeita.`}
+        onConfirm={confirmDeleteSelected}
+        onCancel={() => setIsDeleteConfirmOpen(false)}
       />
     </>
   );

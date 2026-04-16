@@ -13,13 +13,16 @@ import BankAccountModal from '@/components/Modals/BankAccountModal';
 import { useToast } from '@/hooks/use-toast';
 import type { BankAccount, InsertBankAccount } from '@shared/schema';
 import { AppShell } from '@/components/Layout/AppShell';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { formatCurrency } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
 export default function BankAccounts() {
   const { currentAccount } = useAccount();
   const [editingBankAccount, setEditingBankAccount] = useState<BankAccount | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const { data: bankAccounts = [], isLoading } = useBankAccounts(currentAccount?.id || 0);
   const createBankAccount = useCreateBankAccount(currentAccount?.id || 0);
   const updateBankAccount = useUpdateBankAccount();
@@ -52,23 +55,25 @@ export default function BankAccounts() {
   }
 
   function handleDeleteBankAccount(id: number) {
-    if (window.confirm('Tem certeza que deseja excluir esta conta bancária?')) {
-      deleteBankAccount.mutate(id, {
-        onSuccess: () => toast({ title: 'Conta bancária excluída' }),
-        onError: () => toast({ title: 'Erro ao excluir conta bancária', variant: 'destructive' }),
-      });
-    }
+    setDeletingId(id);
+  }
+
+  function confirmDeleteBankAccount() {
+    if (deletingId === null) return;
+    deleteBankAccount.mutate(deletingId, {
+      onSuccess: () => {
+        toast({ title: 'Conta bancária excluída' });
+        setDeletingId(null);
+      },
+      onError: () => {
+        toast({ title: 'Erro ao excluir conta bancária', variant: 'destructive' });
+        setDeletingId(null);
+      },
+    });
   }
 
   if (!currentAccount) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando conta...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen message="Carregando conta..." />;
   }
 
   return (
@@ -163,6 +168,12 @@ export default function BankAccounts() {
         onSaved={handleSaveBankAccount}
         accountId={currentAccount?.id || 0}
         bankAccount={editingBankAccount}
+      />
+      <DeleteConfirmDialog
+        open={deletingId !== null}
+        description="Tem certeza que deseja excluir esta conta bancária?"
+        onConfirm={confirmDeleteBankAccount}
+        onCancel={() => setDeletingId(null)}
       />
     </>
   );

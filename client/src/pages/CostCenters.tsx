@@ -15,27 +15,23 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { CostCenter } from '@shared/schema';
 import { AppShell } from '@/components/Layout/AppShell';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatCurrency } from '@/lib/utils';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
 export default function CostCenters() {
   const { currentAccount } = useAccount();
   const [isCostCenterModalOpen, setIsCostCenterModalOpen] = useState(false);
   const [selectedCostCenter, setSelectedCostCenter] = useState<CostCenter | null>(null);
+  const [deletingCostCenter, setDeletingCostCenter] = useState<CostCenter | null>(null);
   const { toast } = useToast();
 
   const { data: costCenters = [], isLoading } = useCostCenters(currentAccount?.id || 0);
   const deleteMutation = useDeleteCostCenter(currentAccount?.id || 0);
 
   if (!currentAccount) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando conta...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen message="Carregando conta..." />;
   }
 
   if (currentAccount.type !== 'business') {
@@ -58,21 +54,26 @@ export default function CostCenters() {
     setIsCostCenterModalOpen(true);
   };
 
-  const handleDeleteCostCenter = async (costCenter: CostCenter) => {
-    if (window.confirm(`Tem certeza que deseja excluir o centro de custo "${costCenter.name}"?`)) {
-      try {
-        await deleteMutation.mutateAsync(costCenter.id);
-        toast({
-          title: 'Centro de custo excluído!',
-          description: `O centro de custo "${costCenter.name}" foi excluído com sucesso.`,
-        });
-      } catch (_error) {
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível excluir o centro de custo.',
-          variant: 'destructive',
-        });
-      }
+  const handleDeleteCostCenter = (costCenter: CostCenter) => {
+    setDeletingCostCenter(costCenter);
+  };
+
+  const confirmDeleteCostCenter = async () => {
+    if (!deletingCostCenter) return;
+    try {
+      await deleteMutation.mutateAsync(deletingCostCenter.id);
+      toast({
+        title: 'Centro de custo excluído!',
+        description: `O centro de custo "${deletingCostCenter.name}" foi excluído com sucesso.`,
+      });
+    } catch (_error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir o centro de custo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingCostCenter(null);
     }
   };
 
@@ -187,6 +188,12 @@ export default function CostCenters() {
         onClose={handleCloseModal}
         accountId={currentAccount.id}
         costCenter={selectedCostCenter}
+      />
+      <DeleteConfirmDialog
+        open={deletingCostCenter !== null}
+        description={`Tem certeza que deseja excluir o centro de custo "${deletingCostCenter?.name}"?`}
+        onConfirm={confirmDeleteCostCenter}
+        onCancel={() => setDeletingCostCenter(null)}
       />
     </>
   );

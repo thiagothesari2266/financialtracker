@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { todayBR } from '@/lib/date-br';
 import { useAccount } from '@/contexts/AccountContext';
 import { AppShell } from '@/components/Layout/AppShell';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { Button } from '@/components/ui/button';
 import { Plus, CreditCard, Calendar, DollarSign, RefreshCw, Upload } from 'lucide-react';
 import CreditCardModal from '@/components/Modals/CreditCardModal';
@@ -18,6 +19,7 @@ import { useProcessOverdueInvoices } from '@/hooks/useProcessInvoices';
 import { useToast } from '@/hooks/use-toast';
 import { SummaryCard } from '@/components/ui/summary-card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { cn, formatCurrency } from '@/lib/utils';
 
 export default function CreditCards() {
@@ -28,6 +30,7 @@ export default function CreditCards() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<any | null>(null);
   const [selectedCardForUpload, setSelectedCardForUpload] = useState<any | null>(null);
+  const [deletingCard, setDeletingCard] = useState<any | null>(null);
 
   // Hooks SEM condicional (React exige ordem fixa)
   const accountId = currentAccount?.id || 0;
@@ -39,14 +42,7 @@ export default function CreditCards() {
   const { data: invoices = [] } = useCreditCardInvoices(accountId);
 
   if (!currentAccount) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando conta...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen message="Carregando conta..." />;
   }
 
   const monthNames = [
@@ -150,10 +146,16 @@ export default function CreditCards() {
     setIsCreditCardModalOpen(true);
   }
 
-  function _handleDeleteCreditCard(card: any) {
-    if (window.confirm(`Tem certeza que deseja excluir o cartão "${card.name}"?`)) {
-      deleteCreditCard.mutate(card.id);
-    }
+  function handleDeleteCreditCard(card: any) {
+    setDeletingCard(card);
+  }
+
+  function confirmDeleteCreditCard() {
+    if (!deletingCard) return;
+    deleteCreditCard.mutate(deletingCard.id, {
+      onSuccess: () => setDeletingCard(null),
+      onError: () => setDeletingCard(null),
+    });
   }
   function handleViewInvoices(card: any) {
     const { month } = getDisplayInvoiceMonth(card);
@@ -416,6 +418,12 @@ export default function CreditCards() {
           setSelectedCardForUpload(null);
         }}
         creditCard={selectedCardForUpload}
+      />
+      <DeleteConfirmDialog
+        open={deletingCard !== null}
+        description={`Tem certeza que deseja excluir o cartão "${deletingCard?.name}"?`}
+        onConfirm={confirmDeleteCreditCard}
+        onCancel={() => setDeletingCard(null)}
       />
     </>
   );

@@ -3,6 +3,7 @@ import { formatMonth } from '@/lib/utils';
 import { addMonths, format, subMonths } from 'date-fns';
 import { todayBR } from '@/lib/date-br';
 import { AppShell } from '@/components/Layout/AppShell';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import MetricsCards from '@/components/Dashboard/MetricsCards';
 import ExpenseChart from '@/components/Dashboard/ExpenseChart';
 import RecentTransactions from '@/components/Dashboard/RecentTransactions';
@@ -29,14 +30,7 @@ export default function Dashboard() {
   }, [currentDate]);
 
   if (!currentAccount) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando conta...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen message="Carregando conta..." />;
   }
 
   const handlePreviousMonth = () => {

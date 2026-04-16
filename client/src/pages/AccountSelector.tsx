@@ -8,6 +8,7 @@ import AccountModal from '@/components/Modals/AccountModal';
 import { useDeleteAccount } from '@/hooks/useAccounts';
 import type { Account } from '@shared/schema';
 import { AccountCard } from './AccountCard';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { useQuery } from '@tanstack/react-query';
 
 interface AccountLimits {
@@ -75,14 +76,7 @@ export default function AccountSelector() {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando contas...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen message="Carregando contas..." />;
   }
 
   return (

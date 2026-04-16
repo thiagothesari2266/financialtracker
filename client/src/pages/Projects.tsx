@@ -24,27 +24,23 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { ProjectWithClient } from '@shared/schema';
 import { AppShell } from '@/components/Layout/AppShell';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { EmptyState } from '@/components/ui/empty-state';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { formatCurrency } from '@/lib/utils';
 
 export default function Projects() {
   const { currentAccount } = useAccount();
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectWithClient | null>(null);
+  const [deletingProject, setDeletingProject] = useState<ProjectWithClient | null>(null);
   const { toast } = useToast();
 
   const { data: projects = [], isLoading } = useProjects(currentAccount?.id || 0);
   const deleteMutation = useDeleteProject(currentAccount?.id || 0);
 
   if (!currentAccount) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando conta...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen message="Carregando conta..." />;
   }
 
   if (currentAccount.type !== 'business') {
@@ -80,21 +76,26 @@ export default function Projects() {
     setIsProjectModalOpen(true);
   };
 
-  const handleDeleteProject = async (project: ProjectWithClient) => {
-    if (window.confirm(`Tem certeza que deseja excluir o projeto "${project.name}"?`)) {
-      try {
-        await deleteMutation.mutateAsync(project.id);
-        toast({
-          title: 'Projeto excluído!',
-          description: `O projeto "${project.name}" foi excluído com sucesso.`,
-        });
-      } catch (_error) {
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível excluir o projeto.',
-          variant: 'destructive',
-        });
-      }
+  const handleDeleteProject = (project: ProjectWithClient) => {
+    setDeletingProject(project);
+  };
+
+  const confirmDeleteProject = async () => {
+    if (!deletingProject) return;
+    try {
+      await deleteMutation.mutateAsync(deletingProject.id);
+      toast({
+        title: 'Projeto excluído!',
+        description: `O projeto "${deletingProject.name}" foi excluído com sucesso.`,
+      });
+    } catch (_error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir o projeto.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingProject(null);
     }
   };
 
@@ -207,6 +208,12 @@ export default function Projects() {
         onClose={handleCloseModal}
         accountId={currentAccount.id}
         project={selectedProject}
+      />
+      <DeleteConfirmDialog
+        open={deletingProject !== null}
+        description={`Tem certeza que deseja excluir o projeto "${deletingProject?.name}"?`}
+        onConfirm={confirmDeleteProject}
+        onCancel={() => setDeletingProject(null)}
       />
     </>
   );
