@@ -34,6 +34,9 @@ import type {
   Debt,
   InsertDebt,
   Invite,
+  AsaasImport,
+  AsaasImportWithTransactions,
+  InsertAsaasImport,
 } from '@shared/schema';
 
 import * as AccountRepo from './storage/account.repository';
@@ -48,6 +51,7 @@ import * as ProjectRepo from './storage/project.repository';
 import * as CostCenterRepo from './storage/cost-center.repository';
 import * as ClientRepo from './storage/client.repository';
 import * as UserRepo from './storage/user.repository';
+import * as AsaasImportRepo from './storage/asaas-import.repository';
 
 export interface IStorage {
   createAccount(account: InsertAccount, userId: number): Promise<Account>;
@@ -198,6 +202,12 @@ export interface IStorage {
   getUserByEmail(
     email: string
   ): Promise<(AuthenticatedUser & { passwordHash: string }) | undefined>;
+
+  createAsaasImport(data: InsertAsaasImport): Promise<AsaasImport>;
+  getAsaasImports(accountId: number, status?: string): Promise<AsaasImportWithTransactions[]>;
+  getAsaasImportById(id: number): Promise<AsaasImportWithTransactions | undefined>;
+  updateAsaasImport(id: number, data: Partial<InsertAsaasImport> & { resolvedAt?: string | null }): Promise<AsaasImport | undefined>;
+  findAsaasImportByPaymentId(asaasPaymentId: string): Promise<AsaasImport | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -534,6 +544,23 @@ export class DatabaseStorage implements IStorage {
   }
   async countAdminUsers() {
     return UserRepo.countAdminUsers();
+  }
+
+  // --- AsaasImport ---
+  async createAsaasImport(data: InsertAsaasImport) {
+    return AsaasImportRepo.createAsaasImport(data);
+  }
+  async getAsaasImports(accountId: number, status?: string) {
+    return AsaasImportRepo.getAsaasImports(accountId, status);
+  }
+  async getAsaasImportById(id: number) {
+    return AsaasImportRepo.getAsaasImportById(id);
+  }
+  async updateAsaasImport(id: number, data: Partial<InsertAsaasImport> & { resolvedAt?: string | null }) {
+    return AsaasImportRepo.updateAsaasImport(id, data);
+  }
+  async findAsaasImportByPaymentId(asaasPaymentId: string) {
+    return AsaasImportRepo.findAsaasImportByPaymentId(asaasPaymentId);
   }
 }
 

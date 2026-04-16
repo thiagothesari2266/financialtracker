@@ -43,12 +43,15 @@ import {
   Repeat,
   BadgePercent,
   ChevronsUpDown,
+  GitMerge,
 } from 'lucide-react';
 import { AccountSwitcher } from './AccountSwitcher';
 import { BottomNav } from './BottomNav';
 import { useAccount } from '@/contexts/AccountContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAsaasImports } from '@/hooks/useAsaasImports';
+import { Badge } from '@/components/ui/badge';
 
 interface AppShellProps {
   children: ReactNode;
@@ -119,6 +122,8 @@ export function AppShell({ children }: AppShellProps) {
 
 function AppSidebar({ accountType }: { accountType: 'personal' | 'business' }) {
   const [location] = useLocation();
+  const { data: pendingImports = [] } = useAsaasImports({ status: 'pending' });
+  const pendingCount = pendingImports.length;
 
   const renderNavItems = (items: NavigationItem[]) =>
     items.map((item) => {
@@ -141,6 +146,8 @@ function AppSidebar({ accountType }: { accountType: 'personal' | 'business' }) {
       );
     });
 
+  const reconciliationActive = location === '/reconciliation';
+
   return (
     <>
       <Sidebar collapsible="icon">
@@ -155,7 +162,27 @@ function AppSidebar({ accountType }: { accountType: 'personal' | 'business' }) {
           <SidebarGroup>
             <SidebarGroupLabel>Principal</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>{renderNavItems(primaryNavigation)}</SidebarMenu>
+              <SidebarMenu>
+                {renderNavItems(primaryNavigation)}
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={reconciliationActive}
+                    size="default"
+                    className={reconciliationActive ? 'border-l-2 border-primary' : ''}
+                  >
+                    <Link href="/reconciliation" className="flex items-center gap-2">
+                      <GitMerge className="h-4 w-4" />
+                      <span className="flex-1">Reconciliacao</span>
+                      {pendingCount > 0 && (
+                        <Badge className="ml-1 h-5 min-w-[20px] rounded-full px-1.5 text-[10px] bg-primary text-primary-foreground">
+                          {pendingCount}
+                        </Badge>
+                      )}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
 

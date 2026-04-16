@@ -1,8 +1,10 @@
 import { Link, useLocation } from 'wouter';
 import { useAccount } from '@/contexts/AccountContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAsaasImports } from '@/hooks/useAsaasImports';
 import { AccountSwitcher } from './AccountSwitcher';
 import { Logo } from '@/components/Logo';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -16,6 +18,7 @@ import {
   Settings2,
   Repeat,
   Users,
+  GitMerge,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -40,6 +43,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const [location] = useLocation();
   const { currentAccount } = useAccount();
   const { user } = useAuth();
+  const { data: pendingImports = [] } = useAsaasImports({ status: 'pending' });
+  const pendingCount = pendingImports.length;
 
   if (!currentAccount) return null;
 
@@ -88,6 +93,24 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 </Link>
               );
             })}
+            <Link
+              href="/reconciliation"
+              className={cn(
+                'flex items-center rounded-lg px-3 py-2 text-sm transition-colors',
+                location === '/reconciliation'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+              )}
+              onClick={onClose}
+            >
+              <GitMerge className="mr-2 h-4 w-4" />
+              <span className="flex-1">Reconciliacao</span>
+              {pendingCount > 0 && (
+                <Badge className="ml-1 h-5 min-w-[20px] rounded-full px-1.5 text-[10px] bg-primary text-primary-foreground">
+                  {pendingCount}
+                </Badge>
+              )}
+            </Link>
             {isAdmin && (
               <>
                 <div className="my-2 border-t border-sidebar-border" />

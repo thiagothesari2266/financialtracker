@@ -12,6 +12,7 @@ import type {
   Debt as PrismaDebt,
   User as PrismaUser,
   Invite as PrismaInvite,
+  AsaasImport as PrismaAsaasImport,
 } from '@prisma/client';
 import type {
   Account,
@@ -29,6 +30,7 @@ import type {
   AuthenticatedUser,
   Debt,
   Invite,
+  AsaasImport,
 } from '@shared/schema';
 import { ensureDateString, ensureDateTimeString, decimalToString } from './utils';
 
@@ -227,4 +229,26 @@ export const mapInvite = (invite: PrismaInvite): Invite => ({
   expiresAt: ensureDateTimeString(invite.expiresAt) ?? '',
   createdAt: ensureDateTimeString(invite.createdAt) ?? '',
   acceptedAt: ensureDateTimeString(invite.acceptedAt),
+});
+
+export const mapAsaasImport = (record: PrismaAsaasImport): AsaasImport => ({
+  id: record.id,
+  accountId: record.accountId,
+  bankAccountId: record.bankAccountId ?? null,
+  asaasPaymentId: record.asaasPaymentId,
+  event: record.event,
+  status: record.status as AsaasImport['status'],
+  amount: decimalToString(record.amount),
+  dueDate: ensureDateString(record.dueDate) ?? '',
+  paymentDate: ensureDateString(record.paymentDate),
+  description: record.description ?? null,
+  externalReference: record.externalReference ?? null,
+  billingType: record.billingType ?? null,
+  isPaid: record.isPaid,
+  suggestedTransactionId: record.suggestedTransactionId ?? null,
+  matchedTransactionId: record.matchedTransactionId ?? null,
+  matchScore: record.matchScore ?? null,
+  rawPayload: record.rawPayload,
+  createdAt: ensureDateTimeString(record.createdAt) ?? '',
+  resolvedAt: ensureDateTimeString(record.resolvedAt),
 });

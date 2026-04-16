@@ -492,6 +492,57 @@ export const insertFixedCashflowSchema = z.object({
 });
 export type InsertFixedCashflow = z.infer<typeof insertFixedCashflowSchema>;
 
+export const asaasImportStatusEnum = z.enum(['pending', 'matched', 'standalone', 'ignored']);
+export type AsaasImportStatus = z.infer<typeof asaasImportStatusEnum>;
+
+export const insertAsaasImportSchema = z.object({
+  accountId: z.number(),
+  bankAccountId: z.number().optional().nullable(),
+  asaasPaymentId: z.string().min(1),
+  event: z.string().min(1),
+  status: asaasImportStatusEnum.default('pending'),
+  amount: z.string().min(1),
+  dueDate: z.string().min(1),
+  paymentDate: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
+  externalReference: z.string().optional().nullable(),
+  billingType: z.string().optional().nullable(),
+  isPaid: z.boolean().optional().default(false),
+  suggestedTransactionId: z.number().optional().nullable(),
+  matchedTransactionId: z.number().optional().nullable(),
+  matchScore: z.number().int().optional().nullable(),
+  rawPayload: z.record(z.unknown()),
+  resolvedAt: z.string().optional().nullable(),
+});
+export type InsertAsaasImport = z.infer<typeof insertAsaasImportSchema>;
+
+export interface AsaasImport {
+  id: number;
+  accountId: number;
+  bankAccountId: number | null;
+  asaasPaymentId: string;
+  event: string;
+  status: AsaasImportStatus;
+  amount: string;
+  dueDate: string;
+  paymentDate: string | null;
+  description: string | null;
+  externalReference: string | null;
+  billingType: string | null;
+  isPaid: boolean;
+  suggestedTransactionId: number | null;
+  matchedTransactionId: number | null;
+  matchScore: number | null;
+  rawPayload: unknown;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export type AsaasImportWithTransactions = AsaasImport & {
+  suggestedTransaction: Transaction | null;
+  matchedTransaction: Transaction | null;
+};
+
 // Schema para atualização de usuário (admin)
 export const updateUserSchema = z.object({
   role: userRoleEnum.optional(),
