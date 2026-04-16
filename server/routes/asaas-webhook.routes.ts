@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { storage } from '../storage';
+import { getMatchCandidates, findBestMatch } from '../services/asaas-reconciliation';
 
 // PAID_EVENTS: dinheiro confirmado ou disponível -> paid=true
 // Boleto: PAYMENT_CREATED -> PAYMENT_CONFIRMED -> PAYMENT_RECEIVED
@@ -37,49 +38,67 @@ export async function handleAsaasWebhook(req: Request, res: Response): Promise<v
   }
 
   try {
-    // Buscar ou criar categoria "Asaas" para o account
-    const categories = await storage.getCategories(bankAccount.accountId);
-    let category = categories.find(c => c.name === 'Asaas' && c.type === 'income');
-    if (!category) {
-      category = await storage.createCategory({
-        name: 'Asaas',
-        color: '#3b82f6',
-        icon: 'Landmark',
-        type: 'income',
-        accountId: bankAccount.accountId,
-      });
-    }
-
-    const transactionDate = (isPaid && payment.paymentDate) ? payment.paymentDate : payment.dueDate;
-
-    const existing = await storage.findTransactionByExternalId(payment.id, bankAccount.accountId);
+    // Verificar idempotência: import já existe para este paymentId?
+    const existing = await storage.findAsaasImportByPaymentId(payment.id);
 
     if (existing) {
-      await storage.updateTransaction(existing.id, { paid: isPaid });
-      console.log(`[Asaas Webhook] Atualizado: id=${existing.id}, event=${event}, payment=${payment.id}`);
-      res.status(200).json({ received: true, processed: true, action: 'updated', transactionId: existing.id });
+      // Import já resolvido e evento de pagamento confirmado: propagar paid=true
+      if ((existing.status === 'matched' || existing.status === 'standalone') && isPaid) {
+        if (existing.matchedTransactionId) {
+          await storage.updateTransaction(existing.matchedTransactionId, { paid: true });
+          console.log(`[Asaas Webhook] Propagando paid=true para transação ${existing.matchedTransactionId}, import=${existing.id}`);
+        }
+      }
+
+      // Atualizar import com dados atualizados do evento
+      const updateData: Record<string, unknown> = { event, isPaid };
+      if (isPaid && payment.paymentDate) {
+        updateData.paymentDate = new Date(payment.paymentDate);
+      }
+      await storage.updateAsaasImport(existing.id, updateData);
+
+      console.log(`[Asaas Webhook] Import atualizado: id=${existing.id}, event=${event}, payment=${payment.id}`);
+      res.status(200).json({ received: true, processed: true, action: 'updated_existing_import', importId: existing.id });
       return;
     }
 
-    const description = payment.description
-      || (payment.externalReference ? `Pedido ${payment.externalReference}` : 'Recebimento Asaas');
+    // Import não existe: criar novo
+    const payloadResumido = {
+      asaasPaymentId: String(payment.id),
+      amount: payment.value,
+      dueDate: payment.dueDate,
+      paymentDate: payment.paymentDate ?? null,
+      description: payment.description ?? null,
+      externalReference: payment.externalReference ?? null,
+      billingType: payment.billingType ?? null,
+      event,
+      isPaid,
+    };
 
-    const created = await storage.createTransaction({
-      description,
-      amount: String(payment.value),
-      type: 'income' as const,
-      date: String(transactionDate),
-      categoryId: category.id,
+    // Buscar candidatos e calcular melhor match
+    const candidates = await getMatchCandidates(payloadResumido, bankAccount.accountId);
+    const bestMatch = findBestMatch(payloadResumido, candidates);
+
+    const created = await storage.createAsaasImport({
       accountId: bankAccount.accountId,
       bankAccountId: bankAccount.id ?? null,
-      paid: isPaid,
-      paymentMethod: payment.billingType ? String(payment.billingType) : null,
-      externalId: payment.id ? String(payment.id) : null,
-      isException: false,
+      asaasPaymentId: String(payment.id),
+      event,
+      amount: String(payment.value),
+      dueDate: String(payment.dueDate),
+      paymentDate: payment.paymentDate ? String(payment.paymentDate) : null,
+      description: payloadResumido.description,
+      externalReference: payloadResumido.externalReference,
+      billingType: payloadResumido.billingType,
+      isPaid,
+      suggestedTransactionId: bestMatch ? bestMatch.transactionId : null,
+      matchScore: bestMatch ? bestMatch.score : null,
+      rawPayload: req.body,
+      status: 'pending',
     });
 
-    console.log(`[Asaas Webhook] Criado: id=${created.id}, event=${event}, payment=${payment.id}`);
-    res.status(200).json({ received: true, processed: true, action: 'created', transactionId: created.id });
+    console.log(`[Asaas Webhook] Import criado: id=${created.id}, event=${event}, payment=${payment.id}, score=${bestMatch?.score ?? null}`);
+    res.status(200).json({ received: true, processed: true, action: 'created_import', importId: created.id });
   } catch (error) {
     console.error('[Asaas Webhook] Erro:', error);
     res.status(200).json({ received: true, processed: false, reason: 'internal_error' });

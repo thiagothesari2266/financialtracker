@@ -9,6 +9,7 @@ import {
   retryInvoiceImport,
 } from './routes/invoice-upload.routes';
 import { handleAsaasWebhook } from './routes/asaas-webhook.routes';
+import { registerAsaasImportsRoutes } from './routes/asaas-imports.routes';
 import { registerAccountRoutes } from './routes/account.routes';
 import { registerTransactionRoutes } from './routes/transaction.routes';
 import { registerCategoryRoutes } from './routes/category.routes';
@@ -28,6 +29,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerInvoiceManagementRoutes(app);
   registerBusinessEntityRoutes(app);
   registerAiAdvisorRoutes(app);
+  registerAsaasImportsRoutes(app);
 
   // Invoice upload routes
   app.post('/api/invoice-upload', uploadInvoice);

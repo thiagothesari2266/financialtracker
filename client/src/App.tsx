@@ -19,6 +19,7 @@ import BankAccounts from '@/pages/BankAccounts';
 import Settings from '@/pages/Settings';
 import MonthlyFixed from '@/pages/MonthlyFixed';
 import Debts from '@/pages/Debts';
+import Reconciliation from '@/pages/Reconciliation';
 import FloatingChatButton from '@/components/Chat/FloatingChatButton';
 import LoginPage from '@/pages/Login';
 import AdminInvites from '@/pages/AdminInvites';
@@ -63,6 +64,7 @@ function AuthenticatedRoutes() {
         <Route path="/bank-accounts" component={BankAccounts} />
         <Route path="/debts" component={Debts} />
         <Route path="/settings" component={Settings} />
+        <Route path="/reconciliation" component={Reconciliation} />
         <Route component={NotFound} />
       </Switch>
       <FloatingChatButton />
