@@ -411,10 +411,10 @@ export default function Reconciliation() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  disabled={!imp.suggestedTransactionId || isMutating}
+                                  disabled={isMutating}
                                   onClick={() => setConfirmModalImport(imp)}
                                 >
-                                  Confirmar match
+                                  {imp.suggestedTransactionId ? 'Confirmar match' : 'Escolher match'}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -532,10 +532,10 @@ export default function Reconciliation() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    disabled={!imp.suggestedTransactionId || isMutating}
+                                    disabled={isMutating}
                                     onClick={() => setConfirmModalImport(imp)}
                                   >
-                                    Confirmar match
+                                    {imp.suggestedTransactionId ? 'Confirmar match' : 'Escolher match'}
                                   </Button>
                                   <Button
                                     size="sm"
