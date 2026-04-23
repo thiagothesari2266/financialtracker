@@ -1,5 +1,15 @@
-import { useState } from 'react';
-import { GitMerge, Calendar, CheckCircle2, XCircle, Plus, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import {
+  GitMerge,
+  Calendar,
+  CheckCircle2,
+  XCircle,
+  Plus,
+  X,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  RefreshCw,
+} from 'lucide-react';
 import { AppShell } from '@/components/Layout/AppShell';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -14,17 +24,23 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import {
   useAsaasImports,
+  useAsaasSync,
   useConfirmMatch,
   useCreateStandalone,
   useIgnoreImport,
   useBulkResolve,
   type AsaasImport,
+  type AsaasImportDirection,
+  type AsaasImportEntityType,
   type BulkResolveItem,
 } from '@/hooks/useAsaasImports';
+import { useBankAccounts } from '@/hooks/useBankAccounts';
+import { useAccount } from '@/contexts/AccountContext';
 import { cn, formatCurrency, formatDateBR } from '@/lib/utils';
 import ConfirmMatchModal from '@/components/Modals/ConfirmMatchModal';
 
@@ -46,14 +62,67 @@ function labelBillingType(billingType: string | null): string {
   }
 }
 
+function labelEntityType(entityType: AsaasImportEntityType): string {
+  switch (entityType) {
+    case 'payment':
+      return 'Pagamento';
+    case 'transfer':
+      return 'Saque';
+    case 'fee':
+      return 'Tarifa';
+    case 'refund':
+      return 'Estorno';
+    case 'chargeback':
+      return 'Chargeback';
+    case 'bill_payment':
+      return 'Conta';
+    default:
+      return 'Outro';
+  }
+}
+
+function labelMethod(imp: AsaasImport): string {
+  if (imp.billingType) return labelBillingType(imp.billingType);
+  return labelEntityType(imp.asaasEntityType);
+}
+
+function fallbackDescription(direction: AsaasImportDirection): string {
+  return direction === 'expense' ? 'Saída Asaas' : 'Recebimento Asaas';
+}
+
+type DirectionFilter = 'all' | AsaasImportDirection;
+
 export default function Reconciliation() {
   const { toast } = useToast();
-  const { data: imports = [], isLoading } = useAsaasImports({ status: 'pending' });
+  const { currentAccount } = useAccount();
+  const [directionFilter, setDirectionFilter] = useState<DirectionFilter>('all');
+
+  const { data: allImports = [], isLoading } = useAsaasImports({ status: 'pending' });
+  const imports = useMemo(
+    () =>
+      directionFilter === 'all'
+        ? allImports
+        : allImports.filter((i) => i.direction === directionFilter),
+    [allImports, directionFilter],
+  );
+
+  const counts = useMemo(() => {
+    const income = allImports.filter((i) => i.direction === 'income').length;
+    const expense = allImports.filter((i) => i.direction === 'expense').length;
+    return { all: allImports.length, income, expense };
+  }, [allImports]);
+
+  const { data: bankAccounts = [] } = useBankAccounts(currentAccount?.id ?? 0);
+  const asaasBankAccounts = useMemo(
+    () => bankAccounts.filter((b) => !!b.asaasApiKey),
+    [bankAccounts],
+  );
 
   const confirmMatch = useConfirmMatch();
   const createStandalone = useCreateStandalone();
   const ignoreImport = useIgnoreImport();
   const bulkResolve = useBulkResolve();
+  const asaasSync = useAsaasSync();
 
   const [confirmModalImport, setConfirmModalImport] = useState<AsaasImport | null>(null);
 
@@ -64,6 +133,41 @@ export default function Reconciliation() {
     handleCancel,
     isAllSelected,
   } = useBulkSelection(imports);
+
+  const handleSync = async () => {
+    if (asaasBankAccounts.length === 0) {
+      toast({
+        title: 'Nenhuma conta Asaas configurada.',
+        description: 'Adicione uma conta bancária com API key do Asaas primeiro.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      const results = await Promise.all(
+        asaasBankAccounts.map((b) =>
+          asaasSync.mutateAsync({ bankAccountId: b.id, sinceDays: 90 }),
+        ),
+      );
+      const total = results.reduce(
+        (acc, r) => ({
+          created: acc.created + r.created,
+          updated: acc.updated + r.updated,
+          matched: acc.matched + r.matched,
+        }),
+        { created: 0, updated: 0, matched: 0 },
+      );
+      toast({
+        title: `Sync concluído: ${total.created} novos, ${total.matched} com sugestão de match.`,
+      });
+    } catch (err) {
+      toast({
+        title: 'Erro ao sincronizar com Asaas.',
+        description: err instanceof Error ? err.message : undefined,
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleConfirmMatch = async (importId: number, transactionId: number) => {
     try {
@@ -165,7 +269,28 @@ export default function Reconciliation() {
                 <Badge variant="secondary">{imports.length} pendente{imports.length !== 1 ? 's' : ''}</Badge>
               )}
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSync}
+              disabled={asaasSync.isPending || asaasBankAccounts.length === 0}
+            >
+              <RefreshCw className={cn('mr-1.5 h-4 w-4', asaasSync.isPending && 'animate-spin')} />
+              {asaasSync.isPending ? 'Sincronizando...' : 'Sincronizar'}
+            </Button>
           </div>
+
+          {/* Filtro por direcao */}
+          <Tabs
+            value={directionFilter}
+            onValueChange={(v) => setDirectionFilter(v as DirectionFilter)}
+          >
+            <TabsList>
+              <TabsTrigger value="all">Todas ({counts.all})</TabsTrigger>
+              <TabsTrigger value="income">Entradas ({counts.income})</TabsTrigger>
+              <TabsTrigger value="expense">Saidas ({counts.expense})</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           {/* Barra de acoes bulk */}
           {selected.size > 0 && (
@@ -217,8 +342,12 @@ export default function Reconciliation() {
                 />
               ) : imports.length === 0 ? (
                 <EmptyState
-                  title="Nenhum pagamento pendente de reconciliacao."
-                  description="Novos pagamentos recebidos via Asaas apareceram aqui para confirmacao."
+                  title="Nenhuma movimentacao pendente."
+                  description={
+                    asaasBankAccounts.length > 0
+                      ? 'Clique em Sincronizar para puxar movimentacoes do Asaas ou aguarde novos eventos via webhook.'
+                      : 'Configure a API key Asaas na conta bancaria para sincronizar movimentacoes.'
+                  }
                 />
               ) : (
                 <>
@@ -227,7 +356,8 @@ export default function Reconciliation() {
                     {imports.map((imp, index) => {
                       const displayDate = imp.paymentDate ?? imp.dueDate;
                       const displayDescription =
-                        imp.description ?? imp.externalReference ?? 'Recebimento Asaas';
+                        imp.description ?? imp.externalReference ?? fallbackDescription(imp.direction);
+                      const isExpense = imp.direction === 'expense';
 
                       return (
                         <div
@@ -247,15 +377,22 @@ export default function Reconciliation() {
                             />
                             <div className="flex-1 space-y-1 min-w-0">
                               <div className="flex items-center justify-between gap-2">
-                                <p className="text-sm font-semibold truncate">{displayDescription}</p>
-                                <p className="text-sm font-bold text-success shrink-0">
-                                  {formatCurrency(imp.amount)}
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  {isExpense ? (
+                                    <ArrowUpCircle className="h-4 w-4 text-destructive shrink-0" />
+                                  ) : (
+                                    <ArrowDownCircle className="h-4 w-4 text-success shrink-0" />
+                                  )}
+                                  <p className="text-sm font-semibold truncate">{displayDescription}</p>
+                                </div>
+                                <p className={cn('text-sm font-bold shrink-0', isExpense ? 'text-destructive' : 'text-success')}>
+                                  {isExpense ? '-' : ''}{formatCurrency(imp.amount)}
                                 </p>
                               </div>
                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Calendar className="h-3 w-3" />
                                 {formatDateBR(displayDate)}
-                                <span className="ml-2">{labelBillingType(imp.billingType)}</span>
+                                <span className="ml-2">{labelMethod(imp)}</span>
                               </div>
                               {imp.suggestedTransaction ? (
                                 <div className="text-xs text-muted-foreground">
@@ -326,7 +463,8 @@ export default function Reconciliation() {
                         {imports.map((imp, index) => {
                           const displayDate = imp.paymentDate ?? imp.dueDate;
                           const displayDescription =
-                            imp.description ?? imp.externalReference ?? 'Recebimento Asaas';
+                            imp.description ?? imp.externalReference ?? fallbackDescription(imp.direction);
+                          const isExpense = imp.direction === 'expense';
 
                           return (
                             <TableRow
@@ -347,8 +485,15 @@ export default function Reconciliation() {
                                   }}
                                 />
                               </TableCell>
-                              <TableCell className="text-right font-semibold text-success">
-                                {formatCurrency(imp.amount)}
+                              <TableCell className={cn('text-right font-semibold', isExpense ? 'text-destructive' : 'text-success')}>
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {isExpense ? (
+                                    <ArrowUpCircle className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <ArrowDownCircle className="h-3.5 w-3.5" />
+                                  )}
+                                  {isExpense ? '-' : ''}{formatCurrency(imp.amount)}
+                                </div>
                               </TableCell>
                               <TableCell className="text-muted-foreground text-sm">
                                 <div className="flex items-center gap-1.5">
@@ -360,7 +505,7 @@ export default function Reconciliation() {
                                 {displayDescription}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground">
-                                {labelBillingType(imp.billingType)}
+                                {labelMethod(imp)}
                               </TableCell>
                               <TableCell className="text-sm">
                                 {imp.suggestedTransaction ? (

@@ -495,10 +495,27 @@ export type InsertFixedCashflow = z.infer<typeof insertFixedCashflowSchema>;
 export const asaasImportStatusEnum = z.enum(['pending', 'matched', 'standalone', 'ignored']);
 export type AsaasImportStatus = z.infer<typeof asaasImportStatusEnum>;
 
+export const asaasImportDirectionEnum = z.enum(['income', 'expense']);
+export type AsaasImportDirection = z.infer<typeof asaasImportDirectionEnum>;
+
+export const asaasImportEntityTypeEnum = z.enum([
+  'payment',
+  'transfer',
+  'fee',
+  'refund',
+  'chargeback',
+  'bill_payment',
+  'other',
+]);
+export type AsaasImportEntityType = z.infer<typeof asaasImportEntityTypeEnum>;
+
 export const insertAsaasImportSchema = z.object({
   accountId: z.number(),
   bankAccountId: z.number().optional().nullable(),
-  asaasPaymentId: z.string().min(1),
+  asaasPaymentId: z.string().optional().nullable(),
+  asaasTransactionId: z.string().optional().nullable(),
+  asaasEntityType: asaasImportEntityTypeEnum.default('payment'),
+  direction: asaasImportDirectionEnum.default('income'),
   event: z.string().min(1),
   status: asaasImportStatusEnum.default('pending'),
   amount: z.string().min(1),
@@ -520,7 +537,10 @@ export interface AsaasImport {
   id: number;
   accountId: number;
   bankAccountId: number | null;
-  asaasPaymentId: string;
+  asaasPaymentId: string | null;
+  asaasTransactionId: string | null;
+  asaasEntityType: AsaasImportEntityType;
+  direction: AsaasImportDirection;
   event: string;
   status: AsaasImportStatus;
   amount: string;
