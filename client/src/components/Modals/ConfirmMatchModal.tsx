@@ -84,11 +84,15 @@ export default function ConfirmMatchModal({
     onConfirm(selectedTransactionId);
   };
 
+  const hasSuggestion = asaasImport.suggestedTransactionId != null;
+
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Confirmar conciliacao</DialogTitle>
+          <DialogTitle>
+            {hasSuggestion ? 'Confirmar conciliacao' : 'Escolher transacao para conciliar'}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
