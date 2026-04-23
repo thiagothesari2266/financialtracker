@@ -204,10 +204,11 @@ export interface IStorage {
   ): Promise<(AuthenticatedUser & { passwordHash: string }) | undefined>;
 
   createAsaasImport(data: InsertAsaasImport): Promise<AsaasImport>;
-  getAsaasImports(accountId: number, status?: string): Promise<AsaasImportWithTransactions[]>;
+  getAsaasImports(accountId: number, status?: string, direction?: string): Promise<AsaasImportWithTransactions[]>;
   getAsaasImportById(id: number): Promise<AsaasImportWithTransactions | undefined>;
   updateAsaasImport(id: number, data: Partial<InsertAsaasImport> & { resolvedAt?: string | null }): Promise<AsaasImport | undefined>;
   findAsaasImportByPaymentId(asaasPaymentId: string): Promise<AsaasImport | undefined>;
+  findAsaasImportByEntityRef(accountId: number, asaasEntityType: string, asaasTransactionId: string): Promise<AsaasImport | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -550,8 +551,8 @@ export class DatabaseStorage implements IStorage {
   async createAsaasImport(data: InsertAsaasImport) {
     return AsaasImportRepo.createAsaasImport(data);
   }
-  async getAsaasImports(accountId: number, status?: string) {
-    return AsaasImportRepo.getAsaasImports(accountId, status);
+  async getAsaasImports(accountId: number, status?: string, direction?: string) {
+    return AsaasImportRepo.getAsaasImports(accountId, status, direction);
   }
   async getAsaasImportById(id: number) {
     return AsaasImportRepo.getAsaasImportById(id);
@@ -561,6 +562,9 @@ export class DatabaseStorage implements IStorage {
   }
   async findAsaasImportByPaymentId(asaasPaymentId: string) {
     return AsaasImportRepo.findAsaasImportByPaymentId(asaasPaymentId);
+  }
+  async findAsaasImportByEntityRef(accountId: number, asaasEntityType: string, asaasTransactionId: string) {
+    return AsaasImportRepo.findAsaasImportByEntityRef(accountId, asaasEntityType, asaasTransactionId);
   }
 }
 

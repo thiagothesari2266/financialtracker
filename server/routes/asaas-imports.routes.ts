@@ -2,6 +2,8 @@ import type { Express } from 'express';
 import { z } from 'zod';
 import { storage } from '../storage';
 import { prisma } from '../db';
+import { syncBankAccount } from '../services/asaas-sync';
+import type { AsaasImportDirection } from '@shared/schema';
 
 // ---- Schemas de validação ----
 
@@ -19,17 +21,20 @@ const bulkResolveSchema = z.object({
   items: z.array(bulkResolveItemSchema).min(1),
 });
 
-// ---- Helper: buscar ou criar categoria "Asaas" ----
+// ---- Helper: buscar ou criar categoria "Asaas" por direcao ----
 
-async function getOrCreateAsaasCategory(accountId: number): Promise<number> {
+async function getOrCreateAsaasCategory(
+  accountId: number,
+  direction: AsaasImportDirection,
+): Promise<number> {
   const categories = await storage.getCategories(accountId);
-  let category = categories.find(c => c.name === 'Asaas' && c.type === 'income');
+  let category = categories.find(c => c.name === 'Asaas' && c.type === direction);
   if (!category) {
     category = await storage.createCategory({
       name: 'Asaas',
-      color: '#3b82f6',
+      color: direction === 'income' ? '#3b82f6' : '#ef4444',
       icon: 'Landmark',
-      type: 'income',
+      type: direction,
       accountId,
     });
   }
@@ -42,9 +47,11 @@ async function applyMatch(importId: number, transactionId: number): Promise<void
   const asaasImport = await storage.getAsaasImportById(importId);
   if (!asaasImport) throw new Error(`Import ${importId} não encontrado`);
 
+  const externalId = asaasImport.asaasPaymentId ?? asaasImport.asaasTransactionId ?? null;
+
   await storage.updateTransaction(transactionId, {
     paid: true,
-    externalId: asaasImport.asaasPaymentId,
+    externalId,
     paymentMethod: asaasImport.billingType ?? null,
   });
 
@@ -59,26 +66,30 @@ async function applyStandalone(importId: number): Promise<void> {
   const asaasImport = await storage.getAsaasImportById(importId);
   if (!asaasImport) throw new Error(`Import ${importId} não encontrado`);
 
-  const categoryId = await getOrCreateAsaasCategory(asaasImport.accountId);
+  const direction = asaasImport.direction ?? 'income';
+  const categoryId = await getOrCreateAsaasCategory(asaasImport.accountId, direction);
 
   const transactionDate = (asaasImport.isPaid && asaasImport.paymentDate)
     ? asaasImport.paymentDate
     : asaasImport.dueDate;
 
+  const fallbackByDirection = direction === 'expense' ? 'Saída Asaas' : 'Recebimento Asaas';
   const description = asaasImport.description
-    || (asaasImport.externalReference ? `Pedido ${asaasImport.externalReference}` : 'Recebimento Asaas');
+    || (asaasImport.externalReference ? `Pedido ${asaasImport.externalReference}` : fallbackByDirection);
+
+  const externalId = asaasImport.asaasPaymentId ?? asaasImport.asaasTransactionId ?? null;
 
   const created = await storage.createTransaction({
     description,
     amount: String(asaasImport.amount),
-    type: 'income' as const,
+    type: direction,
     date: String(transactionDate),
     categoryId,
     accountId: asaasImport.accountId,
     bankAccountId: asaasImport.bankAccountId ?? null,
     paid: asaasImport.isPaid,
     paymentMethod: asaasImport.billingType ?? null,
-    externalId: asaasImport.asaasPaymentId,
+    externalId,
     isException: false,
   });
 
@@ -109,6 +120,8 @@ export function registerAsaasImportsRoutes(app: Express) {
 
       const accountId = req.query.accountId ? parseInt(req.query.accountId as string) : undefined;
       const status = req.query.status as string | undefined;
+      const directionParam = req.query.direction as string | undefined;
+      const direction = directionParam === 'income' || directionParam === 'expense' ? directionParam : undefined;
 
       if (!accountId) {
         return res.status(400).json({ message: 'accountId é obrigatório' });
@@ -123,7 +136,7 @@ export function registerAsaasImportsRoutes(app: Express) {
         return res.status(403).json({ message: 'Acesso negado' });
       }
 
-      const imports = await storage.getAsaasImports(accountId, status);
+      const imports = await storage.getAsaasImports(accountId, status, direction);
       res.json(imports);
     } catch (error) {
       console.error('[GET /api/asaas-imports]', error);
@@ -234,6 +247,47 @@ export function registerAsaasImportsRoutes(app: Express) {
     } catch (error) {
       console.error('[POST /api/asaas-imports/:id/ignore]', error);
       res.status(500).json({ message: 'Erro ao ignorar import' });
+    }
+  });
+
+  // POST /api/bank-accounts/:id/asaas-sync
+  app.post('/api/bank-accounts/:id/asaas-sync', async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: 'Não autenticado' });
+      }
+
+      const bankAccountId = parseInt(req.params.id);
+      if (isNaN(bankAccountId)) {
+        return res.status(400).json({ message: 'ID inválido' });
+      }
+
+      const bankAccount = await prisma.bankAccount.findUnique({ where: { id: bankAccountId } });
+      if (!bankAccount) {
+        return res.status(404).json({ message: 'Conta bancária não encontrada' });
+      }
+
+      const account = await storage.getAccount(bankAccount.accountId);
+      if (!account || account.userId !== userId) {
+        return res.status(403).json({ message: 'Acesso negado' });
+      }
+
+      if (!bankAccount.asaasApiKey) {
+        return res.status(400).json({ message: 'Conta sem integração Asaas (apiKey ausente)' });
+      }
+
+      const sinceDaysRaw = req.body?.sinceDays;
+      const sinceDays = typeof sinceDaysRaw === 'number' && sinceDaysRaw > 0 && sinceDaysRaw <= 365
+        ? Math.floor(sinceDaysRaw)
+        : 90;
+
+      const result = await syncBankAccount(bankAccountId, sinceDays);
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error('[POST /api/bank-accounts/:id/asaas-sync]', error);
+      const message = error instanceof Error ? error.message : 'Erro ao sincronizar';
+      res.status(500).json({ message });
     }
   });
 

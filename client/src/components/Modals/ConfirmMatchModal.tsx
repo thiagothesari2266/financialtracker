@@ -56,8 +56,9 @@ export default function ConfirmMatchModal({
     enabled: !!currentAccount,
   });
 
+  const direction = asaasImport.direction ?? 'income';
   const unpaidTransactions = transactions.filter(
-    (t) => !t.paid && t.type === 'income'
+    (t) => !t.paid && t.type === direction
   );
 
   const selectedTransaction =
@@ -72,10 +73,11 @@ export default function ConfirmMatchModal({
       : null);
 
   const displayDate = asaasImport.paymentDate ?? asaasImport.dueDate;
+  const fallbackDescription = direction === 'expense' ? 'Saída Asaas' : 'Recebimento Asaas';
   const displayDescription =
     asaasImport.description ??
     asaasImport.externalReference ??
-    'Recebimento Asaas';
+    fallbackDescription;
 
   const handleConfirm = () => {
     if (!selectedTransactionId) return;
@@ -95,7 +97,7 @@ export default function ConfirmMatchModal({
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Pagamento Asaas
             </p>
-            <p className="text-lg font-bold text-success">
+            <p className={cn('text-lg font-bold', direction === 'expense' ? 'text-destructive' : 'text-success')}>
               {formatCurrency(asaasImport.amount)}
             </p>
             <p className="text-sm text-foreground">{displayDescription}</p>
@@ -149,7 +151,7 @@ export default function ConfirmMatchModal({
                 <CommandInput placeholder="Buscar transacao..." />
                 <CommandList>
                   <CommandEmpty>Nenhuma transacao encontrada.</CommandEmpty>
-                  <CommandGroup heading="Receitas nao pagas">
+                  <CommandGroup heading={direction === 'expense' ? 'Despesas nao pagas' : 'Receitas nao pagas'}>
                     {unpaidTransactions.map((t) => (
                       <CommandItem
                         key={t.id}

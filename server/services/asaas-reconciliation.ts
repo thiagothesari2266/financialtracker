@@ -157,12 +157,13 @@ export function findBestMatch(
 
 /**
  * Busca candidatos no banco de dados para reconciliacao.
- * Filtra: type='income', paid=false, externalId=null,
+ * Filtra: type=direction, paid=false, externalId=null,
  * bankAccountId null OU igual ao do import, data ±3 dias do dueDate/paymentDate.
  */
 export async function getMatchCandidates(
   importData: AsaasImportData,
-  accountId: number
+  accountId: number,
+  direction: 'income' | 'expense' = 'income',
 ): Promise<MatchCandidate[]> {
   const referenceDate = importData.paymentDate
     ? toDate(importData.paymentDate)
@@ -178,7 +179,7 @@ export async function getMatchCandidates(
   const transactions = await prisma.transaction.findMany({
     where: {
       accountId,
-      type: 'income',
+      type: direction,
       paid: false,
       externalId: null,
       date: {
