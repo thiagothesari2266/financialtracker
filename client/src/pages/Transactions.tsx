@@ -208,12 +208,10 @@ export default function Transactions() {
     0
   );
 
-  const saldoAtual = allTransactionsUntilPeriod
-    .filter((t) => t.paid)
-    .reduce(
-      (sum, t) => sum + (t.type === 'income' ? parseFloat(t.amount) : -parseFloat(t.amount)),
-      0
-    );
+  const saldoAtual = bankAccounts.reduce(
+    (sum, ba) => sum + parseFloat((ba as any).currentBalance ?? ba.initialBalance ?? '0'),
+    0
+  );
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
