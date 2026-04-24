@@ -3,6 +3,7 @@ import { endOfMonth, format, parse } from 'date-fns';
 import { useAccount } from '@/contexts/AccountContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useBankAccounts } from '@/hooks/useBankAccounts';
 import { formatCurrency } from '@/lib/utils';
 import { Wallet, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
 
@@ -25,22 +26,15 @@ export default function MetricsCards({ currentMonth }: MetricsCardsProps) {
     enabled: !!currentAccount,
   });
 
-  const { data: allTransactionsUntilMonth = [] } = useTransactions(currentAccount?.id || 0, {
-    startDate: '1900-01-01',
-    endDate: monthEnd,
-    enabled: !!currentAccount,
-  });
+  const { data: bankAccounts = [] } = useBankAccounts(currentAccount?.id || 0);
 
   const currentBalance = useMemo(
     () =>
-      allTransactionsUntilMonth
-        .filter((tx) => tx.paid)
-        .reduce(
-          (acc, tx) =>
-            acc + (tx.type === 'income' ? parseFloat(tx.amount) || 0 : -(parseFloat(tx.amount) || 0)),
-          0
-        ),
-    [allTransactionsUntilMonth]
+      bankAccounts.reduce(
+        (sum, ba) => sum + parseFloat(ba.currentBalance ?? ba.initialBalance ?? '0'),
+        0
+      ),
+    [bankAccounts]
   );
 
   const monthlyIncome = useMemo(

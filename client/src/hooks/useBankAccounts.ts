@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
-import type { BankAccount, InsertBankAccount } from '@shared/schema';
+import type { BankAccount, BankAccountWithBalance, InsertBankAccount } from '@shared/schema';
 
 export function useBankAccounts(accountId: number) {
-  return useQuery<BankAccount[]>({
+  return useQuery<BankAccountWithBalance[]>({
     queryKey: ['/api/accounts', accountId, 'bank-accounts'],
     enabled: !!accountId,
     queryFn: async () => {

@@ -203,15 +203,24 @@ export default function Transactions() {
   const totalExpensePeriodo = transactions
     .filter((t) => t.type === 'expense')
     .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-  const previsaoAcumulada = allTransactionsUntilPeriod.reduce(
-    (sum, t) => sum + (t.type === 'income' ? parseFloat(t.amount) : -parseFloat(t.amount)),
+
+  const saldoAtual = bankAccounts.reduce(
+    (sum, ba) => sum + parseFloat(ba.currentBalance ?? ba.initialBalance ?? '0'),
     0
   );
 
-  const saldoAtual = bankAccounts.reduce(
-    (sum, ba) => sum + parseFloat((ba as any).currentBalance ?? ba.initialBalance ?? '0'),
-    0
-  );
+  // Previsão = saldo atual + movimentações não pagas até o fim do período (mesmos filtros do saldo)
+  const isTemplateMensal = (t: TransactionWithCategory) =>
+    t.launchType === 'recorrente' && t.recurrenceFrequency === 'mensal' && !t.isException;
+
+  const movimentacoesPrevistas = allTransactionsUntilPeriod
+    .filter((t) => !t.paid && t.bankAccountId != null && !isTemplateMensal(t))
+    .reduce(
+      (sum, t) => sum + (t.type === 'income' ? parseFloat(t.amount) : -parseFloat(t.amount)),
+      0
+    );
+
+  const previsaoAcumulada = saldoAtual + movimentacoesPrevistas;
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';

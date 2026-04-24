@@ -330,6 +330,8 @@ export interface BankAccount {
   createdAt: string;
 }
 
+export type BankAccountWithBalance = BankAccount & { currentBalance: string };
+
 export interface InvoicePayment {
   id: number;
   creditCardId: number;

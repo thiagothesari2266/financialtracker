@@ -1,7 +1,7 @@
 import type { Express } from 'express';
 import { z } from 'zod';
 import { storage } from '../storage';
-import { prisma } from '../db';
+import { getBankAccountsWithBalance } from '../services/balance.service';
 import { validateAccountOwnership } from '../middleware/account-ownership';
 import { insertBankAccountSchema } from '@shared/schema';
 
@@ -10,33 +10,7 @@ export function registerBankAccountRoutes(app: Express) {
     try {
       const accountId = parseInt(req.params.accountId);
       const userId = req.session.userId!;
-      const bankAccounts = await storage.getBankAccounts(accountId, userId);
-
-      // Calcular saldo atual via aggregate SQL (apenas transações pagas físicas)
-      const aggregates = await prisma.transaction.groupBy({
-        by: ['bankAccountId', 'type'],
-        where: {
-          accountId,
-          paid: true,
-          bankAccountId: { not: null },
-        },
-        _sum: { amount: true },
-      });
-
-      const balanceMap = new Map<number, number>();
-      for (const row of aggregates) {
-        if (!row.bankAccountId) continue;
-        const current = balanceMap.get(row.bankAccountId) || 0;
-        const amount = Number(row._sum.amount ?? 0);
-        balanceMap.set(row.bankAccountId, current + (row.type === 'income' ? amount : -amount));
-      }
-
-      const enriched = bankAccounts.map(ba => {
-        const txBalance = balanceMap.get(ba.id) || 0;
-        const currentBalance = parseFloat(ba.initialBalance || '0') + txBalance;
-        return { ...ba, currentBalance: currentBalance.toFixed(2) };
-      });
-
+      const enriched = await getBankAccountsWithBalance(accountId, userId);
       res.json(enriched);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch bank accounts' });
