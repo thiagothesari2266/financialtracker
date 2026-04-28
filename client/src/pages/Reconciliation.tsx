@@ -31,7 +31,6 @@ import {
   useAsaasImports,
   useAsaasSync,
   useConfirmMatch,
-  useCreateStandalone,
   useIgnoreImport,
   useBulkResolve,
   type AsaasImport,
@@ -43,6 +42,7 @@ import { useBankAccounts } from '@/hooks/useBankAccounts';
 import { useAccount } from '@/contexts/AccountContext';
 import { cn, formatCurrency, formatDateBR } from '@/lib/utils';
 import ConfirmMatchModal from '@/components/Modals/ConfirmMatchModal';
+import TransactionModal from '@/components/Modals/TransactionModal';
 
 function labelBillingType(billingType: string | null): string {
   if (!billingType) return '-';
@@ -119,12 +119,28 @@ export default function Reconciliation() {
   );
 
   const confirmMatch = useConfirmMatch();
-  const createStandalone = useCreateStandalone();
   const ignoreImport = useIgnoreImport();
   const bulkResolve = useBulkResolve();
   const asaasSync = useAsaasSync();
 
   const [confirmModalImport, setConfirmModalImport] = useState<AsaasImport | null>(null);
+  const [createImport, setCreateImport] = useState<AsaasImport | null>(null);
+
+  const buildPrefillTransaction = (imp: AsaasImport) => {
+    const date = (imp.isPaid && imp.paymentDate) ? imp.paymentDate : imp.dueDate;
+    const fallback = imp.direction === 'expense' ? 'Saída Asaas' : 'Recebimento Asaas';
+    const description =
+      imp.description ||
+      (imp.externalReference ? `Pedido ${imp.externalReference}` : fallback);
+    return {
+      description,
+      amount: String(imp.amount),
+      type: imp.direction,
+      date,
+      bankAccountId: imp.bankAccountId ?? undefined,
+      paid: imp.isPaid,
+    };
+  };
 
   const {
     selected,
@@ -179,12 +195,15 @@ export default function Reconciliation() {
     }
   };
 
-  const handleCreateStandalone = async (importId: number) => {
+  const handleCreatedFromImport = async (importId: number, transactionId: number) => {
     try {
-      await createStandalone.mutateAsync(importId);
-      toast({ title: 'Transacao criada com sucesso.' });
+      await confirmMatch.mutateAsync({ id: importId, transactionId });
+      toast({ title: 'Transação criada e vinculada ao import.' });
     } catch {
-      toast({ title: 'Erro ao criar transacao.', variant: 'destructive' });
+      toast({
+        title: 'Transação criada, mas erro ao vincular ao import.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -252,7 +271,6 @@ export default function Reconciliation() {
 
   const isMutating =
     confirmMatch.isPending ||
-    createStandalone.isPending ||
     ignoreImport.isPending ||
     bulkResolve.isPending;
 
@@ -420,7 +438,7 @@ export default function Reconciliation() {
                                   size="sm"
                                   variant="outline"
                                   disabled={isMutating}
-                                  onClick={() => handleCreateStandalone(imp.id)}
+                                  onClick={() => setCreateImport(imp)}
                                 >
                                   Criar nova
                                 </Button>
@@ -541,7 +559,7 @@ export default function Reconciliation() {
                                     size="sm"
                                     variant="outline"
                                     disabled={isMutating}
-                                    onClick={() => handleCreateStandalone(imp.id)}
+                                    onClick={() => setCreateImport(imp)}
                                   >
                                     Criar nova
                                   </Button>
@@ -573,6 +591,15 @@ export default function Reconciliation() {
           asaasImport={confirmModalImport}
           onConfirm={(transactionId) => handleConfirmMatch(confirmModalImport.id, transactionId)}
           onClose={() => setConfirmModalImport(null)}
+        />
+      )}
+
+      {createImport && (
+        <TransactionModal
+          isOpen={!!createImport}
+          onClose={() => setCreateImport(null)}
+          transaction={buildPrefillTransaction(createImport)}
+          onCreated={({ id }) => handleCreatedFromImport(createImport.id, id)}
         />
       )}
     </>

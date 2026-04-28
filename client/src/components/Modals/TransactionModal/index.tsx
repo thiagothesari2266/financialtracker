@@ -80,6 +80,7 @@ interface TransactionModalProps {
   onClose: () => void;
   transaction?: any | null;
   editScope?: 'single' | 'all' | 'future' | null;
+  onCreated?: (created: { id: number }) => void | Promise<void>;
 }
 
 export default function TransactionModal({
@@ -87,6 +88,7 @@ export default function TransactionModal({
   onClose,
   transaction,
   editScope: _editScope,
+  onCreated,
 }: TransactionModalProps) {
   const { currentAccount } = useAccount();
   const { toast } = useToast();
@@ -350,8 +352,15 @@ export default function TransactionModal({
       }
     } else {
       createTransactionMutation.mutate(payload, {
-        onSuccess: () => {
+        onSuccess: async (created: any) => {
           toast({ title: 'Sucesso', description: 'Transação criada com sucesso' });
+          if (onCreated && created?.id) {
+            try {
+              await onCreated({ id: created.id });
+            } catch (err: any) {
+              toast({ title: 'Aviso', description: err?.message || 'Transação criada, mas houve erro no pós-processamento.', variant: 'destructive' });
+            }
+          }
           form.reset();
           onClose();
         },
@@ -516,7 +525,7 @@ export default function TransactionModal({
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold text-foreground">
-              {transaction ? 'Editar Transação' : 'Nova Transação'}
+              {transaction?.id ? 'Editar Transação' : 'Nova Transação'}
             </DialogTitle>
           </DialogHeader>
 
