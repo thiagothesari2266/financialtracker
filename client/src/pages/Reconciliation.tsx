@@ -97,7 +97,15 @@ export default function Reconciliation() {
   const { currentAccount } = useAccount();
   const [directionFilter, setDirectionFilter] = useState<DirectionFilter>('all');
 
-  const { data: allImports = [], isLoading } = useAsaasImports({ status: 'pending' });
+  const { data: rawImports = [], isLoading } = useAsaasImports({ status: 'pending' });
+  const allImports = useMemo(() => {
+    const getSortDate = (i: AsaasImport) => i.paymentDate ?? i.dueDate;
+    return [...rawImports].sort((a, b) => {
+      const cmp = getSortDate(b).localeCompare(getSortDate(a));
+      return cmp !== 0 ? cmp : b.id - a.id;
+    });
+  }, [rawImports]);
+
   const imports = useMemo(
     () =>
       directionFilter === 'all'
