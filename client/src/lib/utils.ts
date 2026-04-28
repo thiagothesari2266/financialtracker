@@ -26,7 +26,12 @@ export function formatMonth(monthStr: string): string {
   }
 }
 
-// Formata 'YYYY-MM-DD' → "15/04/2026"
+// Formata 'YYYY-MM-DD' ou ISO ('YYYY-MM-DDTHH:mm:ss...Z') → "15/04/2026"
+// Evita conversao de timezone: extrai a parte calendario direto da string.
 export function formatDateBR(dateStr: string): string {
+  if (!dateStr) return '';
+  const ymd = dateStr.slice(0, 10);
+  const [y, m, d] = ymd.split('-');
+  if (y && m && d) return `${d}/${m}/${y}`;
   return new Date(dateStr).toLocaleDateString('pt-BR');
 }
