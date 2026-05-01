@@ -12,25 +12,27 @@ interface EventMeta {
 
 // Mapa de eventos do Asaas: define direction/entityType/isPaid por evento.
 // Eventos nao mapeados: retornam 'event_ignored'.
+// Regra: a fila de reconciliacao so recebe movimento JA realizado (isPaid=true).
+// Eventos de cobranca emitida / em processamento sao ignorados.
 const EVENT_MAP: Record<string, EventMeta> = {
   // Entradas (income/payment)
-  PAYMENT_CREATED: { direction: 'income', entityType: 'payment', isPaid: false },
+  PAYMENT_CREATED: { direction: 'income', entityType: 'payment', isPaid: false, ignore: true },
   PAYMENT_CONFIRMED: { direction: 'income', entityType: 'payment', isPaid: true },
   PAYMENT_RECEIVED: { direction: 'income', entityType: 'payment', isPaid: true },
 
   // Estornos: dinheiro saindo
   PAYMENT_REFUNDED: { direction: 'expense', entityType: 'refund', isPaid: true },
-  PAYMENT_REFUND_IN_PROGRESS: { direction: 'expense', entityType: 'refund', isPaid: false },
+  PAYMENT_REFUND_IN_PROGRESS: { direction: 'expense', entityType: 'refund', isPaid: false, ignore: true },
 
-  // Chargebacks: contestacao de cartao
-  PAYMENT_CHARGEBACK_REQUESTED: { direction: 'expense', entityType: 'chargeback', isPaid: false },
-  PAYMENT_CHARGEBACK_DISPUTE: { direction: 'expense', entityType: 'chargeback', isPaid: false },
-  PAYMENT_AWAITING_CHARGEBACK_REVERSAL: { direction: 'expense', entityType: 'chargeback', isPaid: false },
+  // Chargebacks: contestacao de cartao - so registra quando efetivado
+  PAYMENT_CHARGEBACK_REQUESTED: { direction: 'expense', entityType: 'chargeback', isPaid: false, ignore: true },
+  PAYMENT_CHARGEBACK_DISPUTE: { direction: 'expense', entityType: 'chargeback', isPaid: false, ignore: true },
+  PAYMENT_AWAITING_CHARGEBACK_REVERSAL: { direction: 'expense', entityType: 'chargeback', isPaid: false, ignore: true },
 
-  // Transferencias (saque pra banco)
-  TRANSFER_CREATED: { direction: 'expense', entityType: 'transfer', isPaid: false },
-  TRANSFER_PENDING: { direction: 'expense', entityType: 'transfer', isPaid: false },
-  TRANSFER_IN_BANK_PROCESSING: { direction: 'expense', entityType: 'transfer', isPaid: false },
+  // Transferencias (saque pra banco) - so registra quando concluida
+  TRANSFER_CREATED: { direction: 'expense', entityType: 'transfer', isPaid: false, ignore: true },
+  TRANSFER_PENDING: { direction: 'expense', entityType: 'transfer', isPaid: false, ignore: true },
+  TRANSFER_IN_BANK_PROCESSING: { direction: 'expense', entityType: 'transfer', isPaid: false, ignore: true },
   TRANSFER_DONE: { direction: 'expense', entityType: 'transfer', isPaid: true },
   TRANSFER_FAILED: { direction: 'expense', entityType: 'transfer', isPaid: false, ignore: true },
   TRANSFER_CANCELLED: { direction: 'expense', entityType: 'transfer', isPaid: false, ignore: true },
