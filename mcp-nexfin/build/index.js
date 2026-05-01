@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { mcpAuthRouter } from "@modelcontextprotocol/sdk/server/auth/router.js";
+import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
+import express from "express";
 import pg from "pg";
 import crypto from "crypto";
 import { z } from "zod";
 // === Configuração ===
-const DATABASE_URL = process.argv[2] ||
+const DATABASE_URL = process.env.DATABASE_URL ||
+    (process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : null) ||
     "postgresql://postgres:tmttx22ID@localhost:5432/financialtracker";
 const pool = new pg.Pool({ connectionString: DATABASE_URL, max: 5 });
 // === User cache (single-tenant) ===
@@ -661,99 +666,100 @@ async function deleteCreditCardTransactionMcp(current, escopo, exceptionForDate)
 // ============================================
 // MCP SERVER
 // ============================================
-const server = new McpServer({
-    name: "mcp-nexfin",
-    version: "2.0.0",
-});
-// ==========================================
-// LEITURA - Tools com lógica de negócio
-// ==========================================
-// === Tool: nexfin_contas ===
-server.tool("nexfin_contas", "Lista todas as contas financeiras do NexFin com IDs", {}, async () => {
-    const userId = await getUserId();
-    const res = await pool.query(`SELECT id, name, type FROM accounts WHERE user_id = $1 ORDER BY id`, [userId]);
-    let output = `## Contas NexFin\n\n`;
-    for (const row of res.rows) {
-        output += `- **${row.name}** (ID: ${row.id}, tipo: ${row.type})\n`;
-    }
-    return { content: [{ type: "text", text: output }] };
-});
-// === Tool: nexfin_transacoes ===
-server.tool("nexfin_transacoes", "Transações do mês com rollforward de recorrências, flag de atraso, e dados idênticos ao frontend", {
-    accountId: z.coerce.number().describe("ID da conta"),
-    month: z
-        .string()
-        .optional()
-        .describe("Mês YYYY-MM (padrão: mês atual)"),
-}, async ({ accountId, month }) => {
-    const targetMonth = month || currentMonthBR();
-    const [year, mon] = targetMonth.split("-").map(Number);
-    const startDate = `${year}-${String(mon).padStart(2, "0")}-01`;
-    const lastDay = monthLastDay(year, mon);
-    const endDate = `${year}-${String(mon).padStart(2, "0")}-${lastDay}`;
-    const txs = await getTransactionsByDateRange(accountId, startDate, endDate);
-    const income = txs.filter((t) => t.type === "income");
-    const expense = txs.filter((t) => t.type === "expense");
-    const overdue = txs.filter((t) => t.isOverdue);
-    let output = `## Transações ${String(mon).padStart(2, "0")}/${year} (Conta ID: ${accountId})\n\n`;
-    output += `**Total**: ${txs.length} transações | **Em atraso**: ${overdue.length}\n\n`;
-    const tblHeader = `| ID | Data | Descrição | Valor | Status | Categoria |\n|-----|------|-----------|-------|--------|----------|\n`;
-    if (expense.length > 0) {
-        output += `### Despesas (${expense.length})\n`;
-        output += tblHeader;
-        for (const tx of expense)
-            output += txLine(tx, targetMonth) + "\n";
-        output += "\n";
-    }
-    if (income.length > 0) {
-        output += `### Receitas (${income.length})\n`;
-        output += tblHeader;
-        for (const tx of income)
-            output += txLine(tx, targetMonth) + "\n";
-    }
-    output += `\n> *ID com asterisco = recorrência virtual (usar ID da definição + data para atualizar)*\n`;
-    return { content: [{ type: "text", text: output }] };
-});
-// === Tool: nexfin_atrasados ===
-server.tool("nexfin_atrasados", "Lista todas as contas em atraso (não pagas com data anterior a hoje), incluindo recorrências virtuais", {
-    accountId: z.coerce.number().describe("ID da conta"),
-}, async ({ accountId }) => {
-    const today = todayBR();
-    const yearAgo = `${parseInt(today.substring(0, 4)) - 1}-${today.substring(5, 7)}-01`;
-    const txs = await getTransactionsByDateRange(accountId, yearAgo, today);
-    const overdue = txs.filter((t) => t.isOverdue);
-    let output = `## Contas em Atraso (Conta ID: ${accountId})\n\n`;
-    if (overdue.length === 0) {
-        output += `Nenhuma conta em atraso.\n`;
-    }
-    else {
-        const totalOverdue = overdue.reduce((sum, t) => sum + parseFloat(t.amount), 0);
-        output += `**${overdue.length} contas em atraso** | Total: ${formatBRL(totalOverdue)}\n\n`;
-        output += `| ID | Mês | Data | Descrição | Valor | Categoria |\n`;
-        output += `|-----|-----|------|-----------|-------|----------|\n`;
-        for (const tx of overdue) {
-            const cat = tx.categoryName ?? "Sem categoria";
-            const virtual = tx.isVirtual ? " [rec]" : "";
-            const idCol = tx.isVirtual ? `${tx.id}*` : `${tx.id}`;
-            const installment = tx.installments && tx.installments > 1
-                ? ` (${tx.currentInstallment}/${tx.installments})`
-                : "";
-            const origMonth = monthAbbr(tx.exceptionForDate ?? tx.date);
-            output += `| ${idCol} | ${origMonth} | ${tx.date} | ${tx.description}${installment}${virtual} | ${formatBRL(tx.amount)} | ${cat} |\n`;
+function createServer() {
+    const server = new McpServer({
+        name: "mcp-nexfin",
+        version: "2.0.0",
+    });
+    // ==========================================
+    // LEITURA - Tools com lógica de negócio
+    // ==========================================
+    // === Tool: nexfin_contas ===
+    server.tool("nexfin_contas", "Lista todas as contas financeiras do NexFin com IDs", {}, async () => {
+        const userId = await getUserId();
+        const res = await pool.query(`SELECT id, name, type FROM accounts WHERE user_id = $1 ORDER BY id`, [userId]);
+        let output = `## Contas NexFin\n\n`;
+        for (const row of res.rows) {
+            output += `- **${row.name}** (ID: ${row.id}, tipo: ${row.type})\n`;
         }
-    }
-    return { content: [{ type: "text", text: output }] };
-});
-// === Tool: nexfin_saldos ===
-server.tool("nexfin_saldos", "Saldo atual de cada conta bancária (saldo inicial + transações pagas até hoje)", {
-    accountId: z.coerce.number().describe("ID da conta"),
-}, async ({ accountId }) => {
-    const userId = await getUserId();
-    // IDs de todas as contas do usuário (para bank accounts compartilhadas)
-    const userAccounts = await pool.query(`SELECT id FROM accounts WHERE user_id = $1`, [userId]);
-    const accountIds = userAccounts.rows.map((r) => r.id);
-    // Contas bancárias (próprias + compartilhadas) com saldo calculado
-    const bankAccounts = await pool.query(`SELECT ba.id, ba.name, ba.initial_balance, ba.pix, ba.shared, ba.account_id, ba.asaas_api_key,
+        return { content: [{ type: "text", text: output }] };
+    });
+    // === Tool: nexfin_transacoes ===
+    server.tool("nexfin_transacoes", "Transações do mês com rollforward de recorrências, flag de atraso, e dados idênticos ao frontend", {
+        accountId: z.coerce.number().describe("ID da conta"),
+        month: z
+            .string()
+            .optional()
+            .describe("Mês YYYY-MM (padrão: mês atual)"),
+    }, async ({ accountId, month }) => {
+        const targetMonth = month || currentMonthBR();
+        const [year, mon] = targetMonth.split("-").map(Number);
+        const startDate = `${year}-${String(mon).padStart(2, "0")}-01`;
+        const lastDay = monthLastDay(year, mon);
+        const endDate = `${year}-${String(mon).padStart(2, "0")}-${lastDay}`;
+        const txs = await getTransactionsByDateRange(accountId, startDate, endDate);
+        const income = txs.filter((t) => t.type === "income");
+        const expense = txs.filter((t) => t.type === "expense");
+        const overdue = txs.filter((t) => t.isOverdue);
+        let output = `## Transações ${String(mon).padStart(2, "0")}/${year} (Conta ID: ${accountId})\n\n`;
+        output += `**Total**: ${txs.length} transações | **Em atraso**: ${overdue.length}\n\n`;
+        const tblHeader = `| ID | Data | Descrição | Valor | Status | Categoria |\n|-----|------|-----------|-------|--------|----------|\n`;
+        if (expense.length > 0) {
+            output += `### Despesas (${expense.length})\n`;
+            output += tblHeader;
+            for (const tx of expense)
+                output += txLine(tx, targetMonth) + "\n";
+            output += "\n";
+        }
+        if (income.length > 0) {
+            output += `### Receitas (${income.length})\n`;
+            output += tblHeader;
+            for (const tx of income)
+                output += txLine(tx, targetMonth) + "\n";
+        }
+        output += `\n> *ID com asterisco = recorrência virtual (usar ID da definição + data para atualizar)*\n`;
+        return { content: [{ type: "text", text: output }] };
+    });
+    // === Tool: nexfin_atrasados ===
+    server.tool("nexfin_atrasados", "Lista todas as contas em atraso (não pagas com data anterior a hoje), incluindo recorrências virtuais", {
+        accountId: z.coerce.number().describe("ID da conta"),
+    }, async ({ accountId }) => {
+        const today = todayBR();
+        const yearAgo = `${parseInt(today.substring(0, 4)) - 1}-${today.substring(5, 7)}-01`;
+        const txs = await getTransactionsByDateRange(accountId, yearAgo, today);
+        const overdue = txs.filter((t) => t.isOverdue);
+        let output = `## Contas em Atraso (Conta ID: ${accountId})\n\n`;
+        if (overdue.length === 0) {
+            output += `Nenhuma conta em atraso.\n`;
+        }
+        else {
+            const totalOverdue = overdue.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+            output += `**${overdue.length} contas em atraso** | Total: ${formatBRL(totalOverdue)}\n\n`;
+            output += `| ID | Mês | Data | Descrição | Valor | Categoria |\n`;
+            output += `|-----|-----|------|-----------|-------|----------|\n`;
+            for (const tx of overdue) {
+                const cat = tx.categoryName ?? "Sem categoria";
+                const virtual = tx.isVirtual ? " [rec]" : "";
+                const idCol = tx.isVirtual ? `${tx.id}*` : `${tx.id}`;
+                const installment = tx.installments && tx.installments > 1
+                    ? ` (${tx.currentInstallment}/${tx.installments})`
+                    : "";
+                const origMonth = monthAbbr(tx.exceptionForDate ?? tx.date);
+                output += `| ${idCol} | ${origMonth} | ${tx.date} | ${tx.description}${installment}${virtual} | ${formatBRL(tx.amount)} | ${cat} |\n`;
+            }
+        }
+        return { content: [{ type: "text", text: output }] };
+    });
+    // === Tool: nexfin_saldos ===
+    server.tool("nexfin_saldos", "Saldo atual de cada conta bancária (saldo inicial + transações pagas até hoje)", {
+        accountId: z.coerce.number().describe("ID da conta"),
+    }, async ({ accountId }) => {
+        const userId = await getUserId();
+        // IDs de todas as contas do usuário (para bank accounts compartilhadas)
+        const userAccounts = await pool.query(`SELECT id FROM accounts WHERE user_id = $1`, [userId]);
+        const accountIds = userAccounts.rows.map((r) => r.id);
+        // Contas bancárias (próprias + compartilhadas) com saldo calculado
+        const bankAccounts = await pool.query(`SELECT ba.id, ba.name, ba.initial_balance, ba.pix, ba.shared, ba.account_id, ba.asaas_api_key,
               ba.initial_balance + COALESCE(SUM(
                 CASE WHEN t.type = 'income' AND t.paid = true AND t.date <= CURRENT_DATE AND t.account_id = $1
                           AND NOT (COALESCE(t.launch_type, '') = 'recorrente' AND COALESCE(t.recurrence_frequency, '') = 'mensal' AND t.is_exception = false)
@@ -768,130 +774,130 @@ server.tool("nexfin_saldos", "Saldo atual de cada conta bancária (saldo inicial
        WHERE ba.account_id = $1 OR (ba.shared = true AND ba.account_id = ANY($2))
        GROUP BY ba.id
        ORDER BY ba.name ASC`, [accountId, accountIds]);
-    if (bankAccounts.rows.length === 0) {
-        return {
-            content: [
-                { type: "text", text: "Nenhuma conta bancária encontrada." },
-            ],
-        };
-    }
-    // Função para buscar saldo real do Asaas
-    async function fetchAsaasBalance(apiKey) {
-        try {
-            const resp = await fetch("https://api.asaas.com/v3/finance/balance", {
-                headers: { access_token: apiKey },
-            });
-            if (!resp.ok)
+        if (bankAccounts.rows.length === 0) {
+            return {
+                content: [
+                    { type: "text", text: "Nenhuma conta bancária encontrada." },
+                ],
+            };
+        }
+        // Função para buscar saldo real do Asaas
+        async function fetchAsaasBalance(apiKey) {
+            try {
+                const resp = await fetch("https://api.asaas.com/v3/finance/balance", {
+                    headers: { access_token: apiKey },
+                });
+                if (!resp.ok)
+                    return null;
+                const data = await resp.json();
+                return typeof data.balance === "number" ? data.balance : null;
+            }
+            catch {
                 return null;
-            const data = await resp.json();
-            return typeof data.balance === "number" ? data.balance : null;
+            }
         }
-        catch {
-            return null;
-        }
-    }
-    let output = `## Saldos Bancários (Conta ID: ${accountId})\n\n`;
-    let totalGeral = 0;
-    for (const ba of bankAccounts.rows) {
-        let saldo;
-        let fonte = "";
-        if (ba.asaas_api_key) {
-            const asaasSaldo = await fetchAsaasBalance(ba.asaas_api_key);
-            if (asaasSaldo !== null) {
-                saldo = asaasSaldo;
-                fonte = " *(Asaas)*";
+        let output = `## Saldos Bancários (Conta ID: ${accountId})\n\n`;
+        let totalGeral = 0;
+        for (const ba of bankAccounts.rows) {
+            let saldo;
+            let fonte = "";
+            if (ba.asaas_api_key) {
+                const asaasSaldo = await fetchAsaasBalance(ba.asaas_api_key);
+                if (asaasSaldo !== null) {
+                    saldo = asaasSaldo;
+                    fonte = " *(Asaas)*";
+                }
+                else {
+                    saldo = parseFloat(decimalToString(ba.current_balance));
+                    fonte = " *(Asaas indisponível - calculado)*";
+                }
             }
             else {
                 saldo = parseFloat(decimalToString(ba.current_balance));
-                fonte = " *(Asaas indisponível - calculado)*";
             }
+            totalGeral += saldo;
+            const shared = ba.shared ? " (compartilhada)" : "";
+            const pix = ba.pix ? ` | PIX: ${ba.pix}` : "";
+            output += `- **${ba.name}** (ID: ${ba.id})${shared}${fonte}: ${formatBRL(saldo)}${pix}\n`;
         }
-        else {
-            saldo = parseFloat(decimalToString(ba.current_balance));
+        output += `\n**Saldo total**: ${formatBRL(totalGeral)}\n`;
+        return { content: [{ type: "text", text: output }] };
+    });
+    // === Tool: nexfin_resumo ===
+    server.tool("nexfin_resumo", "Resumo financeiro do mês: receitas, despesas e saldo (pagas) + previsão (pagas + pendentes)", {
+        accountId: z.coerce.number().describe("ID da conta"),
+        month: z
+            .string()
+            .optional()
+            .describe("Mês YYYY-MM (padrão: mês atual)"),
+    }, async ({ accountId, month }) => {
+        const targetMonth = month || currentMonthBR();
+        const [year, mon] = targetMonth.split("-").map(Number);
+        const startDate = `${year}-${String(mon).padStart(2, "0")}-01`;
+        const lastDay = monthLastDay(year, mon);
+        const endDate = `${year}-${String(mon).padStart(2, "0")}-${lastDay}`;
+        const txs = await getTransactionsByDateRange(accountId, startDate, endDate);
+        const paid = txs.filter((t) => t.paid);
+        const paidIncome = paid
+            .filter((t) => t.type === "income")
+            .reduce((s, t) => s + parseFloat(t.amount), 0);
+        const paidExpense = paid
+            .filter((t) => t.type === "expense")
+            .reduce((s, t) => s + parseFloat(t.amount), 0);
+        const paidBalance = paidIncome - paidExpense;
+        const allIncome = txs
+            .filter((t) => t.type === "income")
+            .reduce((s, t) => s + parseFloat(t.amount), 0);
+        const allExpense = txs
+            .filter((t) => t.type === "expense")
+            .reduce((s, t) => s + parseFloat(t.amount), 0);
+        const forecastBalance = allIncome - allExpense;
+        const overdue = txs.filter((t) => t.isOverdue);
+        const overdueTotal = overdue.reduce((s, t) => s + parseFloat(t.amount), 0);
+        let output = `## Resumo ${String(mon).padStart(2, "0")}/${year} (Conta ID: ${accountId})\n\n`;
+        output += `### Realizado (somente pagas)\n`;
+        output += `- Receitas: ${formatBRL(paidIncome)}\n`;
+        output += `- Despesas: ${formatBRL(paidExpense)}\n`;
+        output += `- Saldo: ${formatBRL(paidBalance)}\n\n`;
+        output += `### Previsão (pagas + pendentes)\n`;
+        output += `- Receitas previstas: ${formatBRL(allIncome)}\n`;
+        output += `- Despesas previstas: ${formatBRL(allExpense)}\n`;
+        output += `- Saldo previsto: ${formatBRL(forecastBalance)}\n\n`;
+        output += `### Detalhes\n`;
+        output += `- Total de transações: ${txs.length}\n`;
+        output += `- Pagas: ${paid.length}\n`;
+        output += `- Pendentes: ${txs.length - paid.length}\n`;
+        if (overdue.length > 0) {
+            output += `- **Em atraso: ${overdue.length}** (total: ${formatBRL(overdueTotal)})\n`;
         }
-        totalGeral += saldo;
-        const shared = ba.shared ? " (compartilhada)" : "";
-        const pix = ba.pix ? ` | PIX: ${ba.pix}` : "";
-        output += `- **${ba.name}** (ID: ${ba.id})${shared}${fonte}: ${formatBRL(saldo)}${pix}\n`;
-    }
-    output += `\n**Saldo total**: ${formatBRL(totalGeral)}\n`;
-    return { content: [{ type: "text", text: output }] };
-});
-// === Tool: nexfin_resumo ===
-server.tool("nexfin_resumo", "Resumo financeiro do mês: receitas, despesas e saldo (pagas) + previsão (pagas + pendentes)", {
-    accountId: z.coerce.number().describe("ID da conta"),
-    month: z
-        .string()
-        .optional()
-        .describe("Mês YYYY-MM (padrão: mês atual)"),
-}, async ({ accountId, month }) => {
-    const targetMonth = month || currentMonthBR();
-    const [year, mon] = targetMonth.split("-").map(Number);
-    const startDate = `${year}-${String(mon).padStart(2, "0")}-01`;
-    const lastDay = monthLastDay(year, mon);
-    const endDate = `${year}-${String(mon).padStart(2, "0")}-${lastDay}`;
-    const txs = await getTransactionsByDateRange(accountId, startDate, endDate);
-    const paid = txs.filter((t) => t.paid);
-    const paidIncome = paid
-        .filter((t) => t.type === "income")
-        .reduce((s, t) => s + parseFloat(t.amount), 0);
-    const paidExpense = paid
-        .filter((t) => t.type === "expense")
-        .reduce((s, t) => s + parseFloat(t.amount), 0);
-    const paidBalance = paidIncome - paidExpense;
-    const allIncome = txs
-        .filter((t) => t.type === "income")
-        .reduce((s, t) => s + parseFloat(t.amount), 0);
-    const allExpense = txs
-        .filter((t) => t.type === "expense")
-        .reduce((s, t) => s + parseFloat(t.amount), 0);
-    const forecastBalance = allIncome - allExpense;
-    const overdue = txs.filter((t) => t.isOverdue);
-    const overdueTotal = overdue.reduce((s, t) => s + parseFloat(t.amount), 0);
-    let output = `## Resumo ${String(mon).padStart(2, "0")}/${year} (Conta ID: ${accountId})\n\n`;
-    output += `### Realizado (somente pagas)\n`;
-    output += `- Receitas: ${formatBRL(paidIncome)}\n`;
-    output += `- Despesas: ${formatBRL(paidExpense)}\n`;
-    output += `- Saldo: ${formatBRL(paidBalance)}\n\n`;
-    output += `### Previsão (pagas + pendentes)\n`;
-    output += `- Receitas previstas: ${formatBRL(allIncome)}\n`;
-    output += `- Despesas previstas: ${formatBRL(allExpense)}\n`;
-    output += `- Saldo previsto: ${formatBRL(forecastBalance)}\n\n`;
-    output += `### Detalhes\n`;
-    output += `- Total de transações: ${txs.length}\n`;
-    output += `- Pagas: ${paid.length}\n`;
-    output += `- Pendentes: ${txs.length - paid.length}\n`;
-    if (overdue.length > 0) {
-        output += `- **Em atraso: ${overdue.length}** (total: ${formatBRL(overdueTotal)})\n`;
-    }
-    return { content: [{ type: "text", text: output }] };
-});
-// === Tool: nexfin_faturas ===
-server.tool("nexfin_faturas", "Faturas de cartão de crédito com status (paga/pendente/atrasada), valor total e detalhes", {
-    accountId: z.coerce.number().describe("ID da conta"),
-    month: z
-        .string()
-        .optional()
-        .describe("Mês específico YYYY-MM (opcional, padrão: janela de 6 meses)"),
-}, async ({ accountId, month }) => {
-    // Cartões de crédito
-    const cards = await pool.query(`SELECT id, name, closing_day, due_date, credit_limit, brand
+        return { content: [{ type: "text", text: output }] };
+    });
+    // === Tool: nexfin_faturas ===
+    server.tool("nexfin_faturas", "Faturas de cartão de crédito com status (paga/pendente/atrasada), valor total e detalhes", {
+        accountId: z.coerce.number().describe("ID da conta"),
+        month: z
+            .string()
+            .optional()
+            .describe("Mês específico YYYY-MM (opcional, padrão: janela de 6 meses)"),
+    }, async ({ accountId, month }) => {
+        // Cartões de crédito
+        const cards = await pool.query(`SELECT id, name, closing_day, due_date, credit_limit, brand
        FROM credit_cards
        WHERE account_id = $1
        ORDER BY name ASC`, [accountId]);
-    if (cards.rows.length === 0) {
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: "Nenhum cartão de crédito encontrado.",
-                },
-            ],
-        };
-    }
-    const cardIds = cards.rows.map((c) => c.id);
-    // Transações de cartão
-    const ccTxs = await pool.query(`SELECT cct.id, cct.description, cct.amount, cct.date, cct.invoice_month,
+        if (cards.rows.length === 0) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "Nenhum cartão de crédito encontrado.",
+                    },
+                ],
+            };
+        }
+        const cardIds = cards.rows.map((c) => c.id);
+        // Transações de cartão
+        const ccTxs = await pool.query(`SELECT cct.id, cct.description, cct.amount, cct.date, cct.invoice_month,
               cct.credit_card_id, cct.installments, cct.current_installment,
               cct.launch_type, cct.recurrence_frequency, cct.recurrence_end_date,
               c.name as category_name, c.type as category_type
@@ -899,61 +905,18 @@ server.tool("nexfin_faturas", "Faturas de cartão de crédito com status (paga/p
        LEFT JOIN categories c ON cct.category_id = c.id
        WHERE cct.credit_card_id = ANY($1)
        ORDER BY cct.invoice_month ASC, cct.date ASC`, [cardIds]);
-    // Pagamentos de fatura
-    const payments = await pool.query(`SELECT credit_card_id, invoice_month, status
+        // Pagamentos de fatura
+        const payments = await pool.query(`SELECT credit_card_id, invoice_month, status
        FROM invoice_payments
        WHERE account_id = $1`, [accountId]);
-    const paymentMap = new Map(payments.rows.map((p) => [
-        `${p.credit_card_id}:${p.invoice_month}`,
-        p.status,
-    ]));
-    // Agregar faturas
-    const invoices = new Map();
-    for (const tx of ccTxs.rows) {
-        const key = `${tx.credit_card_id}:${tx.invoice_month}`;
-        const amt = parseFloat(String(tx.amount));
-        const isIncome = tx.category_type === "income";
-        const adjustedAmt = isIncome ? -amt : amt;
-        const existing = invoices.get(key);
-        if (existing) {
-            existing.total += adjustedAmt;
-            existing.count++;
-        }
-        else {
-            invoices.set(key, {
-                creditCardId: tx.credit_card_id,
-                month: tx.invoice_month,
-                total: adjustedAmt,
-                count: 1,
-            });
-        }
-    }
-    // Gerar recorrentes virtuais para meses futuros
-    const curMonth = currentMonthBR();
-    const recurrents = ccTxs.rows.filter((tx) => tx.launch_type === "recorrente" && tx.recurrence_frequency === "mensal");
-    for (const tx of recurrents) {
-        const [baseYear, baseMonthNum] = tx.invoice_month.split("-").map(Number);
-        const recEnd = tx.recurrence_end_date
-            ? ensureDateString(tx.recurrence_end_date)
-            : null;
-        for (let offset = 1; offset <= 12; offset++) {
-            let newMonth = baseMonthNum + offset;
-            let newYear = baseYear;
-            while (newMonth > 12) {
-                newMonth -= 12;
-                newYear++;
-            }
-            const futureMonth = `${newYear}-${String(newMonth).padStart(2, "0")}`;
-            if (futureMonth < curMonth)
-                continue;
-            if (recEnd && futureMonth > recEnd.slice(0, 7))
-                break;
-            const alreadyExists = ccTxs.rows.some((e) => e.credit_card_id === tx.credit_card_id &&
-                e.invoice_month === futureMonth &&
-                e.description === tx.description);
-            if (alreadyExists)
-                continue;
-            const key = `${tx.credit_card_id}:${futureMonth}`;
+        const paymentMap = new Map(payments.rows.map((p) => [
+            `${p.credit_card_id}:${p.invoice_month}`,
+            p.status,
+        ]));
+        // Agregar faturas
+        const invoices = new Map();
+        for (const tx of ccTxs.rows) {
+            const key = `${tx.credit_card_id}:${tx.invoice_month}`;
             const amt = parseFloat(String(tx.amount));
             const isIncome = tx.category_type === "income";
             const adjustedAmt = isIncome ? -amt : amt;
@@ -965,319 +928,295 @@ server.tool("nexfin_faturas", "Faturas de cartão de crédito com status (paga/p
             else {
                 invoices.set(key, {
                     creditCardId: tx.credit_card_id,
-                    month: futureMonth,
+                    month: tx.invoice_month,
                     total: adjustedAmt,
                     count: 1,
                 });
             }
         }
-    }
-    // Janela de exibição: mês específico ou -2/+3 meses
-    const today = todayBR();
-    let filterFn;
-    if (month) {
-        filterFn = (inv) => inv.month === month;
-    }
-    else {
-        const [cy, cm] = curMonth.split("-").map(Number);
-        let fromM = cm - 2, fromY = cy;
-        while (fromM < 1) {
-            fromM += 12;
-            fromY--;
-        }
-        let toM = cm + 3, toY = cy;
-        while (toM > 12) {
-            toM -= 12;
-            toY++;
-        }
-        const fromStr = `${fromY}-${String(fromM).padStart(2, "0")}`;
-        const toStr = `${toY}-${String(toM).padStart(2, "0")}`;
-        filterFn = (inv) => inv.month >= fromStr && inv.month <= toStr;
-    }
-    let output = `## Faturas de Cartão (Conta ID: ${accountId})\n\n`;
-    for (const card of cards.rows) {
-        output += `### ${card.name}`;
-        if (card.brand)
-            output += ` (${card.brand})`;
-        output += `\n`;
-        output += `Fechamento: dia ${card.closing_day} | Vencimento: dia ${card.due_date}\n\n`;
-        const cardInvoices = Array.from(invoices.values())
-            .filter((inv) => inv.creditCardId === card.id)
-            .filter(filterFn)
-            .sort((a, b) => a.month.localeCompare(b.month));
-        if (cardInvoices.length === 0) {
-            output += `Nenhuma fatura no período.\n\n`;
-            continue;
-        }
-        output += `| Mês | Total | Itens | Status | Vencimento |\n`;
-        output += `|-----|-------|-------|--------|------------|\n`;
-        for (const inv of cardInvoices) {
-            const payKey = `${inv.creditCardId}:${inv.month}`;
-            const payStatus = paymentMap.get(payKey);
-            const dueDate = computeInvoiceDueDate(inv.month, card.due_date);
-            let status;
-            if (payStatus === "paid") {
-                status = "Paga";
+        // Gerar recorrentes virtuais para meses futuros
+        const curMonth = currentMonthBR();
+        const recurrents = ccTxs.rows.filter((tx) => tx.launch_type === "recorrente" && tx.recurrence_frequency === "mensal");
+        for (const tx of recurrents) {
+            const [baseYear, baseMonthNum] = tx.invoice_month.split("-").map(Number);
+            const recEnd = tx.recurrence_end_date
+                ? ensureDateString(tx.recurrence_end_date)
+                : null;
+            for (let offset = 1; offset <= 12; offset++) {
+                let newMonth = baseMonthNum + offset;
+                let newYear = baseYear;
+                while (newMonth > 12) {
+                    newMonth -= 12;
+                    newYear++;
+                }
+                const futureMonth = `${newYear}-${String(newMonth).padStart(2, "0")}`;
+                if (futureMonth < curMonth)
+                    continue;
+                if (recEnd && futureMonth > recEnd.slice(0, 7))
+                    break;
+                const alreadyExists = ccTxs.rows.some((e) => e.credit_card_id === tx.credit_card_id &&
+                    e.invoice_month === futureMonth &&
+                    e.description === tx.description);
+                if (alreadyExists)
+                    continue;
+                const key = `${tx.credit_card_id}:${futureMonth}`;
+                const amt = parseFloat(String(tx.amount));
+                const isIncome = tx.category_type === "income";
+                const adjustedAmt = isIncome ? -amt : amt;
+                const existing = invoices.get(key);
+                if (existing) {
+                    existing.total += adjustedAmt;
+                    existing.count++;
+                }
+                else {
+                    invoices.set(key, {
+                        creditCardId: tx.credit_card_id,
+                        month: futureMonth,
+                        total: adjustedAmt,
+                        count: 1,
+                    });
+                }
             }
-            else if (dueDate < today) {
-                status = "ATRASADA";
-            }
-            else {
-                status = "Pendente";
-            }
-            output += `| ${inv.month} | ${formatBRL(inv.total)} | ${inv.count} | ${status} | ${dueDate} |\n`;
         }
-        output += "\n";
-    }
-    return { content: [{ type: "text", text: output }] };
-});
-// ==========================================
-// UTILIDADE - Listagens auxiliares
-// ==========================================
-// === Tool: nexfin_categorias ===
-server.tool("nexfin_categorias", "Lista todas as categorias com IDs (necessário para criar transações)", {
-    accountId: z.coerce.number().describe("ID da conta"),
-}, async ({ accountId }) => {
-    const res = await pool.query(`SELECT id, name, type FROM categories WHERE account_id = $1 ORDER BY type, name`, [accountId]);
-    let output = `## Categorias (Conta ID: ${accountId})\n\n`;
-    output += `| ID | Nome | Tipo |\n`;
-    output += `|----|------|------|\n`;
-    for (const row of res.rows) {
-        const tipo = row.type === "income" ? "Receita" : "Despesa";
-        output += `| ${row.id} | ${row.name} | ${tipo} |\n`;
-    }
-    return { content: [{ type: "text", text: output }] };
-});
-// === Tool: nexfin_criar_categoria ===
-server.tool("nexfin_criar_categoria", "Cria uma nova categoria de receita ou despesa", {
-    nome: z.string().describe("Nome da categoria"),
-    tipo: z.enum(["income", "expense"]).default("expense").describe("Tipo: income ou expense (padrão: expense)"),
-    accountId: z.coerce.number().describe("ID da conta (use nexfin_contas)"),
-    cor: z.string().default("#6B7280").describe("Cor hex (padrão: #6B7280)"),
-    icone: z.string().default("circle").describe("Nome do ícone (padrão: circle)"),
-}, async ({ nome, tipo, accountId, cor, icone }) => {
-    if (!(await assertAccountOwnership(accountId))) {
-        return { content: [{ type: "text", text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
-    }
-    const res = await pool.query(`INSERT INTO categories (name, type, account_id, color, icon)
+        // Janela de exibição: mês específico ou -2/+3 meses
+        const today = todayBR();
+        let filterFn;
+        if (month) {
+            filterFn = (inv) => inv.month === month;
+        }
+        else {
+            const [cy, cm] = curMonth.split("-").map(Number);
+            let fromM = cm - 2, fromY = cy;
+            while (fromM < 1) {
+                fromM += 12;
+                fromY--;
+            }
+            let toM = cm + 3, toY = cy;
+            while (toM > 12) {
+                toM -= 12;
+                toY++;
+            }
+            const fromStr = `${fromY}-${String(fromM).padStart(2, "0")}`;
+            const toStr = `${toY}-${String(toM).padStart(2, "0")}`;
+            filterFn = (inv) => inv.month >= fromStr && inv.month <= toStr;
+        }
+        let output = `## Faturas de Cartão (Conta ID: ${accountId})\n\n`;
+        for (const card of cards.rows) {
+            output += `### ${card.name}`;
+            if (card.brand)
+                output += ` (${card.brand})`;
+            output += `\n`;
+            output += `Fechamento: dia ${card.closing_day} | Vencimento: dia ${card.due_date}\n\n`;
+            const cardInvoices = Array.from(invoices.values())
+                .filter((inv) => inv.creditCardId === card.id)
+                .filter(filterFn)
+                .sort((a, b) => a.month.localeCompare(b.month));
+            if (cardInvoices.length === 0) {
+                output += `Nenhuma fatura no período.\n\n`;
+                continue;
+            }
+            output += `| Mês | Total | Itens | Status | Vencimento |\n`;
+            output += `|-----|-------|-------|--------|------------|\n`;
+            for (const inv of cardInvoices) {
+                const payKey = `${inv.creditCardId}:${inv.month}`;
+                const payStatus = paymentMap.get(payKey);
+                const dueDate = computeInvoiceDueDate(inv.month, card.due_date);
+                let status;
+                if (payStatus === "paid") {
+                    status = "Paga";
+                }
+                else if (dueDate < today) {
+                    status = "ATRASADA";
+                }
+                else {
+                    status = "Pendente";
+                }
+                output += `| ${inv.month} | ${formatBRL(inv.total)} | ${inv.count} | ${status} | ${dueDate} |\n`;
+            }
+            output += "\n";
+        }
+        return { content: [{ type: "text", text: output }] };
+    });
+    // ==========================================
+    // UTILIDADE - Listagens auxiliares
+    // ==========================================
+    // === Tool: nexfin_categorias ===
+    server.tool("nexfin_categorias", "Lista todas as categorias com IDs (necessário para criar transações)", {
+        accountId: z.coerce.number().describe("ID da conta"),
+    }, async ({ accountId }) => {
+        const res = await pool.query(`SELECT id, name, type FROM categories WHERE account_id = $1 ORDER BY type, name`, [accountId]);
+        let output = `## Categorias (Conta ID: ${accountId})\n\n`;
+        output += `| ID | Nome | Tipo |\n`;
+        output += `|----|------|------|\n`;
+        for (const row of res.rows) {
+            const tipo = row.type === "income" ? "Receita" : "Despesa";
+            output += `| ${row.id} | ${row.name} | ${tipo} |\n`;
+        }
+        return { content: [{ type: "text", text: output }] };
+    });
+    // === Tool: nexfin_criar_categoria ===
+    server.tool("nexfin_criar_categoria", "Cria uma nova categoria de receita ou despesa", {
+        nome: z.string().describe("Nome da categoria"),
+        tipo: z.enum(["income", "expense"]).default("expense").describe("Tipo: income ou expense (padrão: expense)"),
+        accountId: z.coerce.number().describe("ID da conta (use nexfin_contas)"),
+        cor: z.string().default("#6B7280").describe("Cor hex (padrão: #6B7280)"),
+        icone: z.string().default("circle").describe("Nome do ícone (padrão: circle)"),
+    }, async ({ nome, tipo, accountId, cor, icone }) => {
+        if (!(await assertAccountOwnership(accountId))) {
+            return { content: [{ type: "text", text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
+        }
+        const res = await pool.query(`INSERT INTO categories (name, type, account_id, color, icon)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, name, type`, [nome, tipo, accountId, cor, icone]);
-    const row = res.rows[0];
-    if (!row) {
-        return { content: [{ type: "text", text: "Erro: resposta inesperada do banco." }] };
-    }
-    const tipoLabel = row.type === "income" ? "Receita" : "Despesa";
-    return {
-        content: [{ type: "text", text: `Categoria criada: **${row.name}** (ID: ${row.id}, ${tipoLabel})` }],
-    };
-});
-// === Tool: nexfin_fluxo_fixo ===
-server.tool("nexfin_fluxo_fixo", "Receitas e despesas fixas cadastradas (fluxo de caixa fixo mensal)", {
-    accountId: z.coerce.number().describe("ID da conta"),
-}, async ({ accountId }) => {
-    const curMonth = currentMonthBR();
-    const res = await pool.query(`SELECT id, description, amount, type, start_month, end_month, due_day
+        const row = res.rows[0];
+        if (!row) {
+            return { content: [{ type: "text", text: "Erro: resposta inesperada do banco." }] };
+        }
+        const tipoLabel = row.type === "income" ? "Receita" : "Despesa";
+        return {
+            content: [{ type: "text", text: `Categoria criada: **${row.name}** (ID: ${row.id}, ${tipoLabel})` }],
+        };
+    });
+    // === Tool: nexfin_fluxo_fixo ===
+    server.tool("nexfin_fluxo_fixo", "Receitas e despesas fixas cadastradas (fluxo de caixa fixo mensal)", {
+        accountId: z.coerce.number().describe("ID da conta"),
+    }, async ({ accountId }) => {
+        const curMonth = currentMonthBR();
+        const res = await pool.query(`SELECT id, description, amount, type, start_month, end_month, due_day
        FROM fixed_cashflow
        WHERE account_id = $1
          AND start_month <= $2
          AND (end_month IS NULL OR end_month >= $2)
        ORDER BY type DESC, amount DESC`, [accountId, curMonth]);
-    let totalReceitas = 0;
-    let totalDespesas = 0;
-    let output = `## Fluxo de Caixa Fixo (Conta ID: ${accountId})\n\n`;
-    const receitas = res.rows.filter((r) => r.type === "income");
-    const despesas = res.rows.filter((r) => r.type === "expense");
-    if (receitas.length > 0) {
-        output += `### Receitas Fixas\n`;
-        for (const r of receitas) {
-            const valor = parseFloat(decimalToString(r.amount));
-            totalReceitas += valor;
-            const due = r.due_day ? ` (dia ${r.due_day})` : "";
-            output += `- [ID: ${r.id}] ${r.description}: ${formatBRL(valor)}${due}\n`;
+        let totalReceitas = 0;
+        let totalDespesas = 0;
+        let output = `## Fluxo de Caixa Fixo (Conta ID: ${accountId})\n\n`;
+        const receitas = res.rows.filter((r) => r.type === "income");
+        const despesas = res.rows.filter((r) => r.type === "expense");
+        if (receitas.length > 0) {
+            output += `### Receitas Fixas\n`;
+            for (const r of receitas) {
+                const valor = parseFloat(decimalToString(r.amount));
+                totalReceitas += valor;
+                const due = r.due_day ? ` (dia ${r.due_day})` : "";
+                output += `- [ID: ${r.id}] ${r.description}: ${formatBRL(valor)}${due}\n`;
+            }
+            output += "\n";
         }
-        output += "\n";
-    }
-    if (despesas.length > 0) {
-        output += `### Despesas Fixas\n`;
-        for (const d of despesas) {
-            const valor = parseFloat(decimalToString(d.amount));
-            totalDespesas += valor;
-            const due = d.due_day ? ` (dia ${d.due_day})` : "";
-            output += `- [ID: ${d.id}] ${d.description}: ${formatBRL(valor)}${due}\n`;
+        if (despesas.length > 0) {
+            output += `### Despesas Fixas\n`;
+            for (const d of despesas) {
+                const valor = parseFloat(decimalToString(d.amount));
+                totalDespesas += valor;
+                const due = d.due_day ? ` (dia ${d.due_day})` : "";
+                output += `- [ID: ${d.id}] ${d.description}: ${formatBRL(valor)}${due}\n`;
+            }
+            output += "\n";
         }
-        output += "\n";
-    }
-    const saldo = totalReceitas - totalDespesas;
-    output += `### Resumo\n`;
-    output += `- Total Receitas: ${formatBRL(totalReceitas)}\n`;
-    output += `- Total Despesas: ${formatBRL(totalDespesas)}\n`;
-    output += `- **Saldo Fixo Mensal: ${formatBRL(saldo)}**\n`;
-    return { content: [{ type: "text", text: output }] };
-});
-// ==========================================
-// ESCRITA - CRUD
-// ==========================================
-// === Tool: nexfin_criar_transacao ===
-server.tool("nexfin_criar_transacao", "Cria uma transação simples (sem parcelamento/recorrência)", {
-    descricao: z.string().describe("Descrição da transação"),
-    valor: z.coerce.number().positive().describe("Valor da transação"),
-    tipo: z
-        .enum(["income", "expense"])
-        .describe("Tipo: income (receita) ou expense (despesa)"),
-    data: z.string().describe("Data YYYY-MM-DD"),
-    categoriaId: z
-        .number()
-        .describe("ID da categoria (use nexfin_categorias)"),
-    accountId: z.coerce.number().describe("ID da conta (use nexfin_contas)"),
-    pago: z.boolean().default(false).describe("Se já foi pago (padrão: false)"),
-    bankAccountId: z
-        .number()
-        .optional()
-        .describe("ID da conta bancária (opcional)"),
-}, async ({ descricao, valor, tipo, data, categoriaId, accountId, pago, bankAccountId }) => {
-    if (!(await assertAccountOwnership(accountId))) {
-        return { content: [{ type: "text", text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
-    }
-    const res = await pool.query(`INSERT INTO transactions
+        const saldo = totalReceitas - totalDespesas;
+        output += `### Resumo\n`;
+        output += `- Total Receitas: ${formatBRL(totalReceitas)}\n`;
+        output += `- Total Despesas: ${formatBRL(totalDespesas)}\n`;
+        output += `- **Saldo Fixo Mensal: ${formatBRL(saldo)}**\n`;
+        return { content: [{ type: "text", text: output }] };
+    });
+    // ==========================================
+    // ESCRITA - CRUD
+    // ==========================================
+    // === Tool: nexfin_criar_transacao ===
+    server.tool("nexfin_criar_transacao", "Cria uma transação simples (sem parcelamento/recorrência)", {
+        descricao: z.string().describe("Descrição da transação"),
+        valor: z.coerce.number().positive().describe("Valor da transação"),
+        tipo: z
+            .enum(["income", "expense"])
+            .describe("Tipo: income (receita) ou expense (despesa)"),
+        data: z.string().describe("Data YYYY-MM-DD"),
+        categoriaId: z
+            .number()
+            .describe("ID da categoria (use nexfin_categorias)"),
+        accountId: z.coerce.number().describe("ID da conta (use nexfin_contas)"),
+        pago: z.boolean().default(false).describe("Se já foi pago (padrão: false)"),
+        bankAccountId: z
+            .number()
+            .optional()
+            .describe("ID da conta bancária (opcional)"),
+    }, async ({ descricao, valor, tipo, data, categoriaId, accountId, pago, bankAccountId }) => {
+        if (!(await assertAccountOwnership(accountId))) {
+            return { content: [{ type: "text", text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
+        }
+        const res = await pool.query(`INSERT INTO transactions
         (description, amount, type, date, category_id, account_id, paid,
          installments, current_installment, is_invoice_transaction, is_exception,
          bank_account_id)
        VALUES ($1, $2, $3, $4::date, $5, $6, $7, 1, 1, false, false, $8)
        RETURNING id, description, amount, type, date, paid`, [descricao, valor, tipo, data, categoriaId, accountId, pago, bankAccountId ?? null]);
-    const row = res.rows[0];
-    if (!row) {
-        return {
-            content: [
-                { type: "text", text: "Erro: resposta inesperada do banco." },
-            ],
-        };
-    }
-    const tipoLabel = row.type === "income" ? "Receita" : "Despesa";
-    let output = `## Transação Criada\n\n`;
-    output += `- **ID:** ${row.id}\n`;
-    output += `- **Descrição:** ${row.description}\n`;
-    output += `- **Valor:** ${formatBRL(row.amount)}\n`;
-    output += `- **Tipo:** ${tipoLabel}\n`;
-    output += `- **Data:** ${ensureDateString(row.date)}\n`;
-    output += `- **Pago:** ${row.paid ? "Sim" : "Não"}\n`;
-    return { content: [{ type: "text", text: output }] };
-});
-// === Tool: nexfin_atualizar_transacao ===
-server.tool("nexfin_atualizar_transacao", "Atualiza uma transação. Para recorrentes, suporta escopo: single (só esta, cria exceção), all (todas do grupo), future (esta e próximas). Use tabela='conta'|'cartao' para desambiguar quando o ID existe em ambas as tabelas.", {
-    id: z.coerce.number().describe("ID da transação (para virtuais, usar o ID da definição recorrente)"),
-    tabela: z
-        .enum(["conta", "cartao"])
-        .optional()
-        .describe("Tabela alvo: 'conta' (transactions) ou 'cartao' (credit_card_transactions). Omitir para auto-detect; se ID existir em ambas, retorna erro de ambiguidade."),
-    escopo: z
-        .enum(["single", "all", "future"])
-        .default("single")
-        .describe("Escopo: single (só esta ocorrência), all (todas), future (esta e próximas)"),
-    exceptionForDate: z
-        .string()
-        .optional()
-        .describe("Data da ocorrência virtual sendo editada YYYY-MM-DD (obrigatório para escopo single em recorrentes)"),
-    descricao: z.string().optional().describe("Nova descrição"),
-    valor: z.coerce.number().positive().optional().describe("Novo valor"),
-    tipo: z.enum(["income", "expense"]).optional().describe("Novo tipo"),
-    data: z.string().optional().describe("Nova data YYYY-MM-DD"),
-    categoriaId: z.coerce.number().optional().describe("Novo ID da categoria"),
-    pago: z.boolean().optional().describe("Marcar como pago/não pago"),
-    bankAccountId: z.coerce.number().optional().describe("ID da conta bancária"),
-    creditCardId: z.coerce.number().optional().describe("ID do cartão de crédito"),
-}, async ({ id, tabela, escopo, exceptionForDate, descricao, valor, tipo, data, categoriaId, pago, bankAccountId, creditCardId }) => {
-    const preferred = tabela === "conta" ? "transactions" : tabela === "cartao" ? "credit_card_transactions" : undefined;
-    const lookup = await lookupOwnedTransaction(id, preferred);
-    if (!lookup.ok) {
-        return { content: [{ type: "text", text: `Erro: ${lookup.error}` }] };
-    }
-    if (lookup.table === "credit_card_transactions") {
-        return await updateCreditCardTransactionMcp({
-            current: lookup.row,
-            id,
-            escopo,
-            exceptionForDate,
-            descricao,
-            valor,
-            tipo,
-            data,
-            categoriaId,
-            pago,
-            bankAccountId,
-            creditCardId,
-        });
-    }
-    const current = lookup.row;
-    const isRecurrent = current.launch_type === "recorrente";
-    // === CASO 0: row já é exceção → UPDATE direto (nunca criar exceção de exceção) ===
-    if (current.is_exception) {
-        const sets = [];
-        const params = [];
-        let pi = 1;
-        if (descricao !== undefined) {
-            sets.push(`description = $${pi++}`);
-            params.push(descricao);
-        }
-        if (valor !== undefined) {
-            sets.push(`amount = $${pi++}`);
-            params.push(valor);
-        }
-        if (tipo !== undefined) {
-            sets.push(`type = $${pi++}`);
-            params.push(tipo);
-        }
-        if (data !== undefined) {
-            sets.push(`date = $${pi++}::date`);
-            params.push(data);
-        }
-        if (categoriaId !== undefined) {
-            sets.push(`category_id = $${pi++}`);
-            params.push(categoriaId);
-        }
-        if (pago !== undefined) {
-            sets.push(`paid = $${pi++}`);
-            params.push(pago);
-        }
-        if (bankAccountId !== undefined) {
-            sets.push(`bank_account_id = $${pi++}`);
-            params.push(bankAccountId);
-        }
-        if (creditCardId !== undefined) {
-            sets.push(`credit_card_id = $${pi++}`);
-            params.push(creditCardId);
-        }
-        if (sets.length === 0) {
-            return { content: [{ type: "text", text: "Nenhum campo fornecido para atualizar." }] };
-        }
-        params.push(id, current.account_id);
-        const res = await pool.query(`UPDATE transactions SET ${sets.join(", ")}
-         WHERE id = $${pi} AND account_id = $${pi + 1}
-         RETURNING id, description, amount, type, date, paid`, params);
         const row = res.rows[0];
-        let output = `## Exceção Atualizada (update direto)\n\n`;
+        if (!row) {
+            return {
+                content: [
+                    { type: "text", text: "Erro: resposta inesperada do banco." },
+                ],
+            };
+        }
+        const tipoLabel = row.type === "income" ? "Receita" : "Despesa";
+        let output = `## Transação Criada\n\n`;
         output += `- **ID:** ${row.id}\n`;
         output += `- **Descrição:** ${row.description}\n`;
         output += `- **Valor:** ${formatBRL(row.amount)}\n`;
+        output += `- **Tipo:** ${tipoLabel}\n`;
         output += `- **Data:** ${ensureDateString(row.date)}\n`;
         output += `- **Pago:** ${row.paid ? "Sim" : "Não"}\n`;
         return { content: [{ type: "text", text: output }] };
-    }
-    // === CASO 1: single em recorrente → criar/atualizar exceção ===
-    if (escopo === "single" && isRecurrent) {
-        // Garantir recurrence_group_id (lazy backfill com filtro por account_id)
-        let groupId = current.recurrence_group_id;
-        if (!groupId) {
-            groupId = crypto.randomUUID();
-            await pool.query(`UPDATE transactions SET recurrence_group_id = $1 WHERE id = $2 AND account_id = $3`, [groupId, id, current.account_id]);
+    });
+    // === Tool: nexfin_atualizar_transacao ===
+    server.tool("nexfin_atualizar_transacao", "Atualiza uma transação. Para recorrentes, suporta escopo: single (só esta, cria exceção), all (todas do grupo), future (esta e próximas). Use tabela='conta'|'cartao' para desambiguar quando o ID existe em ambas as tabelas.", {
+        id: z.coerce.number().describe("ID da transação (para virtuais, usar o ID da definição recorrente)"),
+        tabela: z
+            .enum(["conta", "cartao"])
+            .optional()
+            .describe("Tabela alvo: 'conta' (transactions) ou 'cartao' (credit_card_transactions). Omitir para auto-detect; se ID existir em ambas, retorna erro de ambiguidade."),
+        escopo: z
+            .enum(["single", "all", "future"])
+            .default("single")
+            .describe("Escopo: single (só esta ocorrência), all (todas), future (esta e próximas)"),
+        exceptionForDate: z
+            .string()
+            .optional()
+            .describe("Data da ocorrência virtual sendo editada YYYY-MM-DD (obrigatório para escopo single em recorrentes)"),
+        descricao: z.string().optional().describe("Nova descrição"),
+        valor: z.coerce.number().positive().optional().describe("Novo valor"),
+        tipo: z.enum(["income", "expense"]).optional().describe("Novo tipo"),
+        data: z.string().optional().describe("Nova data YYYY-MM-DD"),
+        categoriaId: z.coerce.number().optional().describe("Novo ID da categoria"),
+        pago: z.boolean().optional().describe("Marcar como pago/não pago"),
+        bankAccountId: z.coerce.number().optional().describe("ID da conta bancária"),
+        creditCardId: z.coerce.number().optional().describe("ID do cartão de crédito"),
+    }, async ({ id, tabela, escopo, exceptionForDate, descricao, valor, tipo, data, categoriaId, pago, bankAccountId, creditCardId }) => {
+        const preferred = tabela === "conta" ? "transactions" : tabela === "cartao" ? "credit_card_transactions" : undefined;
+        const lookup = await lookupOwnedTransaction(id, preferred);
+        if (!lookup.ok) {
+            return { content: [{ type: "text", text: `Erro: ${lookup.error}` }] };
         }
-        const originalDate = exceptionForDate ?? ensureDateString(current.date);
-        // Verificar se já existe exceção para esta data
-        const existingExc = await pool.query(`SELECT id FROM transactions
-         WHERE account_id = $1 AND recurrence_group_id = $2
-           AND is_exception = true AND exception_for_date = $3::date`, [current.account_id, groupId, originalDate]);
-        if (existingExc.rows.length > 0) {
-            // Atualizar exceção existente
-            const excId = existingExc.rows[0].id;
+        if (lookup.table === "credit_card_transactions") {
+            return await updateCreditCardTransactionMcp({
+                current: lookup.row,
+                id,
+                escopo,
+                exceptionForDate,
+                descricao,
+                valor,
+                tipo,
+                data,
+                categoriaId,
+                pago,
+                bankAccountId,
+                creditCardId,
+            });
+        }
+        const current = lookup.row;
+        const isRecurrent = current.launch_type === "recorrente";
+        // === CASO 0: row já é exceção → UPDATE direto (nunca criar exceção de exceção) ===
+        if (current.is_exception) {
             const sets = [];
             const params = [];
             let pi = 1;
@@ -1316,12 +1255,12 @@ server.tool("nexfin_atualizar_transacao", "Atualiza uma transação. Para recorr
             if (sets.length === 0) {
                 return { content: [{ type: "text", text: "Nenhum campo fornecido para atualizar." }] };
             }
-            params.push(excId, current.account_id);
+            params.push(id, current.account_id);
             const res = await pool.query(`UPDATE transactions SET ${sets.join(", ")}
-           WHERE id = $${pi} AND account_id = $${pi + 1}
-           RETURNING id, description, amount, type, date, paid`, params);
+         WHERE id = $${pi} AND account_id = $${pi + 1}
+         RETURNING id, description, amount, type, date, paid`, params);
             const row = res.rows[0];
-            let output = `## Exceção Atualizada (single)\n\n`;
+            let output = `## Exceção Atualizada (update direto)\n\n`;
             output += `- **ID:** ${row.id}\n`;
             output += `- **Descrição:** ${row.description}\n`;
             output += `- **Valor:** ${formatBRL(row.amount)}\n`;
@@ -1329,8 +1268,75 @@ server.tool("nexfin_atualizar_transacao", "Atualiza uma transação. Para recorr
             output += `- **Pago:** ${row.paid ? "Sim" : "Não"}\n`;
             return { content: [{ type: "text", text: output }] };
         }
-        // Criar nova exceção
-        const res = await pool.query(`INSERT INTO transactions
+        // === CASO 1: single em recorrente → criar/atualizar exceção ===
+        if (escopo === "single" && isRecurrent) {
+            // Garantir recurrence_group_id (lazy backfill com filtro por account_id)
+            let groupId = current.recurrence_group_id;
+            if (!groupId) {
+                groupId = crypto.randomUUID();
+                await pool.query(`UPDATE transactions SET recurrence_group_id = $1 WHERE id = $2 AND account_id = $3`, [groupId, id, current.account_id]);
+            }
+            const originalDate = exceptionForDate ?? ensureDateString(current.date);
+            // Verificar se já existe exceção para esta data
+            const existingExc = await pool.query(`SELECT id FROM transactions
+         WHERE account_id = $1 AND recurrence_group_id = $2
+           AND is_exception = true AND exception_for_date = $3::date`, [current.account_id, groupId, originalDate]);
+            if (existingExc.rows.length > 0) {
+                // Atualizar exceção existente
+                const excId = existingExc.rows[0].id;
+                const sets = [];
+                const params = [];
+                let pi = 1;
+                if (descricao !== undefined) {
+                    sets.push(`description = $${pi++}`);
+                    params.push(descricao);
+                }
+                if (valor !== undefined) {
+                    sets.push(`amount = $${pi++}`);
+                    params.push(valor);
+                }
+                if (tipo !== undefined) {
+                    sets.push(`type = $${pi++}`);
+                    params.push(tipo);
+                }
+                if (data !== undefined) {
+                    sets.push(`date = $${pi++}::date`);
+                    params.push(data);
+                }
+                if (categoriaId !== undefined) {
+                    sets.push(`category_id = $${pi++}`);
+                    params.push(categoriaId);
+                }
+                if (pago !== undefined) {
+                    sets.push(`paid = $${pi++}`);
+                    params.push(pago);
+                }
+                if (bankAccountId !== undefined) {
+                    sets.push(`bank_account_id = $${pi++}`);
+                    params.push(bankAccountId);
+                }
+                if (creditCardId !== undefined) {
+                    sets.push(`credit_card_id = $${pi++}`);
+                    params.push(creditCardId);
+                }
+                if (sets.length === 0) {
+                    return { content: [{ type: "text", text: "Nenhum campo fornecido para atualizar." }] };
+                }
+                params.push(excId, current.account_id);
+                const res = await pool.query(`UPDATE transactions SET ${sets.join(", ")}
+           WHERE id = $${pi} AND account_id = $${pi + 1}
+           RETURNING id, description, amount, type, date, paid`, params);
+                const row = res.rows[0];
+                let output = `## Exceção Atualizada (single)\n\n`;
+                output += `- **ID:** ${row.id}\n`;
+                output += `- **Descrição:** ${row.description}\n`;
+                output += `- **Valor:** ${formatBRL(row.amount)}\n`;
+                output += `- **Data:** ${ensureDateString(row.date)}\n`;
+                output += `- **Pago:** ${row.paid ? "Sim" : "Não"}\n`;
+                return { content: [{ type: "text", text: output }] };
+            }
+            // Criar nova exceção
+            const res = await pool.query(`INSERT INTO transactions
           (description, amount, type, date, category_id, account_id,
            bank_account_id, payment_method, client_name, project_name, cost_center,
            is_exception, exception_for_date, recurrence_group_id,
@@ -1346,401 +1352,401 @@ server.tool("nexfin_atualizar_transacao", "Atualiza uma transação. Para recorr
            $14, $15, $16, $17
          )
          RETURNING id, description, amount, type, date, paid`, [
-            descricao ?? current.description,
-            valor ?? current.amount,
-            tipo ?? current.type,
-            data ?? originalDate,
-            categoriaId ?? current.category_id,
-            current.account_id,
-            bankAccountId !== undefined ? bankAccountId : current.bank_account_id,
-            current.payment_method,
-            current.client_name,
-            current.project_name,
-            current.cost_center,
-            originalDate,
-            groupId,
-            current.credit_card_invoice_id,
-            creditCardId !== undefined ? creditCardId : current.credit_card_id,
-            current.is_invoice_transaction,
-            pago ?? false,
-        ]);
-        const row = res.rows[0];
-        let output = `## Exceção Criada (single)\n\n`;
-        output += `Ocorrência original de ${originalDate} substituída:\n`;
-        output += `- **ID:** ${row.id}\n`;
-        output += `- **Descrição:** ${row.description}\n`;
-        output += `- **Valor:** ${formatBRL(row.amount)}\n`;
-        output += `- **Data:** ${ensureDateString(row.date)}\n`;
-        output += `- **Pago:** ${row.paid ? "Sim" : "Não"}\n`;
-        return { content: [{ type: "text", text: output }] };
-    }
-    // === CASO 2: single em não-recorrente, ou fallback ===
-    if (escopo === "single") {
+                descricao ?? current.description,
+                valor ?? current.amount,
+                tipo ?? current.type,
+                data ?? originalDate,
+                categoriaId ?? current.category_id,
+                current.account_id,
+                bankAccountId !== undefined ? bankAccountId : current.bank_account_id,
+                current.payment_method,
+                current.client_name,
+                current.project_name,
+                current.cost_center,
+                originalDate,
+                groupId,
+                current.credit_card_invoice_id,
+                creditCardId !== undefined ? creditCardId : current.credit_card_id,
+                current.is_invoice_transaction,
+                pago ?? false,
+            ]);
+            const row = res.rows[0];
+            let output = `## Exceção Criada (single)\n\n`;
+            output += `Ocorrência original de ${originalDate} substituída:\n`;
+            output += `- **ID:** ${row.id}\n`;
+            output += `- **Descrição:** ${row.description}\n`;
+            output += `- **Valor:** ${formatBRL(row.amount)}\n`;
+            output += `- **Data:** ${ensureDateString(row.date)}\n`;
+            output += `- **Pago:** ${row.paid ? "Sim" : "Não"}\n`;
+            return { content: [{ type: "text", text: output }] };
+        }
+        // === CASO 2: single em não-recorrente, ou fallback ===
+        if (escopo === "single") {
+            const sets = [];
+            const params = [];
+            let pi = 1;
+            if (descricao !== undefined) {
+                sets.push(`description = $${pi++}`);
+                params.push(descricao);
+            }
+            if (valor !== undefined) {
+                sets.push(`amount = $${pi++}`);
+                params.push(valor);
+            }
+            if (tipo !== undefined) {
+                sets.push(`type = $${pi++}`);
+                params.push(tipo);
+            }
+            if (data !== undefined) {
+                sets.push(`date = $${pi++}::date`);
+                params.push(data);
+            }
+            if (categoriaId !== undefined) {
+                sets.push(`category_id = $${pi++}`);
+                params.push(categoriaId);
+            }
+            if (pago !== undefined) {
+                sets.push(`paid = $${pi++}`);
+                params.push(pago);
+            }
+            if (bankAccountId !== undefined) {
+                sets.push(`bank_account_id = $${pi++}`);
+                params.push(bankAccountId);
+            }
+            if (creditCardId !== undefined) {
+                sets.push(`credit_card_id = $${pi++}`);
+                params.push(creditCardId);
+            }
+            if (sets.length === 0) {
+                return { content: [{ type: "text", text: "Nenhum campo fornecido para atualizar." }] };
+            }
+            params.push(id, current.account_id);
+            const res = await pool.query(`UPDATE transactions SET ${sets.join(", ")}
+         WHERE id = $${pi} AND account_id = $${pi + 1}
+         RETURNING id, description, amount, type, date, paid`, params);
+            const row = res.rows[0];
+            if (!row) {
+                return { content: [{ type: "text", text: `Transação ID ${id} não encontrada.` }] };
+            }
+            let output = `## Transação Atualizada\n\n`;
+            output += `- **ID:** ${row.id}\n`;
+            output += `- **Descrição:** ${row.description}\n`;
+            output += `- **Valor:** ${formatBRL(row.amount)}\n`;
+            output += `- **Tipo:** ${row.type === "income" ? "Receita" : "Despesa"}\n`;
+            output += `- **Data:** ${ensureDateString(row.date)}\n`;
+            output += `- **Pago:** ${row.paid ? "Sim" : "Não"}\n`;
+            return { content: [{ type: "text", text: output }] };
+        }
+        // === CASO 3: all ou future → atualizar grupo ===
+        const groupId = current.installments_group_id || current.recurrence_group_id;
+        if (!groupId) {
+            // Sem grupo, atualiza só esta
+            return { content: [{ type: "text", text: "Transação não pertence a um grupo. Use escopo 'single'." }] };
+        }
+        const isInstallment = Boolean(current.installments_group_id);
+        const groupCol = isInstallment ? "installments_group_id" : "recurrence_group_id";
+        // Montar WHERE (sempre filtrando por account_id como defesa em profundidade)
+        let whereClause = `${groupCol} = $1 AND account_id = $2`;
+        const whereParams = [groupId, current.account_id];
+        if (escopo === "future") {
+            if (isInstallment) {
+                whereClause += ` AND current_installment >= $${whereParams.length + 1}`;
+                whereParams.push(current.current_installment);
+            }
+            else {
+                whereClause += ` AND date >= $${whereParams.length + 1}::date`;
+                whereParams.push(ensureDateString(current.date));
+            }
+        }
+        // Montar SET
         const sets = [];
-        const params = [];
-        let pi = 1;
+        const setParams = [];
+        let pi = whereParams.length + 1;
         if (descricao !== undefined) {
             sets.push(`description = $${pi++}`);
-            params.push(descricao);
+            setParams.push(descricao);
         }
         if (valor !== undefined) {
             sets.push(`amount = $${pi++}`);
-            params.push(valor);
+            setParams.push(valor);
         }
         if (tipo !== undefined) {
             sets.push(`type = $${pi++}`);
-            params.push(tipo);
-        }
-        if (data !== undefined) {
-            sets.push(`date = $${pi++}::date`);
-            params.push(data);
+            setParams.push(tipo);
         }
         if (categoriaId !== undefined) {
             sets.push(`category_id = $${pi++}`);
-            params.push(categoriaId);
+            setParams.push(categoriaId);
         }
         if (pago !== undefined) {
             sets.push(`paid = $${pi++}`);
-            params.push(pago);
+            setParams.push(pago);
         }
         if (bankAccountId !== undefined) {
             sets.push(`bank_account_id = $${pi++}`);
-            params.push(bankAccountId);
+            setParams.push(bankAccountId);
         }
         if (creditCardId !== undefined) {
             sets.push(`credit_card_id = $${pi++}`);
-            params.push(creditCardId);
+            setParams.push(creditCardId);
         }
         if (sets.length === 0) {
             return { content: [{ type: "text", text: "Nenhum campo fornecido para atualizar." }] };
         }
-        params.push(id, current.account_id);
-        const res = await pool.query(`UPDATE transactions SET ${sets.join(", ")}
-         WHERE id = $${pi} AND account_id = $${pi + 1}
-         RETURNING id, description, amount, type, date, paid`, params);
+        const allParams = [...whereParams, ...setParams];
+        const result = await pool.query(`UPDATE transactions SET ${sets.join(", ")}
+       WHERE ${whereClause}`, allParams);
+        const label = escopo === "all" ? "todas" : "esta e próximas";
+        return {
+            content: [{
+                    type: "text",
+                    text: `## Grupo Atualizado (${label})\n\n**${result.rowCount}** transação(ões) atualizadas no grupo.`,
+                }],
+        };
+    });
+    // === Tool: nexfin_deletar_transacao ===
+    server.tool("nexfin_deletar_transacao", "Deleta transação(ões). Suporta escopo single/all/future. Use tabela='conta'|'cartao' para desambiguar quando o ID existe em ambas. Tenant-isolated por user_id.", {
+        id: z.coerce.number().describe("ID da transação"),
+        tabela: z
+            .enum(["conta", "cartao"])
+            .optional()
+            .describe("Tabela alvo: 'conta' (transactions) ou 'cartao' (credit_card_transactions). Omitir para auto-detect."),
+        escopo: z
+            .enum(["single", "all", "future"])
+            .default("single")
+            .describe("Escopo: single (só esta), all (todas do grupo), future (esta e próximas)"),
+        exceptionForDate: z
+            .string()
+            .optional()
+            .describe("Data da ocorrência virtual sendo deletada YYYY-MM-DD (para CCT recorrente em escopo single, cria tombstone)"),
+    }, async ({ id, tabela, escopo, exceptionForDate }) => {
+        const preferred = tabela === "conta" ? "transactions" : tabela === "cartao" ? "credit_card_transactions" : undefined;
+        const lookup = await lookupOwnedTransaction(id, preferred);
+        if (!lookup.ok) {
+            return { content: [{ type: "text", text: `Erro: ${lookup.error}` }] };
+        }
+        if (lookup.table === "credit_card_transactions") {
+            return await deleteCreditCardTransactionMcp(lookup.row, escopo, exceptionForDate);
+        }
+        const current = lookup.row;
+        if (escopo === "single") {
+            const res = await pool.query(`DELETE FROM transactions WHERE id = $1 AND account_id = $2 RETURNING id, description`, [id, current.account_id]);
+            const row = res.rows[0];
+            return {
+                content: [{ type: "text", text: `Transação deletada: **${row.description}** (ID: ${row.id})` }],
+            };
+        }
+        // all ou future: buscar grupo (com filtro por account_id como defesa em profundidade)
+        const groupId = current.installments_group_id || current.recurrence_group_id;
+        if (!groupId) {
+            await pool.query(`DELETE FROM transactions WHERE id = $1 AND account_id = $2`, [id, current.account_id]);
+            return { content: [{ type: "text", text: `Transação deletada: **${current.description}** (ID: ${id})` }] };
+        }
+        const isInstallment = Boolean(current.installments_group_id);
+        const groupCol = isInstallment ? "installments_group_id" : "recurrence_group_id";
+        let whereClause = `${groupCol} = $1 AND account_id = $2`;
+        const params = [groupId, current.account_id];
+        if (escopo === "future") {
+            if (isInstallment) {
+                whereClause += ` AND current_installment >= $${params.length + 1}`;
+                params.push(current.current_installment);
+            }
+            else {
+                whereClause += ` AND date >= $${params.length + 1}::date`;
+                params.push(ensureDateString(current.date));
+            }
+        }
+        const result = await pool.query(`DELETE FROM transactions WHERE ${whereClause}`, params);
+        const label = escopo === "all" ? "todas" : "esta e próximas";
+        return {
+            content: [{
+                    type: "text",
+                    text: `## Grupo Deletado (${label})\n\n**${result.rowCount}** transação(ões) removidas.`,
+                }],
+        };
+    });
+    // === Tool: nexfin_criar_fluxo_fixo ===
+    server.tool("nexfin_criar_fluxo_fixo", "Cria um item de fluxo de caixa fixo (receita ou despesa recorrente mensal)", {
+        descricao: z.string().describe("Descrição do fluxo fixo"),
+        valor: z.coerce.number().positive().describe("Valor mensal"),
+        tipo: z
+            .enum(["income", "expense"])
+            .describe("Tipo: income (receita) ou expense (despesa)"),
+        accountId: z.coerce.number().describe("ID da conta"),
+        mesInicio: z
+            .string()
+            .optional()
+            .describe("Mês de início YYYY-MM (padrão: mês atual)"),
+        mesFim: z
+            .string()
+            .optional()
+            .describe("Mês de fim YYYY-MM (null = sem fim)"),
+        diaVencimento: z
+            .number()
+            .min(1)
+            .max(31)
+            .optional()
+            .describe("Dia do vencimento (1-31)"),
+    }, async ({ descricao, valor, tipo, accountId, mesInicio, mesFim, diaVencimento }) => {
+        if (!(await assertAccountOwnership(accountId))) {
+            return { content: [{ type: "text", text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
+        }
+        const startMonth = mesInicio || currentMonthBR();
+        const res = await pool.query(`INSERT INTO fixed_cashflow
+        (description, amount, type, account_id, start_month, end_month, due_day)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, description, amount, type`, [descricao, valor, tipo, accountId, startMonth, mesFim ?? null, diaVencimento ?? null]);
         const row = res.rows[0];
         if (!row) {
-            return { content: [{ type: "text", text: `Transação ID ${id} não encontrada.` }] };
+            return {
+                content: [
+                    { type: "text", text: "Erro: resposta inesperada do banco." },
+                ],
+            };
         }
-        let output = `## Transação Atualizada\n\n`;
+        let output = `## Fluxo Fixo Criado\n\n`;
         output += `- **ID:** ${row.id}\n`;
         output += `- **Descrição:** ${row.description}\n`;
         output += `- **Valor:** ${formatBRL(row.amount)}\n`;
         output += `- **Tipo:** ${row.type === "income" ? "Receita" : "Despesa"}\n`;
-        output += `- **Data:** ${ensureDateString(row.date)}\n`;
-        output += `- **Pago:** ${row.paid ? "Sim" : "Não"}\n`;
         return { content: [{ type: "text", text: output }] };
-    }
-    // === CASO 3: all ou future → atualizar grupo ===
-    const groupId = current.installments_group_id || current.recurrence_group_id;
-    if (!groupId) {
-        // Sem grupo, atualiza só esta
-        return { content: [{ type: "text", text: "Transação não pertence a um grupo. Use escopo 'single'." }] };
-    }
-    const isInstallment = Boolean(current.installments_group_id);
-    const groupCol = isInstallment ? "installments_group_id" : "recurrence_group_id";
-    // Montar WHERE (sempre filtrando por account_id como defesa em profundidade)
-    let whereClause = `${groupCol} = $1 AND account_id = $2`;
-    const whereParams = [groupId, current.account_id];
-    if (escopo === "future") {
-        if (isInstallment) {
-            whereClause += ` AND current_installment >= $${whereParams.length + 1}`;
-            whereParams.push(current.current_installment);
-        }
-        else {
-            whereClause += ` AND date >= $${whereParams.length + 1}::date`;
-            whereParams.push(ensureDateString(current.date));
-        }
-    }
-    // Montar SET
-    const sets = [];
-    const setParams = [];
-    let pi = whereParams.length + 1;
-    if (descricao !== undefined) {
-        sets.push(`description = $${pi++}`);
-        setParams.push(descricao);
-    }
-    if (valor !== undefined) {
-        sets.push(`amount = $${pi++}`);
-        setParams.push(valor);
-    }
-    if (tipo !== undefined) {
-        sets.push(`type = $${pi++}`);
-        setParams.push(tipo);
-    }
-    if (categoriaId !== undefined) {
-        sets.push(`category_id = $${pi++}`);
-        setParams.push(categoriaId);
-    }
-    if (pago !== undefined) {
-        sets.push(`paid = $${pi++}`);
-        setParams.push(pago);
-    }
-    if (bankAccountId !== undefined) {
-        sets.push(`bank_account_id = $${pi++}`);
-        setParams.push(bankAccountId);
-    }
-    if (creditCardId !== undefined) {
-        sets.push(`credit_card_id = $${pi++}`);
-        setParams.push(creditCardId);
-    }
-    if (sets.length === 0) {
-        return { content: [{ type: "text", text: "Nenhum campo fornecido para atualizar." }] };
-    }
-    const allParams = [...whereParams, ...setParams];
-    const result = await pool.query(`UPDATE transactions SET ${sets.join(", ")}
-       WHERE ${whereClause}`, allParams);
-    const label = escopo === "all" ? "todas" : "esta e próximas";
-    return {
-        content: [{
-                type: "text",
-                text: `## Grupo Atualizado (${label})\n\n**${result.rowCount}** transação(ões) atualizadas no grupo.`,
-            }],
-    };
-});
-// === Tool: nexfin_deletar_transacao ===
-server.tool("nexfin_deletar_transacao", "Deleta transação(ões). Suporta escopo single/all/future. Use tabela='conta'|'cartao' para desambiguar quando o ID existe em ambas. Tenant-isolated por user_id.", {
-    id: z.coerce.number().describe("ID da transação"),
-    tabela: z
-        .enum(["conta", "cartao"])
-        .optional()
-        .describe("Tabela alvo: 'conta' (transactions) ou 'cartao' (credit_card_transactions). Omitir para auto-detect."),
-    escopo: z
-        .enum(["single", "all", "future"])
-        .default("single")
-        .describe("Escopo: single (só esta), all (todas do grupo), future (esta e próximas)"),
-    exceptionForDate: z
-        .string()
-        .optional()
-        .describe("Data da ocorrência virtual sendo deletada YYYY-MM-DD (para CCT recorrente em escopo single, cria tombstone)"),
-}, async ({ id, tabela, escopo, exceptionForDate }) => {
-    const preferred = tabela === "conta" ? "transactions" : tabela === "cartao" ? "credit_card_transactions" : undefined;
-    const lookup = await lookupOwnedTransaction(id, preferred);
-    if (!lookup.ok) {
-        return { content: [{ type: "text", text: `Erro: ${lookup.error}` }] };
-    }
-    if (lookup.table === "credit_card_transactions") {
-        return await deleteCreditCardTransactionMcp(lookup.row, escopo, exceptionForDate);
-    }
-    const current = lookup.row;
-    if (escopo === "single") {
-        const res = await pool.query(`DELETE FROM transactions WHERE id = $1 AND account_id = $2 RETURNING id, description`, [id, current.account_id]);
-        const row = res.rows[0];
-        return {
-            content: [{ type: "text", text: `Transação deletada: **${row.description}** (ID: ${row.id})` }],
-        };
-    }
-    // all ou future: buscar grupo (com filtro por account_id como defesa em profundidade)
-    const groupId = current.installments_group_id || current.recurrence_group_id;
-    if (!groupId) {
-        await pool.query(`DELETE FROM transactions WHERE id = $1 AND account_id = $2`, [id, current.account_id]);
-        return { content: [{ type: "text", text: `Transação deletada: **${current.description}** (ID: ${id})` }] };
-    }
-    const isInstallment = Boolean(current.installments_group_id);
-    const groupCol = isInstallment ? "installments_group_id" : "recurrence_group_id";
-    let whereClause = `${groupCol} = $1 AND account_id = $2`;
-    const params = [groupId, current.account_id];
-    if (escopo === "future") {
-        if (isInstallment) {
-            whereClause += ` AND current_installment >= $${params.length + 1}`;
-            params.push(current.current_installment);
-        }
-        else {
-            whereClause += ` AND date >= $${params.length + 1}::date`;
-            params.push(ensureDateString(current.date));
-        }
-    }
-    const result = await pool.query(`DELETE FROM transactions WHERE ${whereClause}`, params);
-    const label = escopo === "all" ? "todas" : "esta e próximas";
-    return {
-        content: [{
-                type: "text",
-                text: `## Grupo Deletado (${label})\n\n**${result.rowCount}** transação(ões) removidas.`,
-            }],
-    };
-});
-// === Tool: nexfin_criar_fluxo_fixo ===
-server.tool("nexfin_criar_fluxo_fixo", "Cria um item de fluxo de caixa fixo (receita ou despesa recorrente mensal)", {
-    descricao: z.string().describe("Descrição do fluxo fixo"),
-    valor: z.coerce.number().positive().describe("Valor mensal"),
-    tipo: z
-        .enum(["income", "expense"])
-        .describe("Tipo: income (receita) ou expense (despesa)"),
-    accountId: z.coerce.number().describe("ID da conta"),
-    mesInicio: z
-        .string()
-        .optional()
-        .describe("Mês de início YYYY-MM (padrão: mês atual)"),
-    mesFim: z
-        .string()
-        .optional()
-        .describe("Mês de fim YYYY-MM (null = sem fim)"),
-    diaVencimento: z
-        .number()
-        .min(1)
-        .max(31)
-        .optional()
-        .describe("Dia do vencimento (1-31)"),
-}, async ({ descricao, valor, tipo, accountId, mesInicio, mesFim, diaVencimento }) => {
-    if (!(await assertAccountOwnership(accountId))) {
-        return { content: [{ type: "text", text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
-    }
-    const startMonth = mesInicio || currentMonthBR();
-    const res = await pool.query(`INSERT INTO fixed_cashflow
-        (description, amount, type, account_id, start_month, end_month, due_day)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, description, amount, type`, [descricao, valor, tipo, accountId, startMonth, mesFim ?? null, diaVencimento ?? null]);
-    const row = res.rows[0];
-    if (!row) {
-        return {
-            content: [
-                { type: "text", text: "Erro: resposta inesperada do banco." },
-            ],
-        };
-    }
-    let output = `## Fluxo Fixo Criado\n\n`;
-    output += `- **ID:** ${row.id}\n`;
-    output += `- **Descrição:** ${row.description}\n`;
-    output += `- **Valor:** ${formatBRL(row.amount)}\n`;
-    output += `- **Tipo:** ${row.type === "income" ? "Receita" : "Despesa"}\n`;
-    return { content: [{ type: "text", text: output }] };
-});
-// === Tool: nexfin_deletar_fluxo_fixo ===
-server.tool("nexfin_deletar_fluxo_fixo", "Deleta um item de fluxo de caixa fixo pelo ID. Tenant-isolated.", {
-    id: z.coerce.number().describe("ID do fluxo fixo a deletar"),
-}, async ({ id }) => {
-    const userId = await getUserId();
-    const res = await pool.query(`DELETE FROM fixed_cashflow ff
+    });
+    // === Tool: nexfin_deletar_fluxo_fixo ===
+    server.tool("nexfin_deletar_fluxo_fixo", "Deleta um item de fluxo de caixa fixo pelo ID. Tenant-isolated.", {
+        id: z.coerce.number().describe("ID do fluxo fixo a deletar"),
+    }, async ({ id }) => {
+        const userId = await getUserId();
+        const res = await pool.query(`DELETE FROM fixed_cashflow ff
        USING accounts a
        WHERE ff.id = $1 AND ff.account_id = a.id AND a.user_id = $2
        RETURNING ff.id, ff.description`, [id, userId]);
-    const row = res.rows[0];
-    if (!row) {
+        const row = res.rows[0];
+        if (!row) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Fluxo fixo ID ${id} não encontrado (ou pertence a outro usuário).`,
+                    },
+                ],
+            };
+        }
         return {
             content: [
                 {
                     type: "text",
-                    text: `Fluxo fixo ID ${id} não encontrado (ou pertence a outro usuário).`,
+                    text: `Fluxo fixo deletado: **${row.description}** (ID: ${row.id})`,
                 },
             ],
         };
-    }
-    return {
-        content: [
-            {
-                type: "text",
-                text: `Fluxo fixo deletado: **${row.description}** (ID: ${row.id})`,
-            },
-        ],
-    };
-});
-// ==========================================
-// CARTÃO DE CRÉDITO - Transações
-// ==========================================
-// === Tool: nexfin_criar_transacao_cartao ===
-server.tool("nexfin_criar_transacao_cartao", "Cria transação de cartão de crédito (única, parcelada ou recorrente mensal)", {
-    descricao: z.string().describe("Descrição da compra"),
-    valor: z.coerce.number().positive().describe("Valor da compra"),
-    data: z.string().describe("Data da compra YYYY-MM-DD"),
-    categoriaId: z.coerce.number().describe("ID da categoria (use nexfin_categorias)"),
-    creditCardId: z.coerce.number().describe("ID do cartão de crédito"),
-    accountId: z.coerce.number().describe("ID da conta financeira"),
-    invoiceMonth: z
-        .string()
-        .optional()
-        .describe("Mês da fatura YYYY-MM (calculado automaticamente se omitido)"),
-    launchType: z
-        .enum(["unica", "recorrente", "parcelada"])
-        .default("unica")
-        .describe("Tipo: unica (avulsa), recorrente (assinatura mensal), parcelada"),
-    installments: z
-        .number()
-        .min(1)
-        .default(1)
-        .describe("Número de parcelas (só para parcelada, padrão: 1)"),
-}, async ({ descricao, valor, data, categoriaId, creditCardId, accountId, invoiceMonth, launchType, installments }) => {
-    if (!(await assertAccountOwnership(accountId))) {
-        return { content: [{ type: "text", text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
-    }
-    // Buscar closingDay do cartão (e validar ownership do cartão pela account)
-    const cardRes = await pool.query(`SELECT closing_day FROM credit_cards WHERE id = $1 AND account_id = $2`, [creditCardId, accountId]);
-    if (cardRes.rows.length === 0) {
-        return { content: [{ type: "text", text: `Cartão ID ${creditCardId} não encontrado ou não pertence à conta ${accountId}.` }] };
-    }
-    const closingDay = cardRes.rows[0].closing_day;
-    const baseDate = parseDateInput(data);
-    // === Parcelada: criar N registros ===
-    if (launchType === "parcelada" && installments > 1) {
-        const installmentsGroupId = crypto.randomUUID();
-        const ids = [];
-        for (let i = 1; i <= installments; i++) {
-            const installDate = addMonthsPreserveDay(baseDate, i - 1);
-            const invMonth = calculateInvoiceMonth(installDate, closingDay);
-            const res = await pool.query(`INSERT INTO credit_card_transactions
+    });
+    // ==========================================
+    // CARTÃO DE CRÉDITO - Transações
+    // ==========================================
+    // === Tool: nexfin_criar_transacao_cartao ===
+    server.tool("nexfin_criar_transacao_cartao", "Cria transação de cartão de crédito (única, parcelada ou recorrente mensal)", {
+        descricao: z.string().describe("Descrição da compra"),
+        valor: z.coerce.number().positive().describe("Valor da compra"),
+        data: z.string().describe("Data da compra YYYY-MM-DD"),
+        categoriaId: z.coerce.number().describe("ID da categoria (use nexfin_categorias)"),
+        creditCardId: z.coerce.number().describe("ID do cartão de crédito"),
+        accountId: z.coerce.number().describe("ID da conta financeira"),
+        invoiceMonth: z
+            .string()
+            .optional()
+            .describe("Mês da fatura YYYY-MM (calculado automaticamente se omitido)"),
+        launchType: z
+            .enum(["unica", "recorrente", "parcelada"])
+            .default("unica")
+            .describe("Tipo: unica (avulsa), recorrente (assinatura mensal), parcelada"),
+        installments: z
+            .number()
+            .min(1)
+            .default(1)
+            .describe("Número de parcelas (só para parcelada, padrão: 1)"),
+    }, async ({ descricao, valor, data, categoriaId, creditCardId, accountId, invoiceMonth, launchType, installments }) => {
+        if (!(await assertAccountOwnership(accountId))) {
+            return { content: [{ type: "text", text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
+        }
+        // Buscar closingDay do cartão (e validar ownership do cartão pela account)
+        const cardRes = await pool.query(`SELECT closing_day FROM credit_cards WHERE id = $1 AND account_id = $2`, [creditCardId, accountId]);
+        if (cardRes.rows.length === 0) {
+            return { content: [{ type: "text", text: `Cartão ID ${creditCardId} não encontrado ou não pertence à conta ${accountId}.` }] };
+        }
+        const closingDay = cardRes.rows[0].closing_day;
+        const baseDate = parseDateInput(data);
+        // === Parcelada: criar N registros ===
+        if (launchType === "parcelada" && installments > 1) {
+            const installmentsGroupId = crypto.randomUUID();
+            const ids = [];
+            for (let i = 1; i <= installments; i++) {
+                const installDate = addMonthsPreserveDay(baseDate, i - 1);
+                const invMonth = calculateInvoiceMonth(installDate, closingDay);
+                const res = await pool.query(`INSERT INTO credit_card_transactions
             (description, amount, date, installments, current_installment,
              category_id, credit_card_id, account_id, invoice_month,
              launch_type, recurrence_frequency, installments_group_id)
            VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9, 'parcelada', null, $10)
            RETURNING id`, [
-                descricao, valor, ensureDateString(installDate),
-                installments, i, categoriaId, creditCardId, accountId, invMonth,
-                installmentsGroupId,
-            ]);
-            ids.push(res.rows[0].id);
+                    descricao, valor, ensureDateString(installDate),
+                    installments, i, categoriaId, creditCardId, accountId, invMonth,
+                    installmentsGroupId,
+                ]);
+                ids.push(res.rows[0].id);
+            }
+            let output = `## Transação Parcelada Criada (${installments}x)\n\n`;
+            output += `- **Descrição:** ${descricao}\n`;
+            output += `- **Valor parcela:** ${formatBRL(valor)}\n`;
+            output += `- **Total:** ${formatBRL(valor * installments)}\n`;
+            output += `- **Cartão ID:** ${creditCardId}\n`;
+            output += `- **IDs criados:** ${ids.join(", ")}\n`;
+            output += `- **Group ID:** ${installmentsGroupId}\n`;
+            return { content: [{ type: "text", text: output }] };
         }
-        let output = `## Transação Parcelada Criada (${installments}x)\n\n`;
-        output += `- **Descrição:** ${descricao}\n`;
-        output += `- **Valor parcela:** ${formatBRL(valor)}\n`;
-        output += `- **Total:** ${formatBRL(valor * installments)}\n`;
-        output += `- **Cartão ID:** ${creditCardId}\n`;
-        output += `- **IDs criados:** ${ids.join(", ")}\n`;
-        output += `- **Group ID:** ${installmentsGroupId}\n`;
-        return { content: [{ type: "text", text: output }] };
-    }
-    // === Recorrente: criar definição com recurrence_frequency = mensal ===
-    const invMonth = invoiceMonth || calculateInvoiceMonth(baseDate, closingDay);
-    const recFreq = launchType === "recorrente" ? "mensal" : null;
-    const res = await pool.query(`INSERT INTO credit_card_transactions
+        // === Recorrente: criar definição com recurrence_frequency = mensal ===
+        const invMonth = invoiceMonth || calculateInvoiceMonth(baseDate, closingDay);
+        const recFreq = launchType === "recorrente" ? "mensal" : null;
+        const res = await pool.query(`INSERT INTO credit_card_transactions
         (description, amount, date, installments, current_installment,
          category_id, credit_card_id, account_id, invoice_month,
          launch_type, recurrence_frequency)
        VALUES ($1, $2, $3::date, 1, 1, $4, $5, $6, $7, $8, $9)
        RETURNING id, description, amount, date, invoice_month`, [
-        descricao, valor, data, categoriaId, creditCardId, accountId,
-        invMonth, launchType, recFreq,
-    ]);
-    const row = res.rows[0];
-    const tipoLabel = launchType === "recorrente" ? "Recorrente (mensal)" : "Única";
-    let output = `## Transação de Cartão Criada\n\n`;
-    output += `- **ID:** ${row.id}\n`;
-    output += `- **Descrição:** ${row.description}\n`;
-    output += `- **Valor:** ${formatBRL(row.amount)}\n`;
-    output += `- **Data:** ${ensureDateString(row.date)}\n`;
-    output += `- **Fatura:** ${row.invoice_month}\n`;
-    output += `- **Tipo:** ${tipoLabel}\n`;
-    return { content: [{ type: "text", text: output }] };
-});
-// === Tool: nexfin_transacoes_cartao ===
-server.tool("nexfin_transacoes_cartao", "Lista transações de cartão de crédito por fatura (mês) e/ou cartão", {
-    accountId: z.coerce.number().describe("ID da conta"),
-    creditCardId: z.coerce.number().optional().describe("ID do cartão (opcional, todos se omitido)"),
-    invoiceMonth: z
-        .string()
-        .optional()
-        .describe("Mês da fatura YYYY-MM (opcional, mês atual se omitido)"),
-}, async ({ accountId, creditCardId, invoiceMonth }) => {
-    const targetMonth = invoiceMonth || currentMonthBR();
-    let where = `cct.account_id = $1 AND cct.invoice_month = $2`;
-    const params = [accountId, targetMonth];
-    if (creditCardId !== undefined) {
-        where += ` AND cct.credit_card_id = $3`;
-        params.push(creditCardId);
-    }
-    // Filtros:
-    // 1. Tombstones (amount=0 + is_exception=true) — não aparecem
-    // 2. Templates recorrentes COBERTOS por exceção/tombstone no mesmo
-    //    (recurrence_group_id, invoice_month) — substituídos pela exceção
-    const res = await pool.query(`SELECT cct.id, cct.description, cct.amount, cct.date, cct.invoice_month,
+            descricao, valor, data, categoriaId, creditCardId, accountId,
+            invMonth, launchType, recFreq,
+        ]);
+        const row = res.rows[0];
+        const tipoLabel = launchType === "recorrente" ? "Recorrente (mensal)" : "Única";
+        let output = `## Transação de Cartão Criada\n\n`;
+        output += `- **ID:** ${row.id}\n`;
+        output += `- **Descrição:** ${row.description}\n`;
+        output += `- **Valor:** ${formatBRL(row.amount)}\n`;
+        output += `- **Data:** ${ensureDateString(row.date)}\n`;
+        output += `- **Fatura:** ${row.invoice_month}\n`;
+        output += `- **Tipo:** ${tipoLabel}\n`;
+        return { content: [{ type: "text", text: output }] };
+    });
+    // === Tool: nexfin_transacoes_cartao ===
+    server.tool("nexfin_transacoes_cartao", "Lista transações de cartão de crédito por fatura (mês) e/ou cartão", {
+        accountId: z.coerce.number().describe("ID da conta"),
+        creditCardId: z.coerce.number().optional().describe("ID do cartão (opcional, todos se omitido)"),
+        invoiceMonth: z
+            .string()
+            .optional()
+            .describe("Mês da fatura YYYY-MM (opcional, mês atual se omitido)"),
+    }, async ({ accountId, creditCardId, invoiceMonth }) => {
+        const targetMonth = invoiceMonth || currentMonthBR();
+        let where = `cct.account_id = $1 AND cct.invoice_month = $2`;
+        const params = [accountId, targetMonth];
+        if (creditCardId !== undefined) {
+            where += ` AND cct.credit_card_id = $3`;
+            params.push(creditCardId);
+        }
+        // Filtros:
+        // 1. Tombstones (amount=0 + is_exception=true) — não aparecem
+        // 2. Templates recorrentes COBERTOS por exceção/tombstone no mesmo
+        //    (recurrence_group_id, invoice_month) — substituídos pela exceção
+        const res = await pool.query(`SELECT cct.id, cct.description, cct.amount, cct.date, cct.invoice_month,
               cct.credit_card_id, cct.installments, cct.current_installment,
               cct.launch_type, cct.recurrence_frequency,
               cct.is_exception, cct.recurrence_group_id,
@@ -1768,160 +1774,310 @@ server.tool("nexfin_transacoes_cartao", "Lista transações de cartão de crédi
            AND cct.invoice_month > TO_CHAR(cct.recurrence_end_date, 'YYYY-MM')
          )
        ORDER BY cct.date ASC`, params);
-    if (res.rows.length === 0) {
-        return {
-            content: [{ type: "text", text: `Nenhuma transação de cartão para fatura ${targetMonth}.` }],
-        };
-    }
-    let total = 0;
-    let output = `## Transações de Cartão - Fatura ${targetMonth}\n\n`;
-    output += `| ID | Data | Descrição | Valor | Cartão | Categoria |\n`;
-    output += `|----|------|-----------|-------|--------|-----------|\n`;
-    for (const row of res.rows) {
-        const amt = parseFloat(String(row.amount));
-        const isIncome = row.category_type === "income";
-        total += isIncome ? -amt : amt;
-        const installment = row.installments > 1 ? ` (${row.current_installment}/${row.installments})` : "";
-        const tags = [];
-        if (row.launch_type === "recorrente")
-            tags.push("rec");
-        if (row.is_exception)
-            tags.push("exc");
-        const tagStr = tags.length > 0 ? ` [${tags.join(",")}]` : "";
-        const cat = row.category_name ?? "Sem categoria";
-        output += `| ${row.id} | ${ensureDateString(row.date)} | ${row.description}${installment}${tagStr} | ${formatBRL(amt)} | ${row.card_name} | ${cat} |\n`;
-    }
-    output += `\n**Total fatura:** ${formatBRL(total)} (${res.rows.length} transações)\n`;
-    return { content: [{ type: "text", text: output }] };
-});
-// ==========================================
-// CONTAS BANCÁRIAS - CRUD
-// ==========================================
-// === Tool: nexfin_criar_conta_bancaria ===
-server.tool("nexfin_criar_conta_bancaria", "Cria uma nova conta bancária", {
-    nome: z.string().describe("Nome da conta bancária (ex: Nubank, Inter, Caixa)"),
-    accountId: z.coerce.number().describe("ID da conta financeira (use nexfin_contas)"),
-    saldoInicial: z.coerce.number().default(0).describe("Saldo inicial (padrão: 0)"),
-    pix: z.string().optional().describe("Chave PIX (opcional)"),
-    compartilhada: z.boolean().default(false).describe("Compartilhada entre contas do mesmo usuário (padrão: false)"),
-}, async ({ nome, accountId, saldoInicial, pix, compartilhada }) => {
-    if (!(await assertAccountOwnership(accountId))) {
-        return { content: [{ type: "text", text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
-    }
-    const res = await pool.query(`INSERT INTO bank_accounts (name, account_id, initial_balance, pix, shared)
+        if (res.rows.length === 0) {
+            return {
+                content: [{ type: "text", text: `Nenhuma transação de cartão para fatura ${targetMonth}.` }],
+            };
+        }
+        let total = 0;
+        let output = `## Transações de Cartão - Fatura ${targetMonth}\n\n`;
+        output += `| ID | Data | Descrição | Valor | Cartão | Categoria |\n`;
+        output += `|----|------|-----------|-------|--------|-----------|\n`;
+        for (const row of res.rows) {
+            const amt = parseFloat(String(row.amount));
+            const isIncome = row.category_type === "income";
+            total += isIncome ? -amt : amt;
+            const installment = row.installments > 1 ? ` (${row.current_installment}/${row.installments})` : "";
+            const tags = [];
+            if (row.launch_type === "recorrente")
+                tags.push("rec");
+            if (row.is_exception)
+                tags.push("exc");
+            const tagStr = tags.length > 0 ? ` [${tags.join(",")}]` : "";
+            const cat = row.category_name ?? "Sem categoria";
+            output += `| ${row.id} | ${ensureDateString(row.date)} | ${row.description}${installment}${tagStr} | ${formatBRL(amt)} | ${row.card_name} | ${cat} |\n`;
+        }
+        output += `\n**Total fatura:** ${formatBRL(total)} (${res.rows.length} transações)\n`;
+        return { content: [{ type: "text", text: output }] };
+    });
+    // ==========================================
+    // CONTAS BANCÁRIAS - CRUD
+    // ==========================================
+    // === Tool: nexfin_criar_conta_bancaria ===
+    server.tool("nexfin_criar_conta_bancaria", "Cria uma nova conta bancária", {
+        nome: z.string().describe("Nome da conta bancária (ex: Nubank, Inter, Caixa)"),
+        accountId: z.coerce.number().describe("ID da conta financeira (use nexfin_contas)"),
+        saldoInicial: z.coerce.number().default(0).describe("Saldo inicial (padrão: 0)"),
+        pix: z.string().optional().describe("Chave PIX (opcional)"),
+        compartilhada: z.boolean().default(false).describe("Compartilhada entre contas do mesmo usuário (padrão: false)"),
+    }, async ({ nome, accountId, saldoInicial, pix, compartilhada }) => {
+        if (!(await assertAccountOwnership(accountId))) {
+            return { content: [{ type: "text", text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
+        }
+        const res = await pool.query(`INSERT INTO bank_accounts (name, account_id, initial_balance, pix, shared)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, name, initial_balance, pix, shared`, [nome, accountId, saldoInicial, pix ?? "", compartilhada]);
-    const row = res.rows[0];
-    if (!row) {
-        return {
-            content: [{ type: "text", text: "Erro: resposta inesperada do banco." }],
-        };
-    }
-    let output = `## Conta Bancária Criada\n\n`;
-    output += `- **ID:** ${row.id}\n`;
-    output += `- **Nome:** ${row.name}\n`;
-    output += `- **Saldo Inicial:** ${formatBRL(row.initial_balance)}\n`;
-    if (row.pix)
-        output += `- **PIX:** ${row.pix}\n`;
-    if (row.shared)
-        output += `- **Compartilhada:** Sim\n`;
-    return { content: [{ type: "text", text: output }] };
-});
-// === Tool: nexfin_atualizar_conta_bancaria ===
-server.tool("nexfin_atualizar_conta_bancaria", "Atualiza dados de uma conta bancária existente", {
-    id: z.coerce.number().describe("ID da conta bancária"),
-    nome: z.string().optional().describe("Novo nome"),
-    saldoInicial: z.coerce.number().optional().describe("Novo saldo inicial"),
-    pix: z.string().optional().describe("Nova chave PIX"),
-    compartilhada: z.boolean().optional().describe("Compartilhada entre contas"),
-}, async ({ id, nome, saldoInicial, pix, compartilhada }) => {
-    // Validar ownership: bank_account.account_id deve pertencer ao user
-    const userId = await getUserId();
-    const ownerCheck = await pool.query(`SELECT ba.id FROM bank_accounts ba
+        const row = res.rows[0];
+        if (!row) {
+            return {
+                content: [{ type: "text", text: "Erro: resposta inesperada do banco." }],
+            };
+        }
+        let output = `## Conta Bancária Criada\n\n`;
+        output += `- **ID:** ${row.id}\n`;
+        output += `- **Nome:** ${row.name}\n`;
+        output += `- **Saldo Inicial:** ${formatBRL(row.initial_balance)}\n`;
+        if (row.pix)
+            output += `- **PIX:** ${row.pix}\n`;
+        if (row.shared)
+            output += `- **Compartilhada:** Sim\n`;
+        return { content: [{ type: "text", text: output }] };
+    });
+    // === Tool: nexfin_atualizar_conta_bancaria ===
+    server.tool("nexfin_atualizar_conta_bancaria", "Atualiza dados de uma conta bancária existente", {
+        id: z.coerce.number().describe("ID da conta bancária"),
+        nome: z.string().optional().describe("Novo nome"),
+        saldoInicial: z.coerce.number().optional().describe("Novo saldo inicial"),
+        pix: z.string().optional().describe("Nova chave PIX"),
+        compartilhada: z.boolean().optional().describe("Compartilhada entre contas"),
+    }, async ({ id, nome, saldoInicial, pix, compartilhada }) => {
+        // Validar ownership: bank_account.account_id deve pertencer ao user
+        const userId = await getUserId();
+        const ownerCheck = await pool.query(`SELECT ba.id FROM bank_accounts ba
        JOIN accounts a ON a.id = ba.account_id
        WHERE ba.id = $1 AND a.user_id = $2`, [id, userId]);
-    if (ownerCheck.rows.length === 0) {
-        return { content: [{ type: "text", text: `Conta bancária ID ${id} não encontrada (ou pertence a outro usuário).` }] };
-    }
-    const sets = [];
-    const params = [];
-    let paramIdx = 1;
-    if (nome !== undefined) {
-        sets.push(`name = $${paramIdx++}`);
-        params.push(nome);
-    }
-    if (saldoInicial !== undefined) {
-        sets.push(`initial_balance = $${paramIdx++}`);
-        params.push(saldoInicial);
-    }
-    if (pix !== undefined) {
-        sets.push(`pix = $${paramIdx++}`);
-        params.push(pix);
-    }
-    if (compartilhada !== undefined) {
-        sets.push(`shared = $${paramIdx++}`);
-        params.push(compartilhada);
-    }
-    if (sets.length === 0) {
-        return {
-            content: [{ type: "text", text: "Nenhum campo fornecido para atualizar." }],
-        };
-    }
-    params.push(id);
-    const res = await pool.query(`UPDATE bank_accounts SET ${sets.join(", ")}
+        if (ownerCheck.rows.length === 0) {
+            return { content: [{ type: "text", text: `Conta bancária ID ${id} não encontrada (ou pertence a outro usuário).` }] };
+        }
+        const sets = [];
+        const params = [];
+        let paramIdx = 1;
+        if (nome !== undefined) {
+            sets.push(`name = $${paramIdx++}`);
+            params.push(nome);
+        }
+        if (saldoInicial !== undefined) {
+            sets.push(`initial_balance = $${paramIdx++}`);
+            params.push(saldoInicial);
+        }
+        if (pix !== undefined) {
+            sets.push(`pix = $${paramIdx++}`);
+            params.push(pix);
+        }
+        if (compartilhada !== undefined) {
+            sets.push(`shared = $${paramIdx++}`);
+            params.push(compartilhada);
+        }
+        if (sets.length === 0) {
+            return {
+                content: [{ type: "text", text: "Nenhum campo fornecido para atualizar." }],
+            };
+        }
+        params.push(id);
+        const res = await pool.query(`UPDATE bank_accounts SET ${sets.join(", ")}
        WHERE id = $${paramIdx}
        RETURNING id, name, initial_balance, pix, shared`, params);
-    const row = res.rows[0];
-    if (!row) {
-        return {
-            content: [{ type: "text", text: `Conta bancária ID ${id} não encontrada.` }],
-        };
-    }
-    let output = `## Conta Bancária Atualizada\n\n`;
-    output += `- **ID:** ${row.id}\n`;
-    output += `- **Nome:** ${row.name}\n`;
-    output += `- **Saldo Inicial:** ${formatBRL(row.initial_balance)}\n`;
-    output += `- **PIX:** ${row.pix || "(vazio)"}\n`;
-    output += `- **Compartilhada:** ${row.shared ? "Sim" : "Não"}\n`;
-    return { content: [{ type: "text", text: output }] };
-});
-// === Tool: nexfin_deletar_conta_bancaria ===
-server.tool("nexfin_deletar_conta_bancaria", "Deleta uma conta bancária pelo ID (falha se houver transações vinculadas)", {
-    id: z.coerce.number().describe("ID da conta bancária a deletar"),
-}, async ({ id }) => {
-    // Validar ownership: bank_account.account_id deve pertencer ao user
-    const userId = await getUserId();
-    const ownerCheck = await pool.query(`SELECT ba.id FROM bank_accounts ba
+        const row = res.rows[0];
+        if (!row) {
+            return {
+                content: [{ type: "text", text: `Conta bancária ID ${id} não encontrada.` }],
+            };
+        }
+        let output = `## Conta Bancária Atualizada\n\n`;
+        output += `- **ID:** ${row.id}\n`;
+        output += `- **Nome:** ${row.name}\n`;
+        output += `- **Saldo Inicial:** ${formatBRL(row.initial_balance)}\n`;
+        output += `- **PIX:** ${row.pix || "(vazio)"}\n`;
+        output += `- **Compartilhada:** ${row.shared ? "Sim" : "Não"}\n`;
+        return { content: [{ type: "text", text: output }] };
+    });
+    // === Tool: nexfin_deletar_conta_bancaria ===
+    server.tool("nexfin_deletar_conta_bancaria", "Deleta uma conta bancária pelo ID (falha se houver transações vinculadas)", {
+        id: z.coerce.number().describe("ID da conta bancária a deletar"),
+    }, async ({ id }) => {
+        // Validar ownership: bank_account.account_id deve pertencer ao user
+        const userId = await getUserId();
+        const ownerCheck = await pool.query(`SELECT ba.id FROM bank_accounts ba
        JOIN accounts a ON a.id = ba.account_id
        WHERE ba.id = $1 AND a.user_id = $2`, [id, userId]);
-    if (ownerCheck.rows.length === 0) {
-        return { content: [{ type: "text", text: `Conta bancária ID ${id} não encontrada (ou pertence a outro usuário).` }] };
-    }
-    // Verificar se tem transações vinculadas
-    const txCheck = await pool.query(`SELECT COUNT(*) as count FROM transactions WHERE bank_account_id = $1`, [id]);
-    const txCount = parseInt(txCheck.rows[0].count);
-    if (txCount > 0) {
+        if (ownerCheck.rows.length === 0) {
+            return { content: [{ type: "text", text: `Conta bancária ID ${id} não encontrada (ou pertence a outro usuário).` }] };
+        }
+        // Verificar se tem transações vinculadas
+        const txCheck = await pool.query(`SELECT COUNT(*) as count FROM transactions WHERE bank_account_id = $1`, [id]);
+        const txCount = parseInt(txCheck.rows[0].count);
+        if (txCount > 0) {
+            return {
+                content: [{
+                        type: "text",
+                        text: `Não é possível deletar: ${txCount} transação(ões) vinculada(s) a esta conta bancária. Mova as transações primeiro.`,
+                    }],
+            };
+        }
+        const res = await pool.query(`DELETE FROM bank_accounts WHERE id = $1 RETURNING id, name`, [id]);
+        const row = res.rows[0];
+        if (!row) {
+            return {
+                content: [{ type: "text", text: `Conta bancária ID ${id} não encontrada.` }],
+            };
+        }
         return {
             content: [{
                     type: "text",
-                    text: `Não é possível deletar: ${txCount} transação(ões) vinculada(s) a esta conta bancária. Mova as transações primeiro.`,
+                    text: `Conta bancária deletada: **${row.name}** (ID: ${row.id})`,
                 }],
         };
+    });
+    return server;
+}
+// ==========================================
+// OAUTH PROVIDER
+// ==========================================
+class NexfinOAuthProvider {
+    clients = new Map();
+    codes = new Map();
+    tokens = new Map();
+    refreshTokens = new Map();
+    staticApiKey;
+    constructor(staticApiKey) {
+        this.staticApiKey = staticApiKey;
     }
-    const res = await pool.query(`DELETE FROM bank_accounts WHERE id = $1 RETURNING id, name`, [id]);
-    const row = res.rows[0];
-    if (!row) {
+    get clientsStore() {
         return {
-            content: [{ type: "text", text: `Conta bancária ID ${id} não encontrada.` }],
+            getClient: (clientId) => this.clients.get(clientId),
+            registerClient: (client) => {
+                const full = {
+                    ...client,
+                    client_id: crypto.randomUUID(),
+                    client_id_issued_at: Math.floor(Date.now() / 1000),
+                };
+                this.clients.set(full.client_id, full);
+                return full;
+            },
         };
     }
-    return {
-        content: [{
-                type: "text",
-                text: `Conta bancária deletada: **${row.name}** (ID: ${row.id})`,
-            }],
-    };
-});
+    async authorize(client, params, res) {
+        const code = crypto.randomUUID();
+        this.codes.set(code, {
+            clientId: client.client_id,
+            codeChallenge: params.codeChallenge,
+            redirectUri: params.redirectUri,
+        });
+        const redirectUrl = new URL(params.redirectUri);
+        redirectUrl.searchParams.set("code", code);
+        if (params.state)
+            redirectUrl.searchParams.set("state", params.state);
+        res.redirect(redirectUrl.toString());
+    }
+    async challengeForAuthorizationCode(_client, authorizationCode) {
+        const stored = this.codes.get(authorizationCode);
+        if (!stored)
+            throw new Error("Invalid authorization code");
+        return stored.codeChallenge;
+    }
+    async exchangeAuthorizationCode(client, authorizationCode) {
+        const stored = this.codes.get(authorizationCode);
+        if (!stored)
+            throw new Error("Invalid authorization code");
+        this.codes.delete(authorizationCode);
+        const accessToken = crypto.randomUUID();
+        const refreshToken = crypto.randomUUID();
+        this.tokens.set(accessToken, {
+            token: accessToken,
+            clientId: client.client_id,
+            scopes: ["mcp:tools"],
+            expiresAt: Math.floor(Date.now() / 1000) + 3600,
+        });
+        this.refreshTokens.set(refreshToken, client.client_id);
+        return { access_token: accessToken, token_type: "Bearer", expires_in: 3600, refresh_token: refreshToken };
+    }
+    async exchangeRefreshToken(client, refreshToken) {
+        const clientId = this.refreshTokens.get(refreshToken);
+        if (!clientId || clientId !== client.client_id)
+            throw new Error("Invalid refresh token");
+        this.refreshTokens.delete(refreshToken);
+        const accessToken = crypto.randomUUID();
+        const newRefreshToken = crypto.randomUUID();
+        this.tokens.set(accessToken, {
+            token: accessToken,
+            clientId: client.client_id,
+            scopes: ["mcp:tools"],
+            expiresAt: Math.floor(Date.now() / 1000) + 3600,
+        });
+        this.refreshTokens.set(newRefreshToken, client.client_id);
+        return { access_token: accessToken, token_type: "Bearer", expires_in: 3600, refresh_token: newRefreshToken };
+    }
+    async verifyAccessToken(token) {
+        if (this.staticApiKey && token === this.staticApiKey) {
+            return { token, clientId: "static", scopes: ["mcp:tools"], expiresAt: Math.floor(Date.now() / 1000) + 31536000 };
+        }
+        const info = this.tokens.get(token);
+        if (!info)
+            throw new Error("Invalid access token");
+        if (info.expiresAt && Date.now() / 1000 > info.expiresAt) {
+            this.tokens.delete(token);
+            throw new Error("Token expired");
+        }
+        return info;
+    }
+    async revokeToken(_client, request) {
+        this.tokens.delete(request.token);
+        this.refreshTokens.delete(request.token);
+    }
+}
+// ==========================================
+// HTTP SERVER
+// ==========================================
+async function startHttpServer() {
+    const port = parseInt(process.env.MCP_PORT || "3015", 10);
+    const apiKey = process.env.MCP_API_KEY || "";
+    const issuerUrl = new URL(process.env.MCP_ISSUER_URL || "https://nexfinpro.com.br");
+    const oauthProvider = new NexfinOAuthProvider(apiKey);
+    const app = express();
+    app.set("trust proxy", 1);
+    app.use(express.json());
+    app.use(mcpAuthRouter({ provider: oauthProvider, issuerUrl }));
+    const auth = requireBearerAuth({
+        verifier: oauthProvider,
+        resourceMetadataUrl: `${issuerUrl.origin}/.well-known/oauth-protected-resource`,
+    });
+    app.post("/mcp", auth, async (req, res) => {
+        const server = createServer();
+        const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+        await server.connect(transport);
+        try {
+            await transport.handleRequest(req, res, req.body);
+        }
+        finally {
+            res.on("finish", () => { transport.close(); server.close(); });
+        }
+    });
+    app.get("/mcp", auth, async (req, res) => {
+        const server = createServer();
+        const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+        await server.connect(transport);
+        try {
+            await transport.handleRequest(req, res);
+        }
+        finally {
+            res.on("finish", () => { transport.close(); server.close(); });
+        }
+    });
+    app.delete("/mcp", auth, async (req, res) => {
+        const server = createServer();
+        const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+        await server.connect(transport);
+        try {
+            await transport.handleRequest(req, res);
+        }
+        finally {
+            res.on("finish", () => { transport.close(); server.close(); });
+        }
+    });
+    app.listen(port, () => {
+        console.error(`mcp-nexfin: HTTP iniciado na porta ${port} | issuer: ${issuerUrl.origin}`);
+    });
+}
 // ==========================================
 // MAIN
 // ==========================================
@@ -1943,9 +2099,16 @@ async function main() {
         console.error(err instanceof Error ? err.message : err);
         process.exit(1);
     }
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    console.error("mcp-nexfin: servidor MCP v2.0 iniciado via stdio");
+    const useHttp = process.argv.includes("--http");
+    if (useHttp) {
+        await startHttpServer();
+    }
+    else {
+        const server = createServer();
+        const transport = new StdioServerTransport();
+        await server.connect(transport);
+        console.error("mcp-nexfin: servidor MCP v2.0 iniciado via stdio");
+    }
 }
 main().catch((err) => {
     console.error("mcp-nexfin: erro fatal:", err);
