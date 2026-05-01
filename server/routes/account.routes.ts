@@ -5,6 +5,7 @@ import { currentMonthBR } from '../utils/date-br';
 import { normalizeAmount } from '../utils/normalize-amount';
 import { validateAccountOwnership } from '../middleware/account-ownership';
 import { insertAccountSchema, insertFixedCashflowSchema, insertDebtSchema } from '@shared/schema';
+import logger from '../lib/logger';
 
 export function registerAccountRoutes(app: Express) {
   app.get('/api/accounts', async (req, res) => {
@@ -16,7 +17,7 @@ export function registerAccountRoutes(app: Express) {
       const accounts = await storage.getAccounts(userId);
       res.json(accounts);
     } catch (error) {
-      console.error('[GET /api/accounts]', error);
+      logger.error({ err: error }, 'GET /api/accounts');
       res.status(500).json({ message: 'Failed to fetch accounts' });
     }
   });
@@ -47,7 +48,7 @@ export function registerAccountRoutes(app: Express) {
         },
       });
     } catch (error) {
-      console.error('[GET /api/accounts/limits]', error);
+      logger.error({ err: error }, 'GET /api/accounts/limits');
       res.status(500).json({ message: 'Failed to fetch account limits' });
     }
   });
@@ -85,7 +86,7 @@ export function registerAccountRoutes(app: Express) {
       const account = await storage.createAccount(validatedData, userId);
       res.status(201).json(account);
     } catch (error) {
-      console.error('[POST /api/accounts]', error);
+      logger.error({ err: error }, 'POST /api/accounts');
       if (error instanceof Error && error.message.includes('Limite de contas')) {
         return res.status(403).json({ message: error.message });
       }
@@ -119,7 +120,7 @@ export function registerAccountRoutes(app: Express) {
       await storage.deleteAccount(id);
       res.status(204).send();
     } catch (error) {
-      console.error('[DELETE /api/accounts/:id]', error);
+      logger.error({ err: error }, 'DELETE /api/accounts/:id');
       res.status(500).json({ message: 'Failed to delete account', error: (error as Error).message });
     }
   });
@@ -131,7 +132,7 @@ export function registerAccountRoutes(app: Express) {
       const summary = await storage.getFixedCashflow(id);
       res.json(summary);
     } catch (error) {
-      console.error('[GET /api/accounts/:id/monthly-fixed]', error);
+      logger.error({ err: error }, 'GET /api/accounts/:id/monthly-fixed');
       res.status(500).json({ message: 'Failed to fetch monthly fixed cashflow' });
     }
   });
@@ -147,7 +148,7 @@ export function registerAccountRoutes(app: Express) {
       const created = await storage.createFixedCashflow(validated);
       res.status(201).json(created);
     } catch (error) {
-      console.error('[POST /api/accounts/:id/monthly-fixed]', error);
+      logger.error({ err: error }, 'POST /api/accounts/:id/monthly-fixed');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
@@ -166,7 +167,7 @@ export function registerAccountRoutes(app: Express) {
       if (!updated) return res.status(404).json({ message: 'Item not found' });
       res.json(updated);
     } catch (error) {
-      console.error('[PATCH /api/monthly-fixed/:id]', error);
+      logger.error({ err: error }, 'PATCH /api/monthly-fixed/:id');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
@@ -180,7 +181,7 @@ export function registerAccountRoutes(app: Express) {
       await storage.deleteFixedCashflow(id);
       res.status(204).send();
     } catch (error) {
-      console.error('[DELETE /api/monthly-fixed/:id]', error);
+      logger.error({ err: error }, 'DELETE /api/monthly-fixed/:id');
       res.status(500).json({ message: 'Failed to delete monthly fixed entry' });
     }
   });
@@ -192,7 +193,7 @@ export function registerAccountRoutes(app: Express) {
       const debts = await storage.getDebts(accountId);
       res.json(debts);
     } catch (error) {
-      console.error('[GET /api/accounts/:accountId/debts]', error);
+      logger.error({ err: error }, 'GET /api/accounts/:accountId/debts');
       res.status(500).json({ message: 'Failed to fetch debts' });
     }
   });
@@ -204,7 +205,7 @@ export function registerAccountRoutes(app: Express) {
       if (!debt) return res.status(404).json({ message: 'Debt not found' });
       res.json(debt);
     } catch (error) {
-      console.error('[GET /api/debts/:id]', error);
+      logger.error({ err: error }, 'GET /api/debts/:id');
       res.status(500).json({ message: 'Failed to fetch debt' });
     }
   });
@@ -222,7 +223,7 @@ export function registerAccountRoutes(app: Express) {
       const created = await storage.createDebt(validated);
       res.status(201).json(created);
     } catch (error) {
-      console.error('[POST /api/accounts/:accountId/debts]', error);
+      logger.error({ err: error }, 'POST /api/accounts/:accountId/debts');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
@@ -246,7 +247,7 @@ export function registerAccountRoutes(app: Express) {
       if (!updated) return res.status(404).json({ message: 'Debt not found' });
       res.json(updated);
     } catch (error) {
-      console.error('[PATCH /api/debts/:id]', error);
+      logger.error({ err: error }, 'PATCH /api/debts/:id');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
@@ -260,7 +261,7 @@ export function registerAccountRoutes(app: Express) {
       await storage.deleteDebt(id);
       res.status(204).send();
     } catch (error) {
-      console.error('[DELETE /api/debts/:id]', error);
+      logger.error({ err: error }, 'DELETE /api/debts/:id');
       res.status(500).json({ message: 'Failed to delete debt' });
     }
   });

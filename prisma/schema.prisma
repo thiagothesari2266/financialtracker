@@ -164,6 +164,9 @@ model Transaction {
   asaasImportSuggestions AsaasImport[] @relation("SuggestedImport")
   asaasImportMatches     AsaasImport[] @relation("MatchedImport")
 
+  @@index([accountId, date])
+  @@index([categoryId])
+  @@index([bankAccountId])
   @@map("transactions")
 }
 
@@ -215,6 +218,9 @@ model CreditCardTransaction {
   category   Category  @relation(fields: [categoryId], references: [id])
   creditCard CreditCard @relation("CardOwnTransactions", fields: [creditCardId], references: [id])
 
+  @@index([creditCardId, invoiceMonth])
+  @@index([accountId])
+  @@index([categoryId])
   @@map("credit_card_transactions")
 }
 
@@ -252,6 +258,7 @@ model InvoicePayment {
   creditCard  CreditCard  @relation(fields: [creditCardId], references: [id])
   transaction Transaction? @relation("TransactionInvoicePayment", fields: [transactionId], references: [id])
 
+  @@index([creditCardId])
   @@map("invoice_payments")
 }
 

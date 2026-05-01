@@ -8,6 +8,7 @@ import { Plus, CreditCard, Calendar, DollarSign, RefreshCw, Upload } from 'lucid
 import CreditCardModal from '@/components/Modals/CreditCardModal';
 import { useLocation } from 'wouter';
 import InvoiceUploadModal from '@/components/Modals/InvoiceUploadModal';
+import type { CreditCard as CreditCardType } from '@shared/schema';
 import {
   useCreditCards,
   useCreateCreditCard,
@@ -22,15 +23,23 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { cn, formatCurrency } from '@/lib/utils';
 
+interface CreditCardInvoice {
+  creditCardId: number;
+  month: string;
+  total: string;
+  dueDate: string | null;
+  invoicePayment?: { status: string } | null;
+}
+
 export default function CreditCards() {
   const { currentAccount } = useAccount();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [isCreditCardModalOpen, setIsCreditCardModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [editingCard, setEditingCard] = useState<any | null>(null);
-  const [selectedCardForUpload, setSelectedCardForUpload] = useState<any | null>(null);
-  const [deletingCard, setDeletingCard] = useState<any | null>(null);
+  const [editingCard, setEditingCard] = useState<CreditCardType | null>(null);
+  const [selectedCardForUpload, setSelectedCardForUpload] = useState<CreditCardType | null>(null);
+  const [deletingCard, setDeletingCard] = useState<CreditCardType | null>(null);
 
   // Hooks SEM condicional (React exige ordem fixa)
   const accountId = currentAccount?.id || 0;
@@ -62,7 +71,7 @@ export default function CreditCards() {
   };
 
   // Retorna { month, status } considerando pagamento
-  const getDisplayInvoiceMonth = (card: any): { month: string; status: 'open' | 'pending' | 'overdue' | null } => {
+  const getDisplayInvoiceMonth = (card: CreditCardType): { month: string; status: 'open' | 'pending' | 'overdue' | null } => {
     const closingDay = card.closingDay || 1;
     const [tY, tM, tD] = todayBR().split('-').map(Number);
     const today = todayBR();
@@ -83,8 +92,8 @@ export default function CreditCards() {
     }
 
     // Verificar se a última fatura fechada foi paga
-    const closedInvoice = invoices.find(
-      (inv: any) => inv.creditCardId === card.id && inv.month === lastClosedMonth
+    const closedInvoice = (invoices as CreditCardInvoice[]).find(
+      (inv) => inv.creditCardId === card.id && inv.month === lastClosedMonth
     );
 
     if (closedInvoice) {
@@ -110,7 +119,7 @@ export default function CreditCards() {
   };
 
   // Função para salvar cartão novo ou editar existente
-  function handleSaveCreditCard(data: any) {
+  function handleSaveCreditCard(data: { name: string; brand?: string; creditLimit?: string; dueDate: string; closingDay: string; shared?: boolean; accountId: number }) {
     if (!currentAccount) return;
     // Adapta os campos para o backend
     const payload = {
@@ -141,12 +150,12 @@ export default function CreditCards() {
     }
   }
 
-  function handleEditCreditCard(card: any) {
+  function handleEditCreditCard(card: CreditCardType) {
     setEditingCard(card);
     setIsCreditCardModalOpen(true);
   }
 
-  function handleDeleteCreditCard(card: any) {
+  function handleDeleteCreditCard(card: CreditCardType) {
     setDeletingCard(card);
   }
 
@@ -157,12 +166,12 @@ export default function CreditCards() {
       onError: () => setDeletingCard(null),
     });
   }
-  function handleViewInvoices(card: any) {
+  function handleViewInvoices(card: CreditCardType) {
     const { month } = getDisplayInvoiceMonth(card);
     navigate(`/credit-card-invoice?creditCardId=${card.id}&month=${month}`);
   }
 
-  function handleUploadInvoice(card: any) {
+  function handleUploadInvoice(card: CreditCardType) {
     setSelectedCardForUpload(card);
     setIsUploadModalOpen(true);
   }
@@ -220,7 +229,7 @@ export default function CreditCards() {
                 creditCards.reduce(
                   (sum, card) => {
                     const { month } = getDisplayInvoiceMonth(card);
-                    const inv = invoices.find((i: any) => i.creditCardId === card.id && i.month === month);
+                    const inv = (invoices as CreditCardInvoice[]).find((i) => i.creditCardId === card.id && i.month === month);
                     return sum + parseFloat(inv ? inv.total : (card.currentBalance || '0.00'));
                   },
                   0
@@ -243,7 +252,7 @@ export default function CreditCards() {
                   creditCards.reduce(
                     (sum, card) => {
                       const { month } = getDisplayInvoiceMonth(card);
-                      const inv = invoices.find((i: any) => i.creditCardId === card.id && i.month === month);
+                      const inv = (invoices as CreditCardInvoice[]).find((i) => i.creditCardId === card.id && i.month === month);
                       return sum + parseFloat(inv ? inv.total : (card.currentBalance || '0.00'));
                     },
                     0
@@ -306,7 +315,7 @@ export default function CreditCards() {
                       {(() => {
                         const { month, status } = getDisplayInvoiceMonth(card);
                         const invoice = invoices.find(
-                          (inv: any) => inv.creditCardId === card.id && inv.month === month
+                          (inv: CreditCardInvoice) => inv.creditCardId === card.id && inv.month === month
                         );
                         const invoiceTotal = invoice ? invoice.total : (card.currentBalance || '0.00');
                         return (

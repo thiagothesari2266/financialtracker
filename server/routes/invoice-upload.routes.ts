@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import logger from '../lib/logger';
 import {
   processInvoice,
   processImageFromBuffer,
@@ -100,7 +101,7 @@ export async function pasteInvoiceImage(req: Request, res: Response) {
       });
     }
   } catch (error) {
-    console.error('Erro ao processar imagem colada:', error);
+    logger.error({ err: error }, 'Erro ao processar imagem colada');
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Erro interno do servidor',
     });
@@ -116,7 +117,7 @@ export function uploadMultipleInvoiceImages(req: Request, res: Response) {
   upload.array('files', 10)(req, res, async (err) => {
     // máximo 10 arquivos
     if (err) {
-      console.error('[Invoice Upload Multiple] Erro no upload:', err);
+      logger.error({ err }, 'Invoice Upload Multiple: erro no upload');
       return res.status(400).json({
         error: err.message || 'Erro no upload dos arquivos',
       });
@@ -167,7 +168,7 @@ export function uploadMultipleInvoiceImages(req: Request, res: Response) {
         });
       }
     } catch (error) {
-      console.error('Erro no processamento de múltiplas imagens:', error);
+      logger.error({ err: error }, 'Erro no processamento de múltiplas imagens');
 
       // Limpar arquivos em caso de erro
       files.forEach((file) => {
@@ -191,7 +192,7 @@ export function uploadInvoice(req: Request, res: Response) {
   // Aplicar middleware de upload
   upload.single('file')(req, res, async (err) => {
     if (err) {
-      console.error('[Invoice Upload] Erro no upload:', err);
+      logger.error({ err }, 'Invoice Upload: erro no upload');
       return res.status(400).json({
         error: err.message || 'Erro no upload do arquivo',
       });
@@ -238,7 +239,7 @@ export function uploadInvoice(req: Request, res: Response) {
         });
       }
     } catch (error) {
-      console.error('Erro no processamento:', error);
+      logger.error({ err: error }, 'Invoice Upload: erro no processamento');
 
       // Limpar arquivo em caso de erro
       if (fs.existsSync(file.path)) {
@@ -269,7 +270,7 @@ export async function getCardInvoiceImports(req: Request, res: Response) {
 
     res.json(imports);
   } catch (error) {
-    console.error('Erro ao buscar importações:', error);
+    logger.error({ err: error }, 'Erro ao buscar importações');
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Erro interno do servidor',
     });
@@ -296,7 +297,7 @@ export async function getInvoiceImportDetail(req: Request, res: Response) {
 
     res.json(importDetails);
   } catch (error) {
-    console.error('Erro ao buscar detalhes da importação:', error);
+    logger.error({ err: error }, 'Erro ao buscar detalhes da importação');
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Erro interno do servidor',
     });
@@ -355,7 +356,7 @@ export async function retryInvoiceImport(req: Request, res: Response) {
       });
     }
   } catch (error) {
-    console.error('Erro no reprocessamento:', error);
+    logger.error({ err: error }, 'Erro no reprocessamento de fatura');
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Erro interno do servidor',
     });

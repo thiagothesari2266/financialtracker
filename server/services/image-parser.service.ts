@@ -1,5 +1,6 @@
 import fs from 'fs';
 import sharp from 'sharp';
+import logger from '../lib/logger';
 
 /**
  * Image processing for Vision API
@@ -10,7 +11,7 @@ import sharp from 'sharp';
  */
 export async function processImageToBase64(filePath: string): Promise<string> {
   try {
-    console.log(`[Image Parser] Processando imagem: ${filePath}`);
+    logger.debug({ filePath }, 'Image Parser: processando imagem');
 
     // Para imagens, usar Sharp para otimização
     const optimizedBuffer = await sharp(filePath)
@@ -27,10 +28,10 @@ export async function processImageToBase64(filePath: string): Promise<string> {
     // Converter para base64
     const base64 = optimizedBuffer.toString('base64');
 
-    console.log(`[Image Parser] Imagem processada: ${base64.length} caracteres base64`);
+    logger.debug({ base64Length: base64.length }, 'Image Parser: imagem processada');
     return base64;
   } catch (error) {
-    console.error('Erro ao processar imagem:', error);
+    logger.error({ err: error }, 'Erro ao processar imagem');
     throw new Error(
       `Erro ao processar imagem: ${error instanceof Error ? error.message : 'Erro desconhecido'}`
     );
@@ -45,7 +46,7 @@ export async function processFile(
   fileType: string
 ): Promise<{ imageBase64: string }> {
   try {
-    console.log(`[Image Parser] Processando imagem: ${fileType}`);
+    logger.debug({ fileType }, 'Image Parser: processando arquivo');
 
     if (fileType.startsWith('image/')) {
       // Process image directly
@@ -55,7 +56,7 @@ export async function processFile(
       throw new Error('Tipo de arquivo não suportado. Use apenas PNG, JPG ou JPEG.');
     }
   } catch (error) {
-    console.error('[Image Parser] Erro ao processar arquivo:', error);
+    logger.error({ err: error }, 'Image Parser: erro ao processar arquivo');
     throw error;
   }
 }
@@ -68,7 +69,7 @@ export async function processImageBuffer(
   fileType: string
 ): Promise<{ imageBase64: string }> {
   try {
-    console.log(`[Image Parser] Processando buffer de imagem: ${fileType}`);
+    logger.debug({ fileType }, 'Image Parser: processando buffer de imagem');
 
     // Otimizar imagem para melhor OCR
     const optimizedBuffer = await sharp(imageBuffer)
@@ -85,10 +86,10 @@ export async function processImageBuffer(
     // Converter para base64
     const base64 = optimizedBuffer.toString('base64');
 
-    console.log(`[Image Parser] Buffer processado: ${base64.length} caracteres base64`);
+    logger.debug({ base64Length: base64.length }, 'Image Parser: buffer processado');
     return { imageBase64: base64 };
   } catch (error) {
-    console.error('Erro ao processar buffer de imagem:', error);
+    logger.error({ err: error }, 'Erro ao processar buffer de imagem');
     throw new Error(
       `Erro ao processar imagem: ${error instanceof Error ? error.message : 'Erro desconhecido'}`
     );
@@ -102,9 +103,9 @@ export function cleanupTempFile(filePath: string): void {
   try {
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
-      console.log(`[Cleanup] Arquivo temporário removido: ${filePath}`);
+      logger.debug({ filePath }, 'Arquivo temporário removido');
     }
   } catch (error) {
-    console.error('Erro ao limpar arquivo temporário:', error);
+    logger.error({ err: error }, 'Erro ao limpar arquivo temporário');
   }
 }

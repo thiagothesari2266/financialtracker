@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { storage } from '../storage';
 import { validateAccountOwnership } from '../middleware/account-ownership';
 import { insertProjectSchema, insertCostCenterSchema, insertClientSchema } from '@shared/schema';
+import logger from '../lib/logger';
 
 export function registerBusinessEntityRoutes(app: Express) {
   // Project routes
@@ -12,7 +13,7 @@ export function registerBusinessEntityRoutes(app: Express) {
       const projects = await storage.getProjects(accountId);
       res.json(projects);
     } catch (error) {
-      console.error('[GET /api/accounts/:accountId/projects]', error);
+      logger.error({ err: error }, 'GET /api/accounts/:accountId/projects');
       res.status(500).json({ message: 'Failed to fetch projects' });
     }
   });
@@ -93,7 +94,7 @@ export function registerBusinessEntityRoutes(app: Express) {
       const costCenters = await storage.getCostCenters(accountId);
       res.json(costCenters);
     } catch (error) {
-      console.error('[GET /api/accounts/:accountId/cost-centers]', error);
+      logger.error({ err: error }, 'GET /api/accounts/:accountId/cost-centers');
       res.status(500).json({ message: 'Failed to fetch cost centers' });
     }
   });
@@ -174,7 +175,7 @@ export function registerBusinessEntityRoutes(app: Express) {
       const clients = await storage.getClients(accountId);
       res.json(clients);
     } catch (error) {
-      console.error('[GET /api/accounts/:accountId/clients]', error);
+      logger.error({ err: error }, 'GET /api/accounts/:accountId/clients');
       res.status(500).json({ message: 'Failed to fetch clients' });
     }
   });

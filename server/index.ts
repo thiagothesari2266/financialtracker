@@ -5,6 +5,7 @@ import connectPgSimple from 'connect-pg-simple';
 import { registerRoutes } from './routes';
 import { registerAuthRoutes } from './routes/auth.routes';
 import { setupVite, serveStatic, log } from './vite';
+import logger from './lib/logger';
 
 const shouldLogRequests = process.env.LOG_REQUESTS === 'true';
 
@@ -39,7 +40,7 @@ app.use(
 if (shouldLogRequests) {
   // Middleware global para logar todas as requisições recebidas
   app.use((req, res, next) => {
-    console.log(`[${req.method}] ${req.originalUrl}`);
+    logger.debug({ method: req.method, url: req.originalUrl }, 'request received');
     next();
   });
 
@@ -100,7 +101,7 @@ app.use((req, res, next) => {
     const message = err.message || 'Internal Server Error';
 
     if (process.env.NODE_ENV === 'production') {
-      console.error('[error]', err);
+      logger.error({ err, status }, 'unhandled error');
       return res.status(status).json({ message });
     }
 

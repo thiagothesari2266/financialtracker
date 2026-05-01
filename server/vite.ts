@@ -16,6 +16,7 @@ export function log(message: string, source = 'express') {
     hour12: true,
   });
 
+  // Mantém console.log intencional para output formatado do Vite dev server
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 

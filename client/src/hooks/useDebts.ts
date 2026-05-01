@@ -1,55 +1,17 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createEntityCrud } from './useEntityCrud';
 import type { Debt, InsertDebt } from '@shared/schema';
-import { apiRequest } from '@/lib/queryClient';
 
-export function useDebts(accountId: number) {
-  return useQuery<Debt[]>({
-    queryKey: ['/api/accounts', accountId, 'debts'],
-    queryFn: async () => {
-      const res = await apiRequest('GET', `/api/accounts/${accountId}/debts`);
-      return res.json();
-    },
-    enabled: !!accountId,
-  });
+const crud = createEntityCrud<Debt, InsertDebt>({
+  listKey: (accountId) => ['/api/accounts', accountId, 'debts'],
+  singleKey: (id) => ['/api/debts', id],
+  listPath: (accountId) => `/api/accounts/${accountId}/debts`,
+  singlePath: (id) => `/api/debts/${id}`,
+});
+
+export const useDebts = crud.useList;
+export const useCreateDebt = crud.useCreate;
+// useUpdate não usa accountId (deriva do retorno da entity), mas mantém assinatura para compatibilidade
+export function useUpdateDebt(_accountId?: number) {
+  return crud.useUpdate();
 }
-
-export function useCreateDebt(accountId: number) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: InsertDebt) => {
-      const res = await apiRequest('POST', `/api/accounts/${accountId}/debts`, data);
-      return (await res.json()) as Debt;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'debts'] });
-    },
-  });
-}
-
-export function useUpdateDebt(accountId: number) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertDebt> }) => {
-      const res = await apiRequest('PATCH', `/api/debts/${id}`, data);
-      return (await res.json()) as Debt;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'debts'] });
-    },
-  });
-}
-
-export function useDeleteDebt(accountId: number) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest('DELETE', `/api/debts/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts', accountId, 'debts'] });
-    },
-  });
-}
+export const useDeleteDebt = crud.useDelete;

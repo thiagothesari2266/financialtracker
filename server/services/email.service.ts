@@ -1,4 +1,5 @@
 import * as nodemailer from 'nodemailer';
+import logger from '../lib/logger';
 
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.hostinger.com';
 const SMTP_PORT = Number(process.env.SMTP_PORT) || 465;
@@ -11,7 +12,7 @@ let transporter: nodemailer.Transporter | null = null;
 
 function getTransporter(): nodemailer.Transporter | null {
   if (!SMTP_USER || !SMTP_PASS) {
-    console.warn('[Email] SMTP credentials not configured');
+    logger.warn('Email: SMTP credentials not configured');
     return null;
   }
 
@@ -154,11 +155,11 @@ export async function sendInviteEmail(
       html: getInviteEmailHtml(inviteLink),
     });
 
-    console.log(`[Email] Invite sent to ${to}`);
+    logger.info({ to }, 'Email: invite sent');
     return { success: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erro desconhecido';
-    console.error(`[Email] Failed to send invite to ${to}:`, message);
+    logger.error({ to, message }, 'Email: failed to send invite');
     return {
       success: false,
       error: message,

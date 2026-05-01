@@ -1,9 +1,10 @@
 import OpenAI from 'openai';
 import { storage } from '../storage';
 import { todayBR, currentMonthBR } from '../utils/date-br';
+import logger from '../lib/logger';
 
 if (!process.env.OPENAI_API_KEY) {
-  console.warn('⚠️  OPENAI_API_KEY não encontrada. Funcionalidade de IA desabilitada.');
+  logger.warn('OPENAI_API_KEY não encontrada. Funcionalidade de IA desabilitada.');
 }
 
 const openai = process.env.OPENAI_API_KEY
@@ -79,17 +80,15 @@ FORMATO:
 export class AIFinancialAdvisor {
   static async getFinancialContext(accountId: number, userId: number): Promise<FinancialContext> {
     try {
-      console.log(`[AIFinancialAdvisor] Getting context for account ${accountId}`);
+      logger.debug({ accountId }, 'AIFinancialAdvisor: getting context');
       const currentMonth = currentMonthBR();
       const today = todayBR();
 
       // Buscar estatísticas da conta
-      console.log(
-        `[AIFinancialAdvisor] Fetching account stats for ${accountId}, month: ${currentMonth}`
-      );
+      logger.debug({ accountId, currentMonth }, 'AIFinancialAdvisor: fetching account stats');
       const stats = await storage.getAccountStats(accountId, currentMonth);
       if (!stats) {
-        console.error(`[AIFinancialAdvisor] Account ${accountId} not found`);
+        logger.error({ accountId }, 'AIFinancialAdvisor: account not found');
         throw new Error('Account not found');
       }
 
@@ -105,12 +104,15 @@ export class AIFinancialAdvisor {
           return t.type === 'income' ? sum + parseFloat(t.amount) : sum - parseFloat(t.amount);
         }, 0);
 
-      console.log(`[AIFinancialAdvisor] Raw data for month ${currentMonth}:`);
-      console.log(`- Account Stats monthlyIncome: ${stats.monthlyIncome}`);
-      console.log(`- Account Stats monthlyExpenses: ${stats.monthlyExpenses}`);
-      console.log(`- Calculated currentBalance: ${currentBalance.toFixed(2)}`);
-      console.log(
-        `- Calculated projectedBalance: ${(parseFloat(stats.monthlyIncome) - parseFloat(stats.monthlyExpenses)).toFixed(2)}`
+      logger.debug(
+        {
+          currentMonth,
+          monthlyIncome: stats.monthlyIncome,
+          monthlyExpenses: stats.monthlyExpenses,
+          currentBalance: currentBalance.toFixed(2),
+          projectedBalance: (parseFloat(stats.monthlyIncome) - parseFloat(stats.monthlyExpenses)).toFixed(2),
+        },
+        'AIFinancialAdvisor: raw data'
       );
 
       // Buscar categorias com estatísticas
@@ -167,16 +169,19 @@ export class AIFinancialAdvisor {
         })),
       };
 
-      console.log(`[AIFinancialAdvisor] Final context being sent to AI:`);
-      console.log(`- totalBalance: ${context.stats.totalBalance}`);
-      console.log(`- monthlyIncome: ${context.stats.monthlyIncome}`);
-      console.log(`- monthlyExpenses: ${context.stats.monthlyExpenses}`);
-      console.log(`- projectedBalance: ${context.stats.projectedBalance}`);
+      logger.debug(
+        {
+          totalBalance: context.stats.totalBalance,
+          monthlyIncome: context.stats.monthlyIncome,
+          monthlyExpenses: context.stats.monthlyExpenses,
+          projectedBalance: context.stats.projectedBalance,
+        },
+        'AIFinancialAdvisor: final context sent to AI'
+      );
 
       return context;
     } catch (error) {
-      console.error('[AIFinancialAdvisor] Error getting financial context:', error);
-      console.error('[AIFinancialAdvisor] Stack trace:', error.stack);
+      logger.error({ err: error }, 'AIFinancialAdvisor: error getting financial context');
       throw error;
     }
   }
@@ -283,11 +288,7 @@ ${context.recentTransactions
         'Desculpe, não consegui processar sua solicitação.'
       );
     } catch (error) {
-      console.error('[AIFinancialAdvisor] Error analyzing finances:', error);
-      console.error('[AIFinancialAdvisor] Stack trace:', error.stack);
-      if (error.response?.data) {
-        console.error('[AIFinancialAdvisor] OpenAI API error:', error.response.data);
-      }
+      logger.error({ err: error }, 'AIFinancialAdvisor: error analyzing finances');
       return '❌ Erro ao processar análise financeira. Tente novamente.';
     }
   }

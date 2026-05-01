@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { storage } from '../storage';
 import { registerWithInviteSchema, loginSchema, createInviteSchema, updateUserSchema } from '@shared/schema';
 import { sendInviteEmail } from '../services/email.service';
+import logger from '../lib/logger';
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -50,7 +51,7 @@ export function registerAuthRoutes(app: Express) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Dados inválidos', errors: error.errors });
       }
-      console.error('[POST /api/auth/register]', error);
+      logger.error({ err: error }, 'POST /api/auth/register');
       res.status(500).json({ message: 'Falha ao registrar' });
     }
   });
@@ -73,7 +74,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json({ email: invite.email, expiresAt: invite.expiresAt });
     } catch (error) {
-      console.error('[GET /api/auth/invite/:token]', error);
+      logger.error({ err: error }, 'GET /api/auth/invite/:token');
       res.status(500).json({ message: 'Falha ao verificar convite' });
     }
   });
@@ -102,7 +103,7 @@ export function registerAuthRoutes(app: Express) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Dados inválidos', errors: error.errors });
       }
-      console.error('[POST /api/auth/login]', error);
+      logger.error({ err: error }, 'POST /api/auth/login');
       res.status(500).json({ message: 'Falha ao autenticar' });
     }
   });
@@ -114,7 +115,7 @@ export function registerAuthRoutes(app: Express) {
 
     req.session.destroy((err) => {
       if (err) {
-        console.error('[POST /api/auth/logout]', err);
+        logger.error({ err }, 'POST /api/auth/logout');
         return res.status(500).json({ message: 'Falha ao encerrar sessão' });
       }
       res.clearCookie('connect.sid');
@@ -136,7 +137,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json(user);
     } catch (error) {
-      console.error('[GET /api/auth/session]', error);
+      logger.error({ err: error }, 'GET /api/auth/session');
       res.status(500).json({ message: 'Falha ao carregar sessão' });
     }
   });
@@ -197,7 +198,7 @@ export function registerAuthRoutes(app: Express) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Email inválido', errors: error.errors });
       }
-      console.error('[POST /api/admin/invites]', error);
+      logger.error({ err: error }, 'POST /api/admin/invites');
       res.status(500).json({ message: 'Falha ao criar convite' });
     }
   });
@@ -208,7 +209,7 @@ export function registerAuthRoutes(app: Express) {
       const invites = await storage.getInvites();
       res.json(invites);
     } catch (error) {
-      console.error('[GET /api/admin/invites]', error);
+      logger.error({ err: error }, 'GET /api/admin/invites');
       res.status(500).json({ message: 'Falha ao listar convites' });
     }
   });
@@ -224,7 +225,7 @@ export function registerAuthRoutes(app: Express) {
       await storage.deleteInvite(id);
       res.status(204).send();
     } catch (error) {
-      console.error('[DELETE /api/admin/invites/:id]', error);
+      logger.error({ err: error }, 'DELETE /api/admin/invites/:id');
       res.status(500).json({ message: 'Falha ao deletar convite' });
     }
   });
@@ -237,7 +238,7 @@ export function registerAuthRoutes(app: Express) {
       const users = await storage.getAllUsers();
       res.json(users);
     } catch (error) {
-      console.error('[GET /api/admin/users]', error);
+      logger.error({ err: error }, 'GET /api/admin/users');
       res.status(500).json({ message: 'Falha ao listar usuários' });
     }
   });
@@ -275,7 +276,7 @@ export function registerAuthRoutes(app: Express) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Dados inválidos', errors: error.errors });
       }
-      console.error('[PATCH /api/admin/users/:id]', error);
+      logger.error({ err: error }, 'PATCH /api/admin/users/:id');
       res.status(500).json({ message: 'Falha ao atualizar usuário' });
     }
   });
@@ -307,7 +308,7 @@ export function registerAuthRoutes(app: Express) {
       await storage.deleteUser(id);
       res.status(204).send();
     } catch (error) {
-      console.error('[DELETE /api/admin/users/:id]', error);
+      logger.error({ err: error }, 'DELETE /api/admin/users/:id');
       res.status(500).json({ message: 'Falha ao deletar usuário' });
     }
   });

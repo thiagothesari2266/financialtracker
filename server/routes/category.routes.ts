@@ -4,6 +4,7 @@ import { storage } from '../storage';
 import { currentMonthBR } from '../utils/date-br';
 import { validateAccountOwnership } from '../middleware/account-ownership';
 import { insertCategorySchema } from '@shared/schema';
+import logger from '../lib/logger';
 
 export function registerCategoryRoutes(app: Express) {
   app.get('/api/accounts/:accountId/categories', validateAccountOwnership, async (req, res) => {
@@ -47,19 +48,19 @@ export function registerCategoryRoutes(app: Express) {
   app.patch('/api/categories/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      console.log('[PATCH /api/categories/:id] id:', id, 'body:', req.body);
+      logger.debug({ id, body: req.body }, 'PATCH /api/categories/:id');
       const validatedData = insertCategorySchema.partial().parse(req.body);
       if (!validatedData || Object.keys(validatedData).length === 0) {
         return res.status(400).json({ message: 'Nenhum campo para atualizar' });
       }
       const category = await storage.updateCategory(id, validatedData);
       if (!category) {
-        console.log('[PATCH /api/categories/:id] Category not found');
+        logger.debug({ id }, 'PATCH /api/categories/:id: category not found');
         return res.status(404).json({ message: 'Category not found' });
       }
       res.json(category);
     } catch (error) {
-      console.error('[PATCH /api/categories/:id] error:', error);
+      logger.error({ err: error }, 'PATCH /api/categories/:id');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
@@ -70,11 +71,11 @@ export function registerCategoryRoutes(app: Express) {
   app.delete('/api/categories/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      console.log('[DELETE /api/categories/:id] id:', id);
+      logger.debug({ id }, 'DELETE /api/categories/:id');
       await storage.deleteCategory(id);
       res.status(204).send();
     } catch (error) {
-      console.error('[DELETE /api/categories/:id] error:', error);
+      logger.error({ err: error }, 'DELETE /api/categories/:id');
       res.status(500).json({ message: 'Failed to delete category' });
     }
   });

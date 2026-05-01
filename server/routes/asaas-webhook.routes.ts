@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { storage } from '../storage';
 import { getMatchCandidates, findBestMatch } from '../services/asaas-reconciliation';
 import type { AsaasImportDirection, AsaasImportEntityType } from '@shared/schema';
+import logger from '../lib/logger';
 
 interface EventMeta {
   direction: AsaasImportDirection;
@@ -90,7 +91,7 @@ export async function handleAsaasWebhook(req: Request, res: Response): Promise<v
       if ((existing.status === 'matched' || existing.status === 'standalone') && meta.isPaid) {
         if (existing.matchedTransactionId) {
           await storage.updateTransaction(existing.matchedTransactionId, { paid: true });
-          console.log(`[Asaas Webhook] Propagando paid=true para transação ${existing.matchedTransactionId}, import=${existing.id}`);
+          logger.info({ transactionId: existing.matchedTransactionId, importId: existing.id }, 'Asaas Webhook: propagando paid=true');
         }
       }
 
@@ -101,7 +102,7 @@ export async function handleAsaasWebhook(req: Request, res: Response): Promise<v
       }
       await storage.updateAsaasImport(existing.id, updateData);
 
-      console.log(`[Asaas Webhook] Import atualizado: id=${existing.id}, event=${event}, entity=${entityId}`);
+      logger.info({ importId: existing.id, event, entityId }, 'Asaas Webhook: import atualizado');
       res.status(200).json({ received: true, processed: true, action: 'updated_existing_import', importId: existing.id });
       return;
     }
@@ -147,10 +148,10 @@ export async function handleAsaasWebhook(req: Request, res: Response): Promise<v
       status: 'pending',
     });
 
-    console.log(`[Asaas Webhook] Import criado: id=${created.id}, event=${event}, entity=${entityId}, score=${bestMatch?.score ?? null}`);
+    logger.info({ importId: created.id, event, entityId, score: bestMatch?.score ?? null }, 'Asaas Webhook: import criado');
     res.status(200).json({ received: true, processed: true, action: 'created_import', importId: created.id });
   } catch (error) {
-    console.error('[Asaas Webhook] Erro:', error);
+    logger.error({ err: error }, 'Asaas Webhook: erro ao processar');
     res.status(200).json({ received: true, processed: false, reason: 'internal_error' });
   }
 }

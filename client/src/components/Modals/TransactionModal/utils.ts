@@ -50,8 +50,9 @@ export function formatInvoiceMonth(transactionDate: string, closingDay: number):
 /**
  * Detecta campos alterados entre o original e o atualizado.
  */
-export function getChangedFields(original: any, updated: any): Record<string, any> {
-  const changed: any = {};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- payloads de API têm shape dinâmico e não mapeiam para um tipo fixo sem cast excessivo
+export function getChangedFields(original: any, updated: any): Record<string, unknown> {
+  const changed: Record<string, unknown> = {};
   for (const key of Object.keys(updated)) {
     if (['editScope', 'installmentsGroupId'].includes(key)) continue;
     if (String(updated[key] ?? '') !== String(original[key] ?? '')) {
@@ -86,8 +87,9 @@ export function getChangedFields(original: any, updated: any): Record<string, an
 /**
  * Limpa campos inválidos de um payload antes do envio ao backend.
  */
-export function cleanPatchPayload(payload: any): Record<string, any> {
-  const cleaned: any = {};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- payloads de API têm shape dinâmico
+export function cleanPatchPayload(payload: any): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = {};
   for (const key in payload) {
     if (
       payload[key] === null ||
@@ -120,7 +122,7 @@ export function cleanPatchPayload(payload: any): Record<string, any> {
 /**
  * Verifica se um categoryId é válido (numérico e finito).
  */
-export function isValidCategoryId(value: any): boolean {
+export function isValidCategoryId(value: unknown): boolean {
   if (
     value === null ||
     value === undefined ||
@@ -138,7 +140,7 @@ export function isValidCategoryId(value: any): boolean {
  * Determina o launchType a partir de uma transação existente.
  */
 export function resolveLaunchType(
-  transaction: any
+  transaction: Pick<{ launchType: string | null; installments: number }, 'launchType' | 'installments'>
 ): 'unica' | 'recorrente' | 'parcelada' {
   if (
     transaction.launchType === 'recorrente' ||
@@ -147,7 +149,7 @@ export function resolveLaunchType(
   ) {
     return transaction.launchType;
   }
-  return transaction.installments && transaction.installments > 1
+  return transaction.installments > 1
     ? 'parcelada'
     : 'unica';
 }

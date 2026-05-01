@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { storage } from '../storage';
 import { validateAccountOwnership } from '../middleware/account-ownership';
 import { insertCreditCardSchema, insertCreditCardTransactionSchema } from '@shared/schema';
+import logger from '../lib/logger';
 
 export function registerCreditCardRoutes(app: Express) {
   app.get('/api/accounts/:accountId/credit-cards', validateAccountOwnership, async (req, res) => {
@@ -12,7 +13,7 @@ export function registerCreditCardRoutes(app: Express) {
       const creditCards = await storage.getCreditCards(accountId, userId);
       res.json(creditCards);
     } catch (error) {
-      console.error(`[GET /api/accounts/:accountId/credit-cards] Erro:`, error);
+      logger.error({ err: error }, 'GET /api/accounts/:accountId/credit-cards');
       res.status(500).json({ message: 'Failed to fetch credit cards' });
     }
   });
@@ -54,7 +55,7 @@ export function registerCreditCardRoutes(app: Express) {
       const card = await storage.createCreditCard(normalizedData);
       res.status(201).json(card);
     } catch (error) {
-      console.error('[POST /api/accounts/:accountId/credit-cards] Erro:', error);
+      logger.error({ err: error }, 'POST /api/accounts/:accountId/credit-cards');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
@@ -110,7 +111,7 @@ export function registerCreditCardRoutes(app: Express) {
       await storage.deleteCreditCard(id);
       res.status(204).send();
     } catch (error) {
-      console.error('[DELETE /api/credit-cards/:id] Erro:', error);
+      logger.error({ err: error }, 'DELETE /api/credit-cards/:id');
       res.status(500).json({
         message: 'Failed to delete credit card',
         error:
@@ -188,7 +189,7 @@ export function registerCreditCardRoutes(app: Express) {
       await storage.deleteCreditCardTransaction(id, { editScope, exceptionForDate });
       res.status(204).send();
     } catch (error) {
-      console.error('[DELETE /api/credit-card-transactions/:id] error:', error);
+      logger.error({ err: error }, 'DELETE /api/credit-card-transactions/:id');
       res.status(500).json({ message: 'Failed to delete credit card transaction' });
     }
   });

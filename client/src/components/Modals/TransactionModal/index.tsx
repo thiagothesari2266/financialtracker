@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -40,12 +40,18 @@ import {
   useUpdateCreditCardTransaction,
 } from '@/hooks/useCreditCards';
 import { DatePicker } from '@/components/ui/date-picker';
-import { Switch } from '@/components/ui/switch';
-import { CheckCircle2, Clock } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 import ScopeModal from './ScopeModal';
 import ReceiptSection from './ReceiptSection';
+import PaymentStatusBar from './PaymentStatusBar';
+import DestinationSelector from './DestinationSelector';
+import LaunchTypeSection from './LaunchTypeSection';
+import BusinessFields from './BusinessFields';
+// O modal aceita tanto Transaction quanto CreditCardTransactionWithCategory além de campos virtuais do backend.
+// Os dois tipos têm campos exclusivos incompatíveis (type, bankAccountId, paid vs creditCardId, invoiceMonth),
+// tornando inviável uma união estrita sem type guards extensos que mudariam comportamento.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- shape dinâmico: aceita Transaction ou CreditCardTransaction com campos virtuais
+type AnyTransaction = any;
 import {
   calculateInvoiceMonth,
   formatInvoiceMonth,
@@ -53,7 +59,6 @@ import {
   cleanPatchPayload,
   isValidCategoryId,
   resolveLaunchType,
-  COST_CENTERS,
 } from './utils';
 
 const transactionSchema = z.object({
@@ -73,12 +78,12 @@ const transactionSchema = z.object({
   recurrenceEndDate: z.string().optional(),
 });
 
-type TransactionFormValues = z.infer<typeof transactionSchema>;
+export type TransactionFormValues = z.infer<typeof transactionSchema>;
 
 interface TransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  transaction?: any | null;
+  transaction?: AnyTransaction | null;
   editScope?: 'single' | 'all' | 'future' | null;
   onCreated?: (created: { id: number }) => void | Promise<void>;
 }
@@ -139,7 +144,6 @@ export default function TransactionModal({
       : undefined,
   });
 
-  // Estado para tipo de lançamento e destino
   const [launchType, setLaunchType] = useState<string>('unica');
   const [originalLaunchType, setOriginalLaunchType] = useState<string>('unica');
   const [destinationType, setDestinationType] = useState<'bank' | 'credit'>(
@@ -148,17 +152,12 @@ export default function TransactionModal({
   const [originalDestinationType, setOriginalDestinationType] = useState<'bank' | 'credit'>(
     transaction && transaction.creditCardId ? 'credit' : 'bank'
   );
-
-  // Estado local para checkbox de pago
   const [localPaid, setLocalPaid] = useState<boolean>(!!transaction?.paid);
-
-  // Estado para modais de escopo
   const [showScopeModal, setShowScopeModal] = useState(false);
-  const [pendingScopeData, setPendingScopeData] = useState<any>(null);
+  const [pendingScopeData, setPendingScopeData] = useState<Record<string, unknown> | null>(null);
   const [showDeleteScopeModal, setShowDeleteScopeModal] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
 
-  // Sincroniza estado ao abrir/trocar transação
   React.useEffect(() => {
     if (transaction) {
       const txLaunchType = resolveLaunchType(transaction);
@@ -270,7 +269,7 @@ export default function TransactionModal({
         return;
       }
 
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         ...data,
         creditCardId: Number(data.creditCardId),
         accountId: currentAccount?.id,
@@ -311,7 +310,7 @@ export default function TransactionModal({
     }
 
     // Transação bancária
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       ...data,
       categoryId: parseInt(data.categoryId),
       amount: data.amount,
@@ -336,35 +335,38 @@ export default function TransactionModal({
         setPendingScopeData({ ...payload, date: data.date });
         setShowScopeModal(true);
       } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- payload tem campos extras (paid, recurrenceGroupId) não presentes em UpdateTransactionData
         updateTransactionMutation.mutate(
-          { id: transaction.id, data: payload },
+          { id: transaction.id, data: payload as any },
           {
             onSuccess: () => {
               toast({ title: 'Sucesso', description: 'Transação editada com sucesso' });
               form.reset();
               onClose();
             },
-            onError: (error: any) => {
+            onError: (error: Error) => {
               toast({ title: 'Erro', description: error.message || 'Erro ao editar transação', variant: 'destructive' });
             },
           }
         );
       }
     } else {
-      createTransactionMutation.mutate(payload, {
-        onSuccess: async (created: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- payload tem campos extras dinâmicos que o InsertTransaction não cobre (ex: editScope)
+      createTransactionMutation.mutate(payload as any, {
+        onSuccess: async (created: { id?: number }) => {
           toast({ title: 'Sucesso', description: 'Transação criada com sucesso' });
           if (onCreated && created?.id) {
             try {
               await onCreated({ id: created.id });
-            } catch (err: any) {
-              toast({ title: 'Aviso', description: err?.message || 'Transação criada, mas houve erro no pós-processamento.', variant: 'destructive' });
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : 'Transação criada, mas houve erro no pós-processamento.';
+              toast({ title: 'Aviso', description: msg, variant: 'destructive' });
             }
           }
           form.reset();
           onClose();
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
           toast({ title: 'Erro', description: error.message || 'Erro ao criar transação', variant: 'destructive' });
         },
       });
@@ -373,7 +375,7 @@ export default function TransactionModal({
 
   // --- Scope select (edição em lote) ---
   const handleScopeSelect = (scope: 'single' | 'all' | 'future') => {
-    if (!pendingScopeData) return;
+    if (!pendingScopeData || !transaction) return;
     const cleanedScopeData = { ...pendingScopeData };
     if (!cleanedScopeData.date || cleanedScopeData.date === '' || cleanedScopeData.date === 'null') {
       delete cleanedScopeData.date;
@@ -387,7 +389,7 @@ export default function TransactionModal({
 
     const onMutateSuccess = (msg: string) => ({
       onSuccess: () => { toast({ title: 'Sucesso', description: msg }); form.reset(); onClose(); },
-      onError: (error: any) => { toast({ title: 'Erro', description: error.message || 'Erro ao editar transação', variant: 'destructive' }); },
+      onError: (error: Error) => { toast({ title: 'Erro', description: error.message || 'Erro ao editar transação', variant: 'destructive' }); },
     });
 
     if (scope === 'single') {
@@ -398,8 +400,9 @@ export default function TransactionModal({
         recurrenceGroupId: transaction.recurrenceGroupId,
         exceptionForDate: transaction.virtualDate || transaction.date?.split('T')[0],
       });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- payload tem campos dinâmicos de editScope/groupId não presentes em UpdateTransactionData
       updateTransactionMutation.mutate(
-        { id: transaction.id, data: singlePayload },
+        { id: transaction.id, data: singlePayload as any },
         onMutateSuccess('Transação editada com sucesso')
       );
       setShowScopeModal(false);
@@ -439,8 +442,9 @@ export default function TransactionModal({
         return;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- payload tem campos dinâmicos de editScope/groupId não presentes em UpdateTransactionData
       updateTransactionMutation.mutate(
-        { id: transaction.id, data: patchPayload },
+        { id: transaction.id, data: patchPayload as any },
         onMutateSuccess('Transações editadas com sucesso')
       );
       setShowScopeModal(false);
@@ -448,8 +452,9 @@ export default function TransactionModal({
       return;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- payload tem campos dinâmicos de editScope/groupId não presentes em UpdateTransactionData
     updateTransactionMutation.mutate(
-      { id: transaction.id, data: cleanedScopeData },
+      { id: transaction.id, data: cleanedScopeData as any },
       onMutateSuccess('Transação editada com sucesso')
     );
     setShowScopeModal(false);
@@ -503,7 +508,7 @@ export default function TransactionModal({
           await deleteTransactionMutation.mutateAsync(transaction.id);
         }
       } else {
-        const data: any = { editScope: scope };
+        const data: Record<string, unknown> = { editScope: scope };
         if (isParcelada) data.installmentsGroupId = transaction.installmentsGroupId;
         if (isRecorrente) data.recurrenceGroupId = transaction.recurrenceGroupId;
         await deleteTransactionMutation.mutateAsync({ id: transaction.id, data });
@@ -529,318 +534,92 @@ export default function TransactionModal({
             </DialogTitle>
           </DialogHeader>
 
-          {/* Status de pagamento */}
           {transaction && transaction.id && (
-            <div
-              className={cn(
-                'flex items-center justify-between px-4 py-3 rounded-lg border transition-colors',
-                localPaid ? 'bg-success/10 border-success/20' : 'bg-warning/10 border-warning/20'
-              )}
-            >
-              <div className="flex items-center gap-3">
-                {localPaid ? (
-                  <CheckCircle2 className="w-5 h-5 text-success" />
-                ) : (
-                  <Clock className="w-5 h-5 text-warning" />
-                )}
-                <span
-                  className={cn(
-                    'text-sm font-medium',
-                    localPaid ? 'text-success-foreground' : 'text-warning-foreground'
-                  )}
-                >
-                  {localPaid ? 'Pago' : 'Pendente'}
-                </span>
-              </div>
-              <Switch
-                checked={localPaid}
-                onCheckedChange={(checked) => setLocalPaid(Boolean(checked))}
-                className={cn(localPaid ? 'data-[state=checked]:bg-success' : '')}
-              />
-            </div>
+            <PaymentStatusBar paid={localPaid} onToggle={setLocalPaid} />
           )}
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {/* Descrição + Valor */}
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Descrição</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Digite a descrição..." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Valor</FormLabel>
-                      <FormControl>
-                        <CurrencyInput
-                          placeholder="0,00"
-                          value={field.value ? parseFloat(field.value) : null}
-                          onValueChange={(val) => field.onChange(val == null ? '' : val.toString())}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Tipo + Data + Categoria */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name="type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione o tipo" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="income">Receita</SelectItem>
-                          <SelectItem value="expense">Despesa</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="date"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Data</FormLabel>
-                      <FormControl>
-                        <DatePicker
-                          date={field.value ? parse(field.value, 'yyyy-MM-dd', new Date()) : undefined}
-                          onSelect={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="categoryId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Categoria</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {categories
-                            .filter((category) => category.type === form.watch('type'))
-                            .map((category) => (
-                              <SelectItem key={category.id} value={category.id.toString()}>
-                                {category.name}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Destino: Conta Bancária / Cartão */}
-              <div className="grid grid-cols-2 gap-4">
-                <FormItem>
-                  <FormLabel>Lançar em</FormLabel>
-                  <Select
-                    value={destinationType}
-                    onValueChange={(v) => setDestinationType(v as 'bank' | 'credit')}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o destino" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="bank">Conta Bancária</SelectItem>
-                      <SelectItem value="credit">Cartão de Crédito</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-
-                {destinationType === 'bank' && (
+          <FormProvider {...form}>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                {/* Descrição + Valor */}
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="bankAccountId"
+                    name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Conta Bancária</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <FormLabel>Descrição</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Digite a descrição..." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="amount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Valor</FormLabel>
+                        <FormControl>
+                          <CurrencyInput
+                            placeholder="0,00"
+                            value={field.value ? parseFloat(field.value) : null}
+                            onValueChange={(val) => field.onChange(val == null ? '' : val.toString())}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Tipo + Data + Categoria */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Selecione a conta" />
+                              <SelectValue placeholder="Selecione o tipo" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {bankAccounts.map((ba) => (
-                              <SelectItem key={ba.id} value={ba.id.toString()}>
-                                {ba.name}
-                                {ba.shared && ba.accountId !== currentAccount?.id && ' (compartilhada)'}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="income">Receita</SelectItem>
+                            <SelectItem value="expense">Despesa</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                )}
-
-                {destinationType === 'credit' && (
                   <FormField
                     control={form.control}
-                    name="creditCardId"
-                    render={({ field }) => {
-                      const selectedCard = field.value
-                        ? creditCards.find((cc) => cc.id === Number(field.value))
-                        : null;
-                      const transactionDate = form.watch('date');
-                      const invoiceInfo =
-                        selectedCard && transactionDate
-                          ? `Fatura de ${formatInvoiceMonth(transactionDate, selectedCard.closingDay || 1)}`
-                          : '';
-
-                      return (
-                        <FormItem>
-                          <FormLabel>Cartão de Crédito</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione o cartão" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {creditCards.map((cc) => (
-                                <SelectItem key={cc.id} value={cc.id.toString()}>
-                                  {cc.name} ({cc.brand}) - Fecha dia {cc.closingDay}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {selectedCard && invoiceInfo && (
-                            <p className="text-xs text-info mt-1">{invoiceInfo}</p>
-                          )}
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }}
-                  />
-                )}
-              </div>
-
-              {/* Tipo de lançamento */}
-              <div className="grid grid-cols-1 gap-4">
-                <FormItem>
-                  <FormLabel>Tipo de Lançamento</FormLabel>
-                  <Select value={launchType} onValueChange={setLaunchType}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o tipo" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="unica">Única</SelectItem>
-                      <SelectItem value="recorrente">Recorrente</SelectItem>
-                      <SelectItem value="parcelada">Parcelada</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              </div>
-
-              {/* Campos de parcelada */}
-              {launchType === 'parcelada' && (
-                <div className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="installments"
+                    name="date"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Número de parcelas</FormLabel>
+                        <FormLabel>Data</FormLabel>
                         <FormControl>
-                          <Input type="number" min={2} max={60} placeholder="Ex: 6" {...field} />
+                          <DatePicker
+                            date={field.value ? parse(field.value, 'yyyy-MM-dd', new Date()) : undefined}
+                            onSelect={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  {/* Preview das faturas afetadas */}
-                  {destinationType === 'credit' &&
-                    form.watch('creditCardId') &&
-                    form.watch('installments') &&
-                    Number(form.watch('installments')) >= 2 &&
-                    form.watch('date') &&
-                    (() => {
-                      const selectedCard = creditCards.find(
-                        (cc) => cc.id === Number(form.watch('creditCardId'))
-                      );
-                      const transactionDate = form.watch('date');
-                      const installments = Number(form.watch('installments'));
-                      if (!selectedCard || !transactionDate || installments < 2) return null;
-
-                      const affectedInvoices = [];
-                      for (let i = 0; i < installments; i++) {
-                        const currentDate = new Date(transactionDate);
-                        currentDate.setMonth(currentDate.getMonth() + i);
-                        const dateStr = currentDate.toISOString().split('T')[0];
-                        affectedInvoices.push({
-                          formatted: formatInvoiceMonth(dateStr, selectedCard.closingDay || 1),
-                          installment: i + 1,
-                        });
-                      }
-
-                      return (
-                        <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
-                          <h4 className="text-sm font-medium text-warning-foreground mb-2">
-                            Faturas que serão afetadas:
-                          </h4>
-                          <div className="space-y-1 max-h-32 overflow-y-auto">
-                            {affectedInvoices.map((invoice, index) => (
-                              <div key={index} className="text-xs text-warning-foreground flex justify-between">
-                                <span>Parcela {invoice.installment}:</span>
-                                <span className="font-medium">{invoice.formatted}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                </div>
-              )}
-
-              {/* Campos de recorrente */}
-              {launchType === 'recorrente' && (
-                <div className="grid grid-cols-1 gap-4">
                   <FormField
                     control={form.control}
-                    name="recurrenceFrequency"
+                    name="categoryId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Frequência</FormLabel>
+                        <FormLabel>Categoria</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -848,9 +627,13 @@ export default function TransactionModal({
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="mensal">Mensal</SelectItem>
-                            <SelectItem value="semanal">Semanal</SelectItem>
-                            <SelectItem value="anual">Anual</SelectItem>
+                            {categories
+                              .filter((category) => category.type === form.watch('type'))
+                              .map((category) => (
+                                <SelectItem key={category.id} value={category.id.toString()}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -858,86 +641,60 @@ export default function TransactionModal({
                     )}
                   />
                 </div>
-              )}
 
-              {/* Campos empresariais */}
-              {currentAccount?.type === 'business' && (
-                <div className="space-y-4 border-t border-border pt-4">
-                  <div className="text-sm font-medium text-foreground mb-2">
-                    Informações Empresariais
-                  </div>
-                  <FormField
-                    control={form.control}
-                    name="clientName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Cliente/Projeto</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Nome do cliente ou projeto..." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="costCenter"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Centro de Custo</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o centro de custo" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {COST_CENTERS.map((center) => (
-                              <SelectItem key={center} value={center}>
-                                {center}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
-
-              {/* Comprovante */}
-              {transaction && transaction.id && (
-                <ReceiptSection
-                  transactionId={transaction.id}
-                  initialReceiptPath={transaction.receiptPath || null}
-                  accountId={currentAccount?.id || 0}
+                <DestinationSelector
+                  control={form.control}
+                  destinationType={destinationType}
+                  onDestinationTypeChange={setDestinationType}
+                  bankAccounts={bankAccounts}
+                  creditCards={creditCards}
+                  currentAccountId={currentAccount?.id}
                 />
-              )}
 
-              {/* Ações */}
-              <div className="flex justify-end gap-2 pt-2">
-                {transaction && transaction.id && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? 'Excluindo...' : 'Excluir'}
-                  </Button>
+                <LaunchTypeSection
+                  control={form.control}
+                  launchType={launchType}
+                  onLaunchTypeChange={setLaunchType}
+                  destinationType={destinationType}
+                  creditCards={creditCards}
+                />
+
+                {currentAccount?.type === 'business' && (
+                  <BusinessFields control={form.control} />
                 )}
-                <Button
-                  type="submit"
-                  disabled={isSaving || (transaction && !hasChanges)}
-                >
-                  {isSaving
-                    ? transaction ? 'Salvando...' : 'Criando...'
-                    : transaction ? 'Salvar' : 'Criar'}
-                </Button>
-              </div>
-            </form>
-          </Form>
+
+                {transaction && transaction.id && (
+                  <ReceiptSection
+                    transactionId={transaction.id}
+                    initialReceiptPath={transaction.receiptPath || null}
+                    accountId={currentAccount?.id || 0}
+                  />
+                )}
+
+                {/* Ações */}
+                <div className="flex justify-end gap-2 pt-2">
+                  {transaction && transaction.id && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? 'Excluindo...' : 'Excluir'}
+                    </Button>
+                  )}
+                  <Button
+                    type="submit"
+                    disabled={isSaving || !!(transaction && !hasChanges)}
+                  >
+                    {isSaving
+                      ? transaction ? 'Salvando...' : 'Criando...'
+                      : transaction ? 'Salvar' : 'Criar'}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </FormProvider>
         </DialogContent>
       </Dialog>
 

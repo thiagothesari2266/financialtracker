@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { storage } from '../storage';
 import { validateAccountOwnership } from '../middleware/account-ownership';
 import { insertInvoicePaymentSchema } from '@shared/schema';
+import logger from '../lib/logger';
 
 export function registerInvoiceManagementRoutes(app: Express) {
   // Listar faturas de cartão de crédito
@@ -13,7 +14,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
       const invoices = await storage.getCreditCardInvoices(accountId);
       res.json(invoices);
     } catch (error) {
-      console.error('[GET /credit-card-invoices] Erro:', error);
+      logger.error({ err: error }, 'GET /credit-card-invoices');
       res.status(500).json({ error: 'Erro ao buscar faturas' });
     }
   });
@@ -25,7 +26,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
       const invoicePayments = await storage.getInvoicePayments(accountId);
       res.json(invoicePayments);
     } catch (error) {
-      console.error('[GET /api/accounts/:accountId/invoice-payments]', error);
+      logger.error({ err: error }, 'GET /api/accounts/:accountId/invoice-payments');
       res.status(500).json({ message: 'Failed to fetch invoice payments' });
     }
   });
@@ -36,7 +37,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
       const pendingInvoices = await storage.getPendingInvoicePayments(accountId);
       res.json(pendingInvoices);
     } catch (error) {
-      console.error('[GET /api/accounts/:accountId/invoice-payments/pending]', error);
+      logger.error({ err: error }, 'GET /api/accounts/:accountId/invoice-payments/pending');
       res.status(500).json({ message: 'Failed to fetch pending invoice payments' });
     }
   });
@@ -56,7 +57,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
           .status(400)
           .json({ message: 'Invalid invoice payment data', errors: error.errors });
       }
-      console.error('[POST /api/accounts/:accountId/invoice-payments]', error);
+      logger.error({ err: error }, 'POST /api/accounts/:accountId/invoice-payments');
       res.status(500).json({ message: 'Failed to create invoice payment' });
     }
   });
@@ -67,7 +68,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
       const processedInvoices = await storage.processOverdueInvoices(accountId);
       res.json(processedInvoices);
     } catch (error) {
-      console.error('[POST /api/accounts/:accountId/invoice-payments/process-overdue]', error);
+      logger.error({ err: error }, 'POST /api/accounts/:accountId/invoice-payments/process-overdue');
       res.status(500).json({ message: 'Failed to process overdue invoices' });
     }
   });
@@ -87,7 +88,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
           .status(400)
           .json({ message: 'Invalid invoice payment data', errors: error.errors });
       }
-      console.error('[PUT /api/invoice-payments/:id]', error);
+      logger.error({ err: error }, 'PUT /api/invoice-payments/:id');
       res.status(500).json({ message: 'Failed to update invoice payment' });
     }
   });
@@ -107,7 +108,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
       }
       res.json(invoicePayment);
     } catch (error) {
-      console.error('[PUT /api/invoice-payments/:id/mark-paid]', error);
+      logger.error({ err: error }, 'PUT /api/invoice-payments/:id/mark-paid');
       res.status(500).json({ message: 'Failed to mark invoice as paid' });
     }
   });
@@ -118,7 +119,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
       await storage.deleteInvoicePayment(id);
       res.status(204).send();
     } catch (error) {
-      console.error('[DELETE /api/invoice-payments/:id]', error);
+      logger.error({ err: error }, 'DELETE /api/invoice-payments/:id');
       res.status(500).json({ message: 'Failed to delete invoice payment' });
     }
   });
@@ -130,7 +131,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
       const legacyTransactions = await storage.getLegacyInvoiceTransactions(accountId);
       res.json(legacyTransactions);
     } catch (error) {
-      console.error('[GET /api/accounts/:id/legacy-invoice-transactions]', error);
+      logger.error({ err: error }, 'GET /api/accounts/:id/legacy-invoice-transactions');
       res.status(500).json({ message: 'Failed to fetch legacy invoice transactions' });
     }
   });
@@ -144,7 +145,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
         deletedCount: result.deletedCount,
       });
     } catch (error) {
-      console.error('[DELETE /api/accounts/:id/legacy-invoice-transactions]', error);
+      logger.error({ err: error }, 'DELETE /api/accounts/:id/legacy-invoice-transactions');
       res.status(500).json({ message: 'Failed to delete legacy invoice transactions' });
     }
   });

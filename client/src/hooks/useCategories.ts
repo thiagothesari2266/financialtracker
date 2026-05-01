@@ -1,6 +1,18 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { createEntityCrud } from './useEntityCrud';
 import { apiRequest } from '@/lib/queryClient';
 import type { Category, InsertCategory } from '@shared/schema';
+
+const crud = createEntityCrud<Category, InsertCategory>({
+  listKey: (accountId) => ['/api/categories', accountId],
+  singleKey: (id) => ['/api/categories', id],
+  listPath: (accountId) => `/api/accounts/${accountId}/categories`,
+  singlePath: (id) => `/api/categories/${id}`,
+});
+
+export const useCreateCategory = crud.useCreate;
+export const useUpdateCategory = crud.useUpdate;
+export const useDeleteCategory = crud.useDelete;
 
 export function useCategories(accountId: number) {
   return useQuery({
@@ -22,51 +34,5 @@ export function useCategory(id: number) {
       return (await response.json()) as Category;
     },
     enabled: !!id,
-  });
-}
-
-export function useCreateCategory(accountId: number) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: InsertCategory) => {
-      const response = await fetch(`/api/accounts/${accountId}/categories`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to create category');
-      return (await response.json()) as Category;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/categories', accountId] });
-    },
-  });
-}
-
-export function useUpdateCategory() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertCategory> }) => {
-      const response = await apiRequest('PATCH', `/api/categories/${id}`, data);
-      return (await response.json()) as Category;
-    },
-    onSuccess: (category: Category) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/categories', category.accountId] });
-    },
-  });
-}
-
-export function useDeleteCategory(accountId: number) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest('DELETE', `/api/categories/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/categories', accountId] });
-    },
   });
 }

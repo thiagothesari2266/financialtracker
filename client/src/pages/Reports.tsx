@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
+import type { Transaction } from '@shared/schema';
 import { useToast } from '@/hooks/use-toast';
 import {
   BarChart,
@@ -33,18 +34,31 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { SummaryCard } from '@/components/ui/summary-card';
 import { formatCurrency } from '@/lib/utils';
 
+interface AccountStats {
+  monthlyIncome: string;
+  monthlyExpenses: string;
+  totalBalance: string;
+  transactionCount: number;
+}
+
+interface CategoryStat {
+  categoryName: string;
+  total: string;
+  color: string;
+}
+
 export default function Reports() {
   const { currentAccount } = useAccount();
   const [selectedPeriod, setSelectedPeriod] = useState('2025-01');
   const { toast } = useToast();
 
   // Fetch real data for reports
-  const { data: accountStats } = useQuery({
+  const { data: accountStats } = useQuery<AccountStats>({
     queryKey: ['/api/accounts', currentAccount?.id, 'stats', { month: selectedPeriod }],
     enabled: !!currentAccount,
   });
 
-  const { data: categoryStats = [] } = useQuery({
+  const { data: categoryStats = [] } = useQuery<CategoryStat[]>({
     queryKey: [
       '/api/accounts',
       currentAccount?.id,
@@ -55,7 +69,7 @@ export default function Reports() {
     enabled: !!currentAccount,
   });
 
-  const { data: transactions = [] } = useQuery({
+  const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ['/api/accounts', currentAccount?.id, 'transactions'],
     enabled: !!currentAccount,
   });
@@ -66,8 +80,8 @@ export default function Reports() {
 
   // Prepare chart data
   const expensesByCategory = categoryStats
-    .filter((stat: any) => parseFloat(stat.total) > 0)
-    .map((stat: any) => ({
+    .filter((stat) => parseFloat(stat.total) > 0)
+    .map((stat) => ({
       name: stat.categoryName,
       value: parseFloat(stat.total),
       fill: stat.color,
@@ -83,16 +97,16 @@ export default function Reports() {
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
       const monthTransactions = transactions.filter(
-        (t: any) => typeof t.date === 'string' && t.date.startsWith(monthKey)
+        (t) => typeof t.date === 'string' && t.date.startsWith(monthKey)
       );
 
       const income = monthTransactions
-        .filter((t: any) => t.type === 'income')
-        .reduce((sum: number, t: any) => sum + parseFloat(t.amount), 0);
+        .filter((t) => t.type === 'income')
+        .reduce((sum: number, t) => sum + parseFloat(t.amount), 0);
 
       const expenses = monthTransactions
-        .filter((t: any) => t.type === 'expense')
-        .reduce((sum: number, t: any) => sum + parseFloat(t.amount), 0);
+        .filter((t) => t.type === 'expense')
+        .reduce((sum: number, t) => sum + parseFloat(t.amount), 0);
 
       months.push({
         month: date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
@@ -108,20 +122,20 @@ export default function Reports() {
   const monthlySummary = generateMonthlySummary();
 
   const handleExportReport = (type: string) => {
-    let data: any[] = [];
+    let data: Record<string, unknown>[] = [];
     let filename = '';
 
     switch (type) {
       case 'transactions':
-        data = transactions;
+        data = transactions as unknown as Record<string, unknown>[];
         filename = `transacoes_${selectedPeriod}.csv`;
         break;
       case 'categories':
-        data = categoryStats;
+        data = categoryStats as unknown as Record<string, unknown>[];
         filename = `categorias_${selectedPeriod}.csv`;
         break;
       case 'summary':
-        data = monthlySummary;
+        data = monthlySummary as unknown as Record<string, unknown>[];
         filename = `resumo_mensal.csv`;
         break;
       default:

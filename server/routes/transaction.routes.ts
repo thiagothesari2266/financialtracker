@@ -8,6 +8,7 @@ import { storage } from '../storage';
 import { prisma } from '../db';
 import { validateAccountOwnership } from '../middleware/account-ownership';
 import { insertTransactionSchema } from '@shared/schema';
+import logger from '../lib/logger';
 
 export function registerTransactionRoutes(app: Express) {
   // Receipt upload config
@@ -124,7 +125,7 @@ export function registerTransactionRoutes(app: Express) {
       const transaction = await storage.createTransaction(validatedData);
       res.status(201).json(transaction);
     } catch (error) {
-      console.error('[POST /api/accounts/:accountId/transactions] Erro:', error);
+      logger.error({ err: error }, 'POST /api/accounts/:accountId/transactions');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
@@ -152,7 +153,7 @@ export function registerTransactionRoutes(app: Express) {
       });
       res.json({ receiptPath });
     } catch (error) {
-      console.error('[POST /api/transactions/:id/receipt]', error);
+      logger.error({ err: error }, 'POST /api/transactions/:id/receipt');
       res.status(500).json({ message: 'Erro ao salvar comprovante' });
     }
   });
@@ -176,7 +177,7 @@ export function registerTransactionRoutes(app: Express) {
       });
       res.json({ success: true });
     } catch (error) {
-      console.error('[DELETE /api/transactions/:id/receipt]', error);
+      logger.error({ err: error }, 'DELETE /api/transactions/:id/receipt');
       res.status(500).json({ message: 'Erro ao remover comprovante' });
     }
   });
@@ -186,13 +187,7 @@ export function registerTransactionRoutes(app: Express) {
       const id = parseInt(req.params.id);
       // Permite campos extras para edição em lote
       const { editScope, installmentsGroupId, recurrenceGroupId, ...raw } = req.body;
-      console.log('[PATCH /api/transactions/:id] incoming', {
-        id,
-        editScope,
-        installmentsGroupId,
-        recurrenceGroupId,
-        rawKeys: Object.keys(raw),
-      });
+      logger.debug({ id, editScope, installmentsGroupId, recurrenceGroupId, rawKeys: Object.keys(raw) }, 'PATCH /api/transactions/:id incoming');
       // Remove identificadores de grupo nulos/vazios para evitar falha de validação
       if (recurrenceGroupId === null || recurrenceGroupId === '') {
         delete (raw as any).recurrenceGroupId;
@@ -225,7 +220,7 @@ export function registerTransactionRoutes(app: Express) {
       }
       res.json(transaction);
     } catch (error) {
-      console.error('[PATCH /api/transactions/:id] Erro:', error);
+      logger.error({ err: error }, 'PATCH /api/transactions/:id');
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Invalid data', errors: error.errors });
       }
@@ -262,9 +257,7 @@ export function registerTransactionRoutes(app: Express) {
 
       const result = await storage.deleteAllTransactions(accountId);
 
-      console.log(
-        `[DELETE /api/accounts/${accountId}/transactions/all] Deleted ${result.deletedTransactions} transactions and ${result.deletedCreditCardTransactions} credit card transactions`
-      );
+      logger.info({ accountId, deletedTransactions: result.deletedTransactions, deletedCreditCardTransactions: result.deletedCreditCardTransactions }, 'DELETE all transactions');
 
       res.json({
         message: 'All transactions deleted successfully',
@@ -273,7 +266,7 @@ export function registerTransactionRoutes(app: Express) {
         totalDeleted: result.deletedTransactions + result.deletedCreditCardTransactions,
       });
     } catch (error) {
-      console.error('[DELETE /api/accounts/:accountId/transactions/all]', error);
+      logger.error({ err: error }, 'DELETE /api/accounts/:accountId/transactions/all');
       res.status(500).json({ message: 'Failed to delete all transactions' });
     }
   });

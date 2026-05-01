@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import logger from '../lib/logger';
 
 // Configuração do cliente OpenAI
 const openai = new OpenAI({
@@ -120,12 +121,11 @@ Retorne APENAS o JSON, sem explicações adicionais:`;
         confidence: result.confidence || 0.8,
       };
     } catch (parseError) {
-      console.error('Erro ao fazer parse da resposta JSON:', parseError);
-      console.error('Conteúdo recebido:', content);
+      logger.error({ err: parseError }, 'Erro ao fazer parse da resposta JSON da OpenAI');
       throw new Error('Resposta da IA não está em formato JSON válido');
     }
   } catch (error) {
-    console.error('Erro na API OpenAI:', error);
+    logger.error({ err: error }, 'Erro na API OpenAI');
     throw new Error(
       `Erro ao processar fatura com IA: ${error instanceof Error ? error.message : 'Erro desconhecido'}`
     );
@@ -225,8 +225,7 @@ Analise a imagem e retorne APENAS o JSON:`;
       let jsonContent = content.trim();
       let result;
 
-      console.log('[OpenAI Vision] Conteúdo recebido da API:', content.substring(0, 300) + '...');
-      console.log('[OpenAI Vision] Verificando se é recusa da OpenAI...');
+      logger.debug({ preview: content.substring(0, 300) }, 'OpenAI Vision: conteúdo recebido');
 
       // Check if OpenAI refused to process the image
       const contentLower = content.toLowerCase();
@@ -235,20 +234,18 @@ Analise a imagem e retorne APENAS o JSON:`;
         contentLower.includes("i can't assist") ||
         contentLower.includes('cannot assist')
       ) {
-        console.log('[OpenAI Vision] Detectada recusa da OpenAI');
+        logger.warn('OpenAI Vision: recusa detectada');
         throw new Error(
           'OpenAI não conseguiu processar a imagem. Verifique se é uma fatura válida de cartão de crédito.'
         );
       }
 
-      console.log('[OpenAI Vision] Não é recusa, tentando fazer parsing...');
-
       // Strategy 1: Try parsing the content directly
       try {
         result = JSON.parse(jsonContent);
-        console.log('[OpenAI Vision] Strategy 1 (direct) funcionou');
+        logger.debug('OpenAI Vision: strategy 1 (direct) funcionou');
       } catch (e) {
-        console.log('[OpenAI Vision] Strategy 1 (direct) falhou, tentando strategy 2');
+        logger.debug('OpenAI Vision: strategy 1 falhou, tentando strategy 2');
 
         // Strategy 2: Look for JSON content between curly braces
         const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -256,16 +253,16 @@ Analise a imagem e retorne APENAS o JSON:`;
           jsonContent = jsonMatch[0];
           try {
             result = JSON.parse(jsonContent);
-            console.log('[OpenAI Vision] Strategy 2 (regex) funcionou');
+            logger.debug('OpenAI Vision: strategy 2 (regex) funcionou');
           } catch (e2) {
-            console.log('[OpenAI Vision] Strategy 2 (regex) falhou, tentando strategy 3');
+            logger.debug('OpenAI Vision: strategy 2 falhou, tentando strategy 3');
 
             // Strategy 3: Try to find JSON between ```json blocks
             const codeBlockMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
             if (codeBlockMatch) {
               jsonContent = codeBlockMatch[1];
               result = JSON.parse(jsonContent);
-              console.log('[OpenAI Vision] Strategy 3 (code block) funcionou');
+              logger.debug('OpenAI Vision: strategy 3 (code block) funcionou');
             } else {
               throw e2;
             }
@@ -275,10 +272,7 @@ Analise a imagem e retorne APENAS o JSON:`;
         }
       }
 
-      console.log(
-        '[OpenAI Vision] JSON extraído com sucesso:',
-        JSON.stringify(result, null, 2).substring(0, 200) + '...'
-      );
+      logger.debug('OpenAI Vision: JSON extraído com sucesso');
 
       if (!result.transactions || !Array.isArray(result.transactions)) {
         throw new Error('Formato de resposta inválido: transactions não encontrado');
@@ -288,7 +282,7 @@ Analise a imagem e retorne APENAS o JSON:`;
         (t: any) => t.date && t.description && typeof t.amount === 'number' && t.amount > 0
       );
 
-      console.log(`[OpenAI Vision] ${result.transactions.length} transações extraídas com sucesso`);
+      logger.debug({ count: result.transactions.length }, 'OpenAI Vision: transações extraídas');
 
       return {
         transactions: result.transactions,
@@ -299,8 +293,7 @@ Analise a imagem e retorne APENAS o JSON:`;
         confidence: result.confidence || 0.8,
       };
     } catch (parseError) {
-      console.error('Erro ao fazer parse da resposta JSON Vision:', parseError);
-      console.error('Conteúdo completo recebido:', content);
+      logger.error({ err: parseError }, 'Erro ao fazer parse da resposta JSON Vision');
 
       // Try to provide more helpful error information
       const hasOpenBrace = content.includes('{');
@@ -313,7 +306,7 @@ Analise a imagem e retorne APENAS o JSON:`;
       throw new Error('Resposta da IA Vision não está em formato JSON válido');
     }
   } catch (error) {
-    console.error('Erro na API OpenAI Vision:', error);
+    logger.error({ err: error }, 'Erro na API OpenAI Vision');
     throw new Error(
       `Erro ao processar imagem com IA: ${error instanceof Error ? error.message : 'Erro desconhecido'}`
     );
@@ -448,12 +441,11 @@ Analise todas as imagens e retorne APENAS o JSON, sem explicações adicionais:`
         confidence: result.confidence || 0.8,
       };
     } catch (parseError) {
-      console.error('Erro ao fazer parse da resposta JSON múltiplas imagens:', parseError);
-      console.error('Conteúdo recebido:', responseContent);
+      logger.error({ err: parseError }, 'Erro ao fazer parse da resposta JSON múltiplas imagens');
       throw new Error('Resposta da IA para múltiplas imagens não está em formato JSON válido');
     }
   } catch (error) {
-    console.error('Erro na API OpenAI Vision múltiplas imagens:', error);
+    logger.error({ err: error }, 'Erro na API OpenAI Vision múltiplas imagens');
     throw new Error(
       `Erro ao processar múltiplas imagens com IA: ${error instanceof Error ? error.message : 'Erro desconhecido'}`
     );

@@ -3,6 +3,7 @@ import { storage } from '../storage';
 import { validateAccountOwnership } from '../middleware/account-ownership';
 import { AIFinancialAdvisor } from '../services/ai-financial-advisor';
 import { aiChatRateLimit, createRateLimitMiddleware } from '../middleware/rate-limit';
+import logger from '../lib/logger';
 
 export function registerAiAdvisorRoutes(app: Express) {
   app.get('/api/accounts/:id/financial-summary', validateAccountOwnership, async (req, res) => {
@@ -12,7 +13,7 @@ export function registerAiAdvisorRoutes(app: Express) {
       const context = await AIFinancialAdvisor.getFinancialContext(id, userId);
       res.json(context);
     } catch (error) {
-      console.error('[GET /api/accounts/:id/financial-summary]', error);
+      logger.error({ err: error }, 'GET /api/accounts/:id/financial-summary');
       res.status(500).json({ message: 'Failed to fetch financial summary' });
     }
   });
@@ -47,9 +48,7 @@ export function registerAiAdvisorRoutes(app: Express) {
           return res.status(404).json({ message: 'Account not found' });
         }
 
-        console.log(
-          `[AI Chat] Account ${id}: "${sanitizedMessage.substring(0, 50)}${sanitizedMessage.length > 50 ? '...' : ''}"`
-        );
+        logger.debug({ accountId: id, messagePreview: sanitizedMessage.substring(0, 50) }, 'AI Chat: request');
 
         const userId = req.session.userId!;
         const response = await AIFinancialAdvisor.analyzeFinances(
@@ -60,7 +59,7 @@ export function registerAiAdvisorRoutes(app: Express) {
         );
         res.json({ response });
       } catch (error) {
-        console.error('[POST /api/accounts/:id/ai-chat]', error);
+        logger.error({ err: error }, 'POST /api/accounts/:id/ai-chat');
         res.status(500).json({ message: 'Failed to process AI request' });
       }
     }
