@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import express from 'express';
 import { z } from 'zod';
-import { storage } from '../storage';
+import * as TransactionRepo from '../storage/transaction.repository';
 import { prisma } from '../db';
 import { validateAccountOwnership } from '../middleware/account-ownership';
 import { insertTransactionSchema } from '@shared/schema';
@@ -46,9 +46,9 @@ export function registerTransactionRoutes(app: Express) {
       const endDate = req.query.endDate as string;
       let transactions;
       if (startDate && endDate) {
-        transactions = await storage.getTransactionsByDateRange(accountId, startDate, endDate);
+        transactions = await TransactionRepo.getTransactionsByDateRange(accountId, startDate, endDate);
       } else {
-        transactions = await storage.getTransactions(accountId, limit);
+        transactions = await TransactionRepo.getTransactions(accountId, limit);
       }
 
       res.json(transactions);
@@ -60,7 +60,7 @@ export function registerTransactionRoutes(app: Express) {
   app.get('/api/transactions/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const transaction = await storage.getTransaction(id);
+      const transaction = await TransactionRepo.getTransaction(id);
       if (!transaction) {
         return res.status(404).json({ message: 'Transaction not found' });
       }
@@ -122,7 +122,7 @@ export function registerTransactionRoutes(app: Express) {
         ...raw,
         accountId,
       });
-      const transaction = await storage.createTransaction(validatedData);
+      const transaction = await TransactionRepo.createTransaction(validatedData);
       res.status(201).json(transaction);
     } catch (error) {
       logger.error({ err: error }, 'POST /api/accounts/:accountId/transactions');
@@ -211,9 +211,9 @@ export function registerTransactionRoutes(app: Express) {
         const scopedPayload: any = { ...validatedData, editScope };
         if (installmentsGroupId) scopedPayload.installmentsGroupId = installmentsGroupId;
         if (recurrenceGroupId) scopedPayload.recurrenceGroupId = recurrenceGroupId;
-        transaction = await storage.updateTransactionWithScope(id, scopedPayload);
+        transaction = await TransactionRepo.updateTransactionWithScope(id, scopedPayload);
       } else {
-        transaction = await storage.updateTransaction(id, validatedData);
+        transaction = await TransactionRepo.updateTransaction(id, validatedData);
       }
       if (!transaction) {
         return res.status(404).json({ message: 'Transação não encontrada' });
@@ -240,9 +240,9 @@ export function registerTransactionRoutes(app: Express) {
       // Suporte a exclusão em lote via body
       const { editScope, installmentsGroupId } = req.body || {};
       if (editScope && installmentsGroupId) {
-        await storage.deleteTransaction(id, { editScope, installmentsGroupId });
+        await TransactionRepo.deleteTransaction(id, { editScope, installmentsGroupId });
       } else {
-        await storage.deleteTransaction(id);
+        await TransactionRepo.deleteTransaction(id);
       }
       res.status(204).send();
     } catch (error) {
@@ -255,7 +255,7 @@ export function registerTransactionRoutes(app: Express) {
     try {
       const accountId = parseInt(req.params.accountId);
 
-      const result = await storage.deleteAllTransactions(accountId);
+      const result = await TransactionRepo.deleteAllTransactions(accountId);
 
       logger.info({ accountId, deletedTransactions: result.deletedTransactions, deletedCreditCardTransactions: result.deletedCreditCardTransactions }, 'DELETE all transactions');
 

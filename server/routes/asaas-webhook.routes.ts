@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
-import { storage } from '../storage';
+import * as BankAccountRepo from '../storage/bank-account.repository';
+import * as AsaasImportRepo from '../storage/asaas-import.repository';
+import * as TransactionRepo from '../storage/transaction.repository';
 import { getMatchCandidates, findBestMatch } from '../services/asaas-reconciliation';
 import type { AsaasImportDirection, AsaasImportEntityType } from '@shared/schema';
 import logger from '../lib/logger';
@@ -47,7 +49,7 @@ export async function handleAsaasWebhook(req: Request, res: Response): Promise<v
     return;
   }
 
-  const bankAccount = await storage.getBankAccountByWebhookToken(token);
+  const bankAccount = await BankAccountRepo.getBankAccountByWebhookToken(token);
   if (!bankAccount) {
     res.status(200).json({ received: true, processed: false, reason: 'unknown_token' });
     return;
@@ -80,7 +82,7 @@ export async function handleAsaasWebhook(req: Request, res: Response): Promise<v
 
   try {
     // Idempotencia: busca por (account, entityType, entityId)
-    const existing = await storage.findAsaasImportByEntityRef(
+    const existing = await AsaasImportRepo.findAsaasImportByEntityRef(
       bankAccount.accountId,
       meta.entityType,
       entityId,
@@ -90,7 +92,7 @@ export async function handleAsaasWebhook(req: Request, res: Response): Promise<v
       // Propaga paid=true para transacao resolvida
       if ((existing.status === 'matched' || existing.status === 'standalone') && meta.isPaid) {
         if (existing.matchedTransactionId) {
-          await storage.updateTransaction(existing.matchedTransactionId, { paid: true });
+          await TransactionRepo.updateTransaction(existing.matchedTransactionId, { paid: true });
           logger.info({ transactionId: existing.matchedTransactionId, importId: existing.id }, 'Asaas Webhook: propagando paid=true');
         }
       }
@@ -100,7 +102,7 @@ export async function handleAsaasWebhook(req: Request, res: Response): Promise<v
       if (meta.isPaid && paymentDate) {
         updateData.paymentDate = String(paymentDate).slice(0, 10);
       }
-      await storage.updateAsaasImport(existing.id, updateData);
+      await AsaasImportRepo.updateAsaasImport(existing.id, updateData);
 
       logger.info({ importId: existing.id, event, entityId }, 'Asaas Webhook: import atualizado');
       res.status(200).json({ received: true, processed: true, action: 'updated_existing_import', importId: existing.id });
@@ -127,7 +129,7 @@ export async function handleAsaasWebhook(req: Request, res: Response): Promise<v
     );
     const bestMatch = findBestMatch(payloadResumido, candidates);
 
-    const created = await storage.createAsaasImport({
+    const created = await AsaasImportRepo.createAsaasImport({
       accountId: bankAccount.accountId,
       bankAccountId: bankAccount.id ?? null,
       asaasPaymentId: paymentId,

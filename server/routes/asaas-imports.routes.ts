@@ -1,6 +1,7 @@
 import type { Express } from 'express';
 import { z } from 'zod';
-import { storage } from '../storage';
+import * as AccountRepo from '../storage/account.repository';
+import * as AsaasImportRepo from '../storage/asaas-import.repository';
 import { prisma } from '../db';
 import { syncBankAccount } from '../services/asaas-sync';
 import {
@@ -48,7 +49,7 @@ export function registerAsaasImportsRoutes(app: Express) {
       }
 
       // Verificar propriedade da conta
-      const account = await storage.getAccount(accountId);
+      const account = await AccountRepo.getAccount(accountId);
       if (!account) {
         return res.status(404).json({ message: 'Conta não encontrada' });
       }
@@ -56,7 +57,7 @@ export function registerAsaasImportsRoutes(app: Express) {
         return res.status(403).json({ message: 'Acesso negado' });
       }
 
-      const imports = await storage.getAsaasImports(accountId, status, direction);
+      const imports = await AsaasImportRepo.getAsaasImports(accountId, status, direction);
       res.json(imports);
     } catch (error) {
       logger.error({ err: error }, 'GET /api/asaas-imports');
@@ -82,13 +83,13 @@ export function registerAsaasImportsRoutes(app: Express) {
         return res.status(400).json({ message: 'Dados inválidos', errors: parsed.error.errors });
       }
 
-      const asaasImport = await storage.getAsaasImportById(importId);
+      const asaasImport = await AsaasImportRepo.getAsaasImportById(importId);
       if (!asaasImport) {
         return res.status(404).json({ message: 'Import não encontrado' });
       }
 
       // Verificar propriedade da conta
-      const account = await storage.getAccount(asaasImport.accountId);
+      const account = await AccountRepo.getAccount(asaasImport.accountId);
       if (!account || account.userId !== userId) {
         return res.status(403).json({ message: 'Acesso negado' });
       }
@@ -118,19 +119,19 @@ export function registerAsaasImportsRoutes(app: Express) {
         return res.status(400).json({ message: 'ID inválido' });
       }
 
-      const asaasImport = await storage.getAsaasImportById(importId);
+      const asaasImport = await AsaasImportRepo.getAsaasImportById(importId);
       if (!asaasImport) {
         return res.status(404).json({ message: 'Import não encontrado' });
       }
 
-      const account = await storage.getAccount(asaasImport.accountId);
+      const account = await AccountRepo.getAccount(asaasImport.accountId);
       if (!account || account.userId !== userId) {
         return res.status(403).json({ message: 'Acesso negado' });
       }
 
       await applyStandalone(importId);
 
-      const updated = await storage.getAsaasImportById(importId);
+      const updated = await AsaasImportRepo.getAsaasImportById(importId);
       res.json({ success: true, action: 'standalone', importId, transactionId: updated?.matchedTransactionId });
     } catch (error) {
       logger.error({ err: error }, 'POST /api/asaas-imports/:id/create-standalone');
@@ -151,12 +152,12 @@ export function registerAsaasImportsRoutes(app: Express) {
         return res.status(400).json({ message: 'ID inválido' });
       }
 
-      const asaasImport = await storage.getAsaasImportById(importId);
+      const asaasImport = await AsaasImportRepo.getAsaasImportById(importId);
       if (!asaasImport) {
         return res.status(404).json({ message: 'Import não encontrado' });
       }
 
-      const account = await storage.getAccount(asaasImport.accountId);
+      const account = await AccountRepo.getAccount(asaasImport.accountId);
       if (!account || account.userId !== userId) {
         return res.status(403).json({ message: 'Acesso negado' });
       }
@@ -188,7 +189,7 @@ export function registerAsaasImportsRoutes(app: Express) {
         return res.status(404).json({ message: 'Conta bancária não encontrada' });
       }
 
-      const account = await storage.getAccount(bankAccount.accountId);
+      const account = await AccountRepo.getAccount(bankAccount.accountId);
       if (!account || account.userId !== userId) {
         return res.status(403).json({ message: 'Acesso negado' });
       }

@@ -1,6 +1,10 @@
 import type { Express } from 'express';
 import { z } from 'zod';
-import { storage } from '../storage';
+import * as AccountRepo from '../storage/account.repository';
+import * as UserRepo from '../storage/user.repository';
+import * as AnalyticsRepo from '../storage/analytics.repository';
+import * as FixedCashflowRepo from '../storage/fixed-cashflow.repository';
+import * as DebtRepo from '../storage/debt.repository';
 import { currentMonthBR } from '../utils/date-br';
 import { normalizeAmount } from '../utils/normalize-amount';
 import { validateAccountOwnership } from '../middleware/account-ownership';
@@ -14,7 +18,7 @@ export function registerAccountRoutes(app: Express) {
       if (!userId) {
         return res.status(401).json({ message: 'Não autenticado' });
       }
-      const accounts = await storage.getAccounts(userId);
+      const accounts = await AccountRepo.getAccounts(userId);
       res.json(accounts);
     } catch (error) {
       logger.error({ err: error }, 'GET /api/accounts');
@@ -30,11 +34,11 @@ export function registerAccountRoutes(app: Express) {
       if (!userId) {
         return res.status(401).json({ message: 'Não autenticado' });
       }
-      const user = await storage.getUserById(userId);
+      const user = await UserRepo.getUserById(userId);
       if (!user) {
         return res.status(404).json({ message: 'Usuário não encontrado' });
       }
-      const counts = await storage.getUserAccountCounts(userId);
+      const counts = await AccountRepo.getUserAccountCounts(userId);
 
       res.json({
         limits: {
@@ -66,7 +70,7 @@ export function registerAccountRoutes(app: Express) {
     try {
       const id = parseInt(req.params.id);
       const month = (req.query.month as string) || currentMonthBR();
-      const stats = await storage.getAccountStats(id, month);
+      const stats = await AnalyticsRepo.getAccountStats(id, month);
       if (!stats) {
         return res.status(404).json({ message: 'Account not found' });
       }
@@ -83,7 +87,7 @@ export function registerAccountRoutes(app: Express) {
         return res.status(401).json({ message: 'Não autenticado' });
       }
       const validatedData = insertAccountSchema.parse(req.body);
-      const account = await storage.createAccount(validatedData, userId);
+      const account = await AccountRepo.createAccount(validatedData, userId);
       res.status(201).json(account);
     } catch (error) {
       logger.error({ err: error }, 'POST /api/accounts');
@@ -101,7 +105,7 @@ export function registerAccountRoutes(app: Express) {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertAccountSchema.partial().parse(req.body);
-      const account = await storage.updateAccount(id, validatedData);
+      const account = await AccountRepo.updateAccount(id, validatedData);
       if (!account) {
         return res.status(404).json({ message: 'Account not found' });
       }
@@ -117,7 +121,7 @@ export function registerAccountRoutes(app: Express) {
   app.delete('/api/accounts/:id', validateAccountOwnership, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      await storage.deleteAccount(id);
+      await AccountRepo.deleteAccount(id);
       res.status(204).send();
     } catch (error) {
       logger.error({ err: error }, 'DELETE /api/accounts/:id');
@@ -129,7 +133,7 @@ export function registerAccountRoutes(app: Express) {
   app.get('/api/accounts/:id/monthly-fixed', validateAccountOwnership, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const summary = await storage.getFixedCashflow(id);
+      const summary = await FixedCashflowRepo.getFixedCashflow(id);
       res.json(summary);
     } catch (error) {
       logger.error({ err: error }, 'GET /api/accounts/:id/monthly-fixed');
@@ -145,7 +149,7 @@ export function registerAccountRoutes(app: Express) {
         amount: normalizeAmount(req.body.amount),
         accountId,
       });
-      const created = await storage.createFixedCashflow(validated);
+      const created = await FixedCashflowRepo.createFixedCashflow(validated);
       res.status(201).json(created);
     } catch (error) {
       logger.error({ err: error }, 'POST /api/accounts/:id/monthly-fixed');
@@ -163,7 +167,7 @@ export function registerAccountRoutes(app: Express) {
         ...req.body,
         amount: req.body.amount !== undefined ? normalizeAmount(req.body.amount) : undefined,
       });
-      const updated = await storage.updateFixedCashflow(id, validated);
+      const updated = await FixedCashflowRepo.updateFixedCashflow(id, validated);
       if (!updated) return res.status(404).json({ message: 'Item not found' });
       res.json(updated);
     } catch (error) {
@@ -178,7 +182,7 @@ export function registerAccountRoutes(app: Express) {
   app.delete('/api/monthly-fixed/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      await storage.deleteFixedCashflow(id);
+      await FixedCashflowRepo.deleteFixedCashflow(id);
       res.status(204).send();
     } catch (error) {
       logger.error({ err: error }, 'DELETE /api/monthly-fixed/:id');
@@ -190,7 +194,7 @@ export function registerAccountRoutes(app: Express) {
   app.get('/api/accounts/:accountId/debts', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
-      const debts = await storage.getDebts(accountId);
+      const debts = await DebtRepo.getDebts(accountId);
       res.json(debts);
     } catch (error) {
       logger.error({ err: error }, 'GET /api/accounts/:accountId/debts');
@@ -201,7 +205,7 @@ export function registerAccountRoutes(app: Express) {
   app.get('/api/debts/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const debt = await storage.getDebt(id);
+      const debt = await DebtRepo.getDebt(id);
       if (!debt) return res.status(404).json({ message: 'Debt not found' });
       res.json(debt);
     } catch (error) {
@@ -220,7 +224,7 @@ export function registerAccountRoutes(app: Express) {
         accountId,
       });
 
-      const created = await storage.createDebt(validated);
+      const created = await DebtRepo.createDebt(validated);
       res.status(201).json(created);
     } catch (error) {
       logger.error({ err: error }, 'POST /api/accounts/:accountId/debts');
@@ -243,7 +247,7 @@ export function registerAccountRoutes(app: Express) {
             : undefined,
       });
 
-      const updated = await storage.updateDebt(id, validated);
+      const updated = await DebtRepo.updateDebt(id, validated);
       if (!updated) return res.status(404).json({ message: 'Debt not found' });
       res.json(updated);
     } catch (error) {
@@ -258,7 +262,7 @@ export function registerAccountRoutes(app: Express) {
   app.delete('/api/debts/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      await storage.deleteDebt(id);
+      await DebtRepo.deleteDebt(id);
       res.status(204).send();
     } catch (error) {
       logger.error({ err: error }, 'DELETE /api/debts/:id');

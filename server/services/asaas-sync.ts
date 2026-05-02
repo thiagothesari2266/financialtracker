@@ -1,4 +1,4 @@
-import { storage } from '../storage';
+import * as AsaasImportRepo from '../storage/asaas-import.repository';
 import { prisma } from '../db';
 import { AsaasClient, type AsaasFinancialTransaction } from './asaas-client';
 import { getMatchCandidates, findBestMatch } from './asaas-reconciliation';
@@ -77,7 +77,7 @@ export async function syncBankAccount(
         const absValue = Math.abs(item.value).toFixed(2);
         const txDate = item.date ? formatDateOnly(item.date) : formatDateOnly(now);
 
-        const existing = await storage.findAsaasImportByEntityRef(
+        const existing = await AsaasImportRepo.findAsaasImportByEntityRef(
           bankAccount.accountId,
           entityType,
           item.id,
@@ -133,7 +133,7 @@ export async function syncBankAccount(
           }
         }
 
-        await storage.createAsaasImport(payload);
+        await AsaasImportRepo.createAsaasImport(payload);
 
         if (existing) result.updated++;
         else {

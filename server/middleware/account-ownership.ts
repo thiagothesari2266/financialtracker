@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { storage } from '../storage';
+import * as AccountRepo from '../storage/account.repository';
 
 declare module 'express-session' {
   interface SessionData {
@@ -23,7 +23,7 @@ export const validateAccountOwnership = async (
     return next(); // Não é rota de conta específica
   }
 
-  const account = await storage.getAccount(accountId);
+  const account = await AccountRepo.getAccount(accountId);
   if (!account) {
     return res.status(404).json({ message: 'Account not found' });
   }

@@ -1,6 +1,6 @@
 import type { Express } from 'express';
 import { z } from 'zod';
-import { storage } from '../storage';
+import * as CreditCardRepo from '../storage/credit-card.repository';
 import { validateAccountOwnership } from '../middleware/account-ownership';
 import { insertInvoicePaymentSchema } from '@shared/schema';
 import logger from '../lib/logger';
@@ -11,7 +11,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
     const accountId = Number(req.params.accountId);
     if (!accountId) return res.status(400).json({ error: 'accountId obrigatório' });
     try {
-      const invoices = await storage.getCreditCardInvoices(accountId);
+      const invoices = await CreditCardRepo.getCreditCardInvoices(accountId);
       res.json(invoices);
     } catch (error) {
       logger.error({ err: error }, 'GET /credit-card-invoices');
@@ -23,7 +23,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
   app.get('/api/accounts/:accountId/invoice-payments', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
-      const invoicePayments = await storage.getInvoicePayments(accountId);
+      const invoicePayments = await CreditCardRepo.getInvoicePayments(accountId);
       res.json(invoicePayments);
     } catch (error) {
       logger.error({ err: error }, 'GET /api/accounts/:accountId/invoice-payments');
@@ -34,7 +34,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
   app.get('/api/accounts/:accountId/invoice-payments/pending', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
-      const pendingInvoices = await storage.getPendingInvoicePayments(accountId);
+      const pendingInvoices = await CreditCardRepo.getPendingInvoicePayments(accountId);
       res.json(pendingInvoices);
     } catch (error) {
       logger.error({ err: error }, 'GET /api/accounts/:accountId/invoice-payments/pending');
@@ -49,7 +49,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
         ...req.body,
         accountId,
       });
-      const invoicePayment = await storage.createInvoicePayment(invoicePaymentData);
+      const invoicePayment = await CreditCardRepo.createInvoicePayment(invoicePaymentData);
       res.status(201).json(invoicePayment);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -65,7 +65,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
   app.post('/api/accounts/:accountId/invoice-payments/process-overdue', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
-      const processedInvoices = await storage.processOverdueInvoices(accountId);
+      const processedInvoices = await CreditCardRepo.processOverdueInvoices(accountId);
       res.json(processedInvoices);
     } catch (error) {
       logger.error({ err: error }, 'POST /api/accounts/:accountId/invoice-payments/process-overdue');
@@ -77,7 +77,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
     try {
       const id = parseInt(req.params.id);
       const invoicePaymentData = insertInvoicePaymentSchema.partial().parse(req.body);
-      const invoicePayment = await storage.updateInvoicePayment(id, invoicePaymentData);
+      const invoicePayment = await CreditCardRepo.updateInvoicePayment(id, invoicePaymentData);
       if (!invoicePayment) {
         return res.status(404).json({ message: 'Invoice payment not found' });
       }
@@ -102,7 +102,7 @@ export function registerInvoiceManagementRoutes(app: Express) {
         return res.status(400).json({ message: 'Transaction ID is required' });
       }
 
-      const invoicePayment = await storage.markInvoiceAsPaid(id, transactionId);
+      const invoicePayment = await CreditCardRepo.markInvoiceAsPaid(id, transactionId);
       if (!invoicePayment) {
         return res.status(404).json({ message: 'Invoice payment not found' });
       }
@@ -116,37 +116,11 @@ export function registerInvoiceManagementRoutes(app: Express) {
   app.delete('/api/invoice-payments/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      await storage.deleteInvoicePayment(id);
+      await CreditCardRepo.deleteInvoicePayment(id);
       res.status(204).send();
     } catch (error) {
       logger.error({ err: error }, 'DELETE /api/invoice-payments/:id');
       res.status(500).json({ message: 'Failed to delete invoice payment' });
-    }
-  });
-
-  // Legacy invoice transaction endpoints
-  app.get('/api/accounts/:id/legacy-invoice-transactions', validateAccountOwnership, async (req, res) => {
-    try {
-      const accountId = parseInt(req.params.id);
-      const legacyTransactions = await storage.getLegacyInvoiceTransactions(accountId);
-      res.json(legacyTransactions);
-    } catch (error) {
-      logger.error({ err: error }, 'GET /api/accounts/:id/legacy-invoice-transactions');
-      res.status(500).json({ message: 'Failed to fetch legacy invoice transactions' });
-    }
-  });
-
-  app.delete('/api/accounts/:id/legacy-invoice-transactions', validateAccountOwnership, async (req, res) => {
-    try {
-      const accountId = parseInt(req.params.id);
-      const result = await storage.deleteLegacyInvoiceTransactions(accountId);
-      res.json({
-        message: 'Legacy invoice transactions deleted successfully',
-        deletedCount: result.deletedCount,
-      });
-    } catch (error) {
-      logger.error({ err: error }, 'DELETE /api/accounts/:id/legacy-invoice-transactions');
-      res.status(500).json({ message: 'Failed to delete legacy invoice transactions' });
     }
   });
 }

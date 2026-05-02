@@ -1,5 +1,5 @@
 import { prisma } from '../db';
-import { storage } from '../storage';
+import * as BankAccountRepo from '../storage/bank-account.repository';
 import type { BankAccount } from '@shared/schema';
 
 export type BankAccountWithBalance = BankAccount & { currentBalance: string };
@@ -11,7 +11,7 @@ export async function getBankAccountsWithBalance(
   accountId: number,
   userId: number
 ): Promise<BankAccountWithBalance[]> {
-  const bankAccounts = await storage.getBankAccounts(accountId, userId);
+  const bankAccounts = await BankAccountRepo.getBankAccounts(accountId, userId);
 
   const aggregates = await prisma.$queryRaw<
     Array<{ bank_account_id: number; type: string; total: string }>

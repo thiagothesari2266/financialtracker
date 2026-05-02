@@ -1,6 +1,7 @@
 import type { Express } from 'express';
 import { z } from 'zod';
-import { storage } from '../storage';
+import * as CategoryRepo from '../storage/category.repository';
+import * as AnalyticsRepo from '../storage/analytics.repository';
 import { currentMonthBR } from '../utils/date-br';
 import { validateAccountOwnership } from '../middleware/account-ownership';
 import { insertCategorySchema } from '@shared/schema';
@@ -10,7 +11,7 @@ export function registerCategoryRoutes(app: Express) {
   app.get('/api/accounts/:accountId/categories', validateAccountOwnership, async (req, res) => {
     try {
       const accountId = parseInt(req.params.accountId);
-      const categories = await storage.getCategories(accountId);
+      const categories = await CategoryRepo.getCategories(accountId);
       res.json(categories);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch categories' });
@@ -21,7 +22,7 @@ export function registerCategoryRoutes(app: Express) {
     try {
       const accountId = parseInt(req.params.accountId);
       const month = (req.query.month as string) || currentMonthBR();
-      const stats = await storage.getCategoryStats(accountId, month);
+      const stats = await AnalyticsRepo.getCategoryStats(accountId, month);
       res.json(stats);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch category stats' });
@@ -35,7 +36,7 @@ export function registerCategoryRoutes(app: Express) {
         ...req.body,
         accountId,
       });
-      const category = await storage.createCategory(validatedData);
+      const category = await CategoryRepo.createCategory(validatedData);
       res.status(201).json(category);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -53,7 +54,7 @@ export function registerCategoryRoutes(app: Express) {
       if (!validatedData || Object.keys(validatedData).length === 0) {
         return res.status(400).json({ message: 'Nenhum campo para atualizar' });
       }
-      const category = await storage.updateCategory(id, validatedData);
+      const category = await CategoryRepo.updateCategory(id, validatedData);
       if (!category) {
         logger.debug({ id }, 'PATCH /api/categories/:id: category not found');
         return res.status(404).json({ message: 'Category not found' });
@@ -72,7 +73,7 @@ export function registerCategoryRoutes(app: Express) {
     try {
       const id = parseInt(req.params.id);
       logger.debug({ id }, 'DELETE /api/categories/:id');
-      await storage.deleteCategory(id);
+      await CategoryRepo.deleteCategory(id);
       res.status(204).send();
     } catch (error) {
       logger.error({ err: error }, 'DELETE /api/categories/:id');

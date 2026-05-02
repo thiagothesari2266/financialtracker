@@ -1,5 +1,5 @@
 import type { Express } from 'express';
-import { storage } from '../storage';
+import * as AccountRepo from '../storage/account.repository';
 import { validateAccountOwnership } from '../middleware/account-ownership';
 import { AIFinancialAdvisor } from '../services/ai-financial-advisor';
 import { aiChatRateLimit, createRateLimitMiddleware } from '../middleware/rate-limit';
@@ -43,7 +43,7 @@ export function registerAiAdvisorRoutes(app: Express) {
         }
 
         // Verificar se a conta existe
-        const account = await storage.getAccount(id);
+        const account = await AccountRepo.getAccount(id);
         if (!account) {
           return res.status(404).json({ message: 'Account not found' });
         }

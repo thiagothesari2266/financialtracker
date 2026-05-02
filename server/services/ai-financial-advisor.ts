@@ -1,5 +1,9 @@
 import OpenAI from 'openai';
-import { storage } from '../storage';
+import * as AnalyticsRepo from '../storage/analytics.repository';
+import * as TransactionRepo from '../storage/transaction.repository';
+import * as CategoryRepo from '../storage/category.repository';
+import * as CreditCardRepo from '../storage/credit-card.repository';
+import * as BankAccountRepo from '../storage/bank-account.repository';
 import { todayBR, currentMonthBR } from '../utils/date-br';
 import logger from '../lib/logger';
 
@@ -86,14 +90,14 @@ export class AIFinancialAdvisor {
 
       // Buscar estatísticas da conta
       logger.debug({ accountId, currentMonth }, 'AIFinancialAdvisor: fetching account stats');
-      const stats = await storage.getAccountStats(accountId, currentMonth);
+      const stats = await AnalyticsRepo.getAccountStats(accountId, currentMonth);
       if (!stats) {
         logger.error({ accountId }, 'AIFinancialAdvisor: account not found');
         throw new Error('Account not found');
       }
 
       // Calcular saldo atual (até hoje)
-      const transactionsUpToToday = await storage.getTransactionsByDateRange(
+      const transactionsUpToToday = await TransactionRepo.getTransactionsByDateRange(
         accountId,
         '1900-01-01',
         today
@@ -116,16 +120,16 @@ export class AIFinancialAdvisor {
       );
 
       // Buscar categorias com estatísticas
-      const categoryStats = await storage.getCategoryStats(accountId, currentMonth);
+      const categoryStats = await AnalyticsRepo.getCategoryStats(accountId, currentMonth);
 
       // Buscar transações recentes
-      const transactions = await storage.getTransactions(accountId, 10);
+      const transactions = await TransactionRepo.getTransactions(accountId, 10);
 
       // Buscar cartões de crédito
-      const creditCards = await storage.getCreditCards(accountId);
+      const creditCards = await CreditCardRepo.getCreditCards(accountId, userId);
 
       // Buscar contas bancárias
-      const bankAccounts = await storage.getBankAccounts(accountId, userId);
+      const bankAccounts = await BankAccountRepo.getBankAccounts(accountId, userId);
 
       const context: FinancialContext = {
         account: {

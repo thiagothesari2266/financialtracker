@@ -1,7 +1,7 @@
 import type { Express } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { storage } from '../storage';
+import * as UserRepo from '../storage/user.repository';
 import { registerWithInviteSchema, loginSchema, createInviteSchema, updateUserSchema } from '@shared/schema';
 import { sendInviteEmail } from '../services/email.service';
 import logger from '../lib/logger';
@@ -19,7 +19,7 @@ export function registerAuthRoutes(app: Express) {
       });
 
       // Verificar convite
-      const invite = await storage.getInviteByToken(payload.inviteToken);
+      const invite = await UserRepo.getInviteByToken(payload.inviteToken);
       if (!invite) {
         return res.status(400).json({ message: 'Convite inválido' });
       }
@@ -36,14 +36,14 @@ export function registerAuthRoutes(app: Express) {
         return res.status(400).json({ message: 'Email não corresponde ao convite' });
       }
 
-      const existing = await storage.getUserByEmail(payload.email);
+      const existing = await UserRepo.getUserByEmail(payload.email);
       if (existing) {
         return res.status(409).json({ message: 'Usuário já cadastrado' });
       }
 
       // Criar usuário com limites do convite e marcar convite como aceito
-      const user = await storage.createUserFromInvite(payload.email, payload.password, invite);
-      await storage.acceptInvite(payload.inviteToken);
+      const user = await UserRepo.createUserFromInvite(payload.email, payload.password, invite);
+      await UserRepo.acceptInvite(payload.inviteToken);
 
       req.session.userId = user.id;
       res.status(201).json(user);
@@ -59,7 +59,7 @@ export function registerAuthRoutes(app: Express) {
   // Verificar convite (para preencher email no form)
   app.get('/api/auth/invite/:token', async (req, res) => {
     try {
-      const invite = await storage.getInviteByToken(req.params.token);
+      const invite = await UserRepo.getInviteByToken(req.params.token);
       if (!invite) {
         return res.status(404).json({ message: 'Convite não encontrado' });
       }
@@ -86,7 +86,7 @@ export function registerAuthRoutes(app: Express) {
         password: String(req.body.password ?? ''),
       });
 
-      const userWithPassword = await storage.getUserByEmail(payload.email);
+      const userWithPassword = await UserRepo.getUserByEmail(payload.email);
       if (!userWithPassword) {
         return res.status(401).json({ message: 'Credenciais inválidas' });
       }
@@ -129,7 +129,7 @@ export function registerAuthRoutes(app: Express) {
         return res.status(401).json({ message: 'Não autenticado' });
       }
 
-      const user = await storage.getUserById(req.session.userId);
+      const user = await UserRepo.getUserById(req.session.userId);
       if (!user) {
         req.session.destroy(() => undefined);
         return res.status(401).json({ message: 'Sessão inválida' });
@@ -150,7 +150,7 @@ export function registerAuthRoutes(app: Express) {
       return res.status(401).json({ message: 'Não autenticado' });
     }
 
-    const user = await storage.getUserById(req.session.userId);
+    const user = await UserRepo.getUserById(req.session.userId);
     if (!user || user.role !== 'admin') {
       return res.status(403).json({ message: 'Acesso negado' });
     }
@@ -168,18 +168,18 @@ export function registerAuthRoutes(app: Express) {
       });
 
       // Verificar se já existe usuário com esse email
-      const existingUser = await storage.getUserByEmail(payload.email);
+      const existingUser = await UserRepo.getUserByEmail(payload.email);
       if (existingUser) {
         return res.status(409).json({ message: 'Usuário já cadastrado com esse email' });
       }
 
       // Verificar se já existe convite pendente
-      const existingInvite = await storage.getInviteByEmail(payload.email);
+      const existingInvite = await UserRepo.getInviteByEmail(payload.email);
       if (existingInvite) {
         return res.status(409).json({ message: 'Já existe um convite pendente para esse email' });
       }
 
-      const invite = await storage.createInvite(
+      const invite = await UserRepo.createInvite(
         payload.email,
         req.session!.userId as number,
         payload.maxPersonalAccounts,
@@ -206,7 +206,7 @@ export function registerAuthRoutes(app: Express) {
   // Listar convites (apenas admin)
   app.get('/api/admin/invites', requireAdmin, async (_req, res) => {
     try {
-      const invites = await storage.getInvites();
+      const invites = await UserRepo.getInvites();
       res.json(invites);
     } catch (error) {
       logger.error({ err: error }, 'GET /api/admin/invites');
@@ -222,7 +222,7 @@ export function registerAuthRoutes(app: Express) {
         return res.status(400).json({ message: 'ID inválido' });
       }
 
-      await storage.deleteInvite(id);
+      await UserRepo.deleteInvite(id);
       res.status(204).send();
     } catch (error) {
       logger.error({ err: error }, 'DELETE /api/admin/invites/:id');
@@ -235,7 +235,7 @@ export function registerAuthRoutes(app: Express) {
   // Listar todos os usuários (apenas admin)
   app.get('/api/admin/users', requireAdmin, async (_req, res) => {
     try {
-      const users = await storage.getAllUsers();
+      const users = await UserRepo.getAllUsers();
       res.json(users);
     } catch (error) {
       logger.error({ err: error }, 'GET /api/admin/users');
@@ -255,9 +255,9 @@ export function registerAuthRoutes(app: Express) {
 
       // Verificar se está tentando rebaixar o último admin
       if (payload.role === 'user') {
-        const currentUser = await storage.getUserById(id);
+        const currentUser = await UserRepo.getUserById(id);
         if (currentUser?.role === 'admin') {
-          const adminCount = await storage.countAdminUsers();
+          const adminCount = await UserRepo.countAdminUsers();
           if (adminCount <= 1) {
             return res.status(400).json({
               message: 'Não é possível rebaixar o único administrador do sistema'
@@ -266,7 +266,7 @@ export function registerAuthRoutes(app: Express) {
         }
       }
 
-      const updated = await storage.updateUser(id, payload);
+      const updated = await UserRepo.updateUser(id, payload);
       if (!updated) {
         return res.status(404).json({ message: 'Usuário não encontrado' });
       }
@@ -295,9 +295,9 @@ export function registerAuthRoutes(app: Express) {
       }
 
       // Verificar se está tentando deletar o último admin
-      const userToDelete = await storage.getUserById(id);
+      const userToDelete = await UserRepo.getUserById(id);
       if (userToDelete?.role === 'admin') {
-        const adminCount = await storage.countAdminUsers();
+        const adminCount = await UserRepo.countAdminUsers();
         if (adminCount <= 1) {
           return res.status(400).json({
             message: 'Não é possível deletar o único administrador do sistema'
@@ -305,7 +305,7 @@ export function registerAuthRoutes(app: Express) {
         }
       }
 
-      await storage.deleteUser(id);
+      await UserRepo.deleteUser(id);
       res.status(204).send();
     } catch (error) {
       logger.error({ err: error }, 'DELETE /api/admin/users/:id');

@@ -1,6 +1,6 @@
 import type { Express } from 'express';
 import { z } from 'zod';
-import { storage } from '../storage';
+import * as CreditCardRepo from '../storage/credit-card.repository';
 import { validateAccountOwnership } from '../middleware/account-ownership';
 import { insertCreditCardSchema, insertCreditCardTransactionSchema } from '@shared/schema';
 import logger from '../lib/logger';
@@ -10,7 +10,7 @@ export function registerCreditCardRoutes(app: Express) {
     try {
       const accountId = parseInt(req.params.accountId);
       const userId = req.session.userId!;
-      const creditCards = await storage.getCreditCards(accountId, userId);
+      const creditCards = await CreditCardRepo.getCreditCards(accountId, userId);
       res.json(creditCards);
     } catch (error) {
       logger.error({ err: error }, 'GET /api/accounts/:accountId/credit-cards');
@@ -21,7 +21,7 @@ export function registerCreditCardRoutes(app: Express) {
   app.get('/api/credit-cards/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const card = await storage.getCreditCard(id);
+      const card = await CreditCardRepo.getCreditCard(id);
       if (!card) {
         return res.status(404).json({ message: 'Credit card not found' });
       }
@@ -52,7 +52,7 @@ export function registerCreditCardRoutes(app: Express) {
             ? validatedData.creditLimit
             : '0',
       };
-      const card = await storage.createCreditCard(normalizedData);
+      const card = await CreditCardRepo.createCreditCard(normalizedData);
       res.status(201).json(card);
     } catch (error) {
       logger.error({ err: error }, 'POST /api/accounts/:accountId/credit-cards');
@@ -92,7 +92,7 @@ export function registerCreditCardRoutes(app: Express) {
               : '0',
         }),
       };
-      const creditCard = await storage.updateCreditCard(id, normalizedData);
+      const creditCard = await CreditCardRepo.updateCreditCard(id, normalizedData);
       if (!creditCard) {
         return res.status(404).json({ message: 'Credit card not found' });
       }
@@ -108,7 +108,7 @@ export function registerCreditCardRoutes(app: Express) {
   app.delete('/api/credit-cards/:id', async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      await storage.deleteCreditCard(id);
+      await CreditCardRepo.deleteCreditCard(id);
       res.status(204).send();
     } catch (error) {
       logger.error({ err: error }, 'DELETE /api/credit-cards/:id');
@@ -129,7 +129,7 @@ export function registerCreditCardRoutes(app: Express) {
       const creditCardId = req.query.creditCardId
         ? parseInt(req.query.creditCardId as string)
         : undefined;
-      const transactions = await storage.getCreditCardTransactions(accountId, creditCardId);
+      const transactions = await CreditCardRepo.getCreditCardTransactions(accountId, creditCardId);
       res.json(transactions);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch credit card transactions' });
@@ -143,7 +143,7 @@ export function registerCreditCardRoutes(app: Express) {
         ...req.body,
         accountId,
       });
-      const transaction = await storage.createCreditCardTransaction(validatedData);
+      const transaction = await CreditCardRepo.createCreditCardTransaction(validatedData);
       res.status(201).json(transaction);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -158,7 +158,7 @@ export function registerCreditCardRoutes(app: Express) {
       const id = parseInt(req.params.id);
       const { editScope, exceptionForDate, ...body } = req.body ?? {};
       const validatedData = insertCreditCardTransactionSchema.partial().parse(body);
-      const transaction = await storage.updateCreditCardTransaction(id, {
+      const transaction = await CreditCardRepo.updateCreditCardTransaction(id, {
         ...validatedData,
         editScope,
         exceptionForDate,
@@ -186,7 +186,7 @@ export function registerCreditCardRoutes(app: Express) {
       const exceptionForDate = (req.query.exceptionForDate ?? req.body?.exceptionForDate) as
         | string
         | undefined;
-      await storage.deleteCreditCardTransaction(id, { editScope, exceptionForDate });
+      await CreditCardRepo.deleteCreditCardTransaction(id, { editScope, exceptionForDate });
       res.status(204).send();
     } catch (error) {
       logger.error({ err: error }, 'DELETE /api/credit-card-transactions/:id');
