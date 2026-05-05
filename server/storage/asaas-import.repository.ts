@@ -49,6 +49,7 @@ export async function createAsaasImport(data: InsertAsaasImport): Promise<AsaasI
       event: data.event,
       isPaid: data.isPaid ?? false,
       paymentDate: data.paymentDate ? parseDateOnly(data.paymentDate) : null,
+      ...(data.description !== undefined ? { description: data.description } : {}),
     },
   });
   return mapAsaasImport(record);

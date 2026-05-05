@@ -28,6 +28,21 @@ export interface ListFinancialTransactionsParams {
   limit?: number;
 }
 
+export interface AsaasPayment {
+  id: string;
+  customer: string | null;
+  billingType: string | null;
+  value: number;
+  description: string | null;
+}
+
+export interface AsaasCustomer {
+  id: string;
+  name: string | null;
+  email: string | null;
+  cpfCnpj: string | null;
+}
+
 const BASE_URLS: Record<AsaasEnv, string> = {
   production: 'https://api.asaas.com/v3',
   sandbox: 'https://api-sandbox.asaas.com/v3',
@@ -81,5 +96,13 @@ export class AsaasClient {
       offset: params.offset ?? 0,
       limit: params.limit ?? 100,
     });
+  }
+
+  async getPayment(id: string): Promise<AsaasPayment> {
+    return this.request<AsaasPayment>(`/payments/${id}`);
+  }
+
+  async getCustomer(id: string): Promise<AsaasCustomer> {
+    return this.request<AsaasCustomer>(`/customers/${id}`);
   }
 }

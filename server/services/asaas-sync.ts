@@ -2,11 +2,14 @@ import * as AsaasImportRepo from '../storage/asaas-import.repository';
 import { prisma } from '../db';
 import { AsaasClient, type AsaasFinancialTransaction } from './asaas-client';
 import { getMatchCandidates, findBestMatch } from './asaas-reconciliation';
+import logger from '../lib/logger';
 import type {
   AsaasImportDirection,
   AsaasImportEntityType,
   InsertAsaasImport,
 } from '@shared/schema';
+
+const PIX_GENERIC_DESCRIPTION = 'Cobrança gerada automaticamente a partir de Pix recebido.';
 
 export interface SyncResult {
   scanned: number;
@@ -45,6 +48,39 @@ function describe(tx: AsaasFinancialTransaction): string {
   return tx.type.replace(/_/g, ' ').toLowerCase();
 }
 
+async function resolveCustomerName(
+  client: AsaasClient,
+  paymentId: string,
+  paymentToCustomer: Map<string, string | null>,
+  customerNames: Map<string, string | null>,
+): Promise<string | null> {
+  let customerId = paymentToCustomer.get(paymentId);
+  if (customerId === undefined) {
+    try {
+      const payment = await client.getPayment(paymentId);
+      customerId = payment.customer ?? null;
+    } catch (err) {
+      logger.warn({ paymentId, err: err instanceof Error ? err.message : err }, 'Falha ao buscar payment no Asaas');
+      customerId = null;
+    }
+    paymentToCustomer.set(paymentId, customerId);
+  }
+  if (!customerId) return null;
+
+  let name = customerNames.get(customerId);
+  if (name === undefined) {
+    try {
+      const customer = await client.getCustomer(customerId);
+      name = customer.name?.trim() || null;
+    } catch (err) {
+      logger.warn({ customerId, err: err instanceof Error ? err.message : err }, 'Falha ao buscar customer no Asaas');
+      name = null;
+    }
+    customerNames.set(customerId, name);
+  }
+  return name;
+}
+
 export async function syncBankAccount(
   bankAccountId: number,
   sinceDays = 90,
@@ -62,6 +98,9 @@ export async function syncBankAccount(
   const finishDate = formatDateOnly(now);
 
   const result: SyncResult = { scanned: 0, created: 0, updated: 0, matched: 0, errors: [] };
+
+  const paymentToCustomer = new Map<string, string | null>();
+  const customerNames = new Map<string, string | null>();
 
   let offset = 0;
   const limit = 100;
@@ -86,6 +125,17 @@ export async function syncBankAccount(
           item.id,
         );
 
+        let description = describe(item);
+        if (item.payment && description === PIX_GENERIC_DESCRIPTION) {
+          const customerName = await resolveCustomerName(
+            client,
+            item.payment,
+            paymentToCustomer,
+            customerNames,
+          );
+          if (customerName) description = customerName;
+        }
+
         const payload: InsertAsaasImport = {
           accountId: bankAccount.accountId,
           bankAccountId: bankAccount.id,
@@ -98,7 +148,7 @@ export async function syncBankAccount(
           amount: absValue,
           dueDate: txDate,
           paymentDate: txDate,
-          description: describe(item),
+          description,
           externalReference: null,
           billingType: null,
           isPaid: true,
