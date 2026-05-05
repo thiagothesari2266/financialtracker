@@ -215,8 +215,13 @@ export default function Transactions() {
   );
 
   // Previsão = saldo atual + movimentações não pagas até o fim do período (mesmos filtros do saldo)
+  // Virtuais (ocorrências geradas pelo backend) têm virtualDate; templates reais, não.
+  // Sem o check de virtualDate, virtuais futuros eram excluídos da previsão.
   const isTemplateMensal = (t: TransactionWithCategory) =>
-    t.launchType === 'recorrente' && t.recurrenceFrequency === 'mensal' && !t.isException;
+    t.launchType === 'recorrente' &&
+    t.recurrenceFrequency === 'mensal' &&
+    !t.isException &&
+    !t.virtualDate;
 
   const movimentacoesPrevistas = allTransactionsUntilPeriod
     .filter((t) => !t.paid && t.bankAccountId != null && !isTemplateMensal(t))
