@@ -7,8 +7,8 @@ export interface AsaasFinancialTransaction {
   value: number;
   date: string;
   description: string | null;
-  payment?: string | null;
-  transfer?: string | null;
+  paymentId?: string | null;
+  transferId?: string | null;
   netValue?: number;
 }
 

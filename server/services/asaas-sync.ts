@@ -119,17 +119,24 @@ export async function syncBankAccount(
         // Ignorar transações com data futura (ex: boletos com vencimento futuro)
         if (txDate > finishDate) continue;
 
+        // Para entityType 'payment', usar paymentId como asaasTransactionId
+        // (mesmo id usado pelo webhook), garantindo dedup via upsert.
+        // Para fees/transfers/saques, usar item.id (financialTransaction id).
+        const canonicalTxId = entityType === 'payment' && item.paymentId
+          ? item.paymentId
+          : item.id;
+
         const existing = await AsaasImportRepo.findAsaasImportByEntityRef(
           bankAccount.accountId,
           entityType,
-          item.id,
+          canonicalTxId,
         );
 
         let description = describe(item);
-        if (item.payment && description === PIX_GENERIC_DESCRIPTION) {
+        if (item.paymentId && description === PIX_GENERIC_DESCRIPTION) {
           const customerName = await resolveCustomerName(
             client,
-            item.payment,
+            item.paymentId,
             paymentToCustomer,
             customerNames,
           );
@@ -139,8 +146,8 @@ export async function syncBankAccount(
         const payload: InsertAsaasImport = {
           accountId: bankAccount.accountId,
           bankAccountId: bankAccount.id,
-          asaasPaymentId: item.payment ?? null,
-          asaasTransactionId: item.id,
+          asaasPaymentId: item.paymentId ?? null,
+          asaasTransactionId: canonicalTxId,
           asaasEntityType: entityType,
           direction,
           event: item.type,
