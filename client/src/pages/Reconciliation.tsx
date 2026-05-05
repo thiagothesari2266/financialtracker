@@ -25,6 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import {
@@ -527,8 +528,15 @@ export default function Reconciliation() {
                                   {formatDateBR(displayDate)}
                                 </div>
                               </TableCell>
-                              <TableCell className="max-w-[200px] truncate text-sm">
-                                {displayDescription}
+                              <TableCell className="max-w-[200px] text-sm">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="truncate cursor-default">{displayDescription}</div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-md break-words">
+                                    {displayDescription}
+                                  </TooltipContent>
+                                </Tooltip>
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground">
                                 {labelMethod(imp)}
