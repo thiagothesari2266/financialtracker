@@ -77,6 +77,9 @@ export async function syncBankAccount(
         const absValue = Math.abs(item.value).toFixed(2);
         const txDate = item.date ? formatDateOnly(item.date) : formatDateOnly(now);
 
+        // Ignorar transações com data futura (ex: boletos com vencimento futuro)
+        if (txDate > finishDate) continue;
+
         const existing = await AsaasImportRepo.findAsaasImportByEntityRef(
           bankAccount.accountId,
           entityType,
