@@ -36,7 +36,6 @@ import {
   ChevronRight,
   Clock,
   CreditCard,
-  Filter,
   Plus,
   Search,
   Target,
@@ -53,6 +52,11 @@ import { SummaryCard } from '@/components/ui/summary-card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn, formatCurrency } from '@/lib/utils';
 import type { TransactionWithCategory } from '@shared/schema';
+import {
+  TransactionsFilterPopover,
+  emptyFilters,
+  type TransactionFilters,
+} from '@/components/Transactions/TransactionsFilterPopover';
 
 type ViewType = 'month' | 'week' | 'day';
 
@@ -71,6 +75,7 @@ export default function Transactions() {
   );
   const [editScope, setEditScope] = useState<'single' | 'all' | 'future' | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState<TransactionFilters>(emptyFilters);
 
   const [currentDate, setCurrentDate] = useState(() => todayBR());
   const [viewType, setViewType] = useState<ViewType>('month');
@@ -340,16 +345,74 @@ export default function Transactions() {
   };
 
   const filteredTransactions = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     return [...transactions]
-      .filter((transaction) => {
+      .filter((t) => {
+        // --- filtros do popover ---
+        if (filters.types.size > 0 && !filters.types.has(t.type as 'income' | 'expense')) {
+          return false;
+        }
+
+        if (filters.statuses.size > 0) {
+          const tDate = new Date(t.date);
+          tDate.setHours(0, 0, 0, 0);
+          const isPaid = t.paid;
+          const isOverdueT = !t.paid && tDate < today;
+          const isPending = !t.paid && tDate >= today;
+
+          const matchesStatus =
+            (filters.statuses.has('paid') && isPaid) ||
+            (filters.statuses.has('overdue') && isOverdueT) ||
+            (filters.statuses.has('pending') && isPending);
+          if (!matchesStatus) return false;
+        }
+
+        if (filters.categoryIds.size > 0) {
+          if (t.categoryId == null || !filters.categoryIds.has(t.categoryId)) return false;
+        }
+
+        if (filters.bankAccountIds.size > 0) {
+          if (t.bankAccountId == null || !filters.bankAccountIds.has(t.bankAccountId)) return false;
+        }
+
+        if (filters.creditCardIds.size > 0) {
+          if (t.creditCardId == null || !filters.creditCardIds.has(t.creditCardId)) return false;
+        }
+
+        if (filters.launchTypes.size > 0) {
+          const isFatura = t.isInvoiceTransaction;
+          // transação sem launchType é tratada como "unica"
+          const lt = (t.launchType || 'unica') as 'unica' | 'parcelada' | 'recorrente';
+
+          const matchesLaunch =
+            (filters.launchTypes.has('fatura') && isFatura) ||
+            (filters.launchTypes.has(lt) && !isFatura);
+          if (!matchesLaunch) return false;
+        }
+
+        if (filters.amountMin !== '') {
+          if (parseFloat(t.amount) < parseFloat(filters.amountMin)) return false;
+        }
+
+        if (filters.amountMax !== '') {
+          if (parseFloat(t.amount) > parseFloat(filters.amountMax)) return false;
+        }
+
+        // --- filtro de busca por texto ---
         const term = searchTerm.toLowerCase();
-        return (
-          transaction?.description?.toLowerCase().includes(term) ||
-          transaction?.category?.name?.toLowerCase().includes(term)
-        );
+        if (term) {
+          return (
+            t?.description?.toLowerCase().includes(term) ||
+            t?.category?.name?.toLowerCase().includes(term)
+          );
+        }
+
+        return true;
       })
       .sort((a, b) => a.date.localeCompare(b.date));
-  }, [transactions, searchTerm]);
+  }, [transactions, searchTerm, filters]);
 
   const handleEditTransaction = (transaction: TransactionWithCategory) => {
     setSelectedTransaction(transaction);
@@ -508,10 +571,13 @@ export default function Transactions() {
                 />
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline">
-                  <Filter className="mr-2 h-4 w-4" />
-                  Filtros
-                </Button>
+                <TransactionsFilterPopover
+                  filters={filters}
+                  onChange={setFilters}
+                  accountId={currentAccount?.id ?? 0}
+                  bankAccounts={bankAccounts}
+                  creditCards={creditCards}
+                />
               </div>
             </CardContent>
           </Card>
