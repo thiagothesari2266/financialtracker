@@ -1,8 +1,10 @@
+import { randomUUID } from 'crypto';
 import * as CategoryRepo from '../storage/category.repository';
 import * as TransactionRepo from '../storage/transaction.repository';
 import * as AsaasImportRepo from '../storage/asaas-import.repository';
 import * as AccountRepo from '../storage/account.repository';
 import { prisma } from '../db';
+import { addMonthsPreserveDay } from '../storage/utils';
 import type { AsaasImportDirection } from '@shared/schema';
 
 // ---- Helper: buscar ou criar categoria "Asaas" por direcao ----
@@ -27,21 +29,113 @@ export async function getOrCreateAsaasCategory(
 
 // ---- Ações atômicas por import ----
 
+function isMonthlyRecurrenceTemplate(tx: { launchType: string | null; recurrenceFrequency: string | null; isException: boolean }): boolean {
+  return tx.launchType === 'recorrente'
+    && tx.recurrenceFrequency === 'mensal'
+    && !tx.isException;
+}
+
+/**
+ * Para um template recorrente mensal, calcula a data canônica da ocorrência
+ * mais próxima de targetDate (alinhada com o ciclo do template).
+ */
+function alignToTemplateCycle(templateDate: Date, targetDate: Date): Date {
+  const monthsDiff =
+    (targetDate.getUTCFullYear() - templateDate.getUTCFullYear()) * 12 +
+    (targetDate.getUTCMonth() - templateDate.getUTCMonth());
+  return addMonthsPreserveDay(templateDate, monthsDiff);
+}
+
+function parseDate(input: Date | string): Date {
+  if (input instanceof Date) return input;
+  return new Date(input.includes('T') ? input : `${input}T00:00:00.000Z`);
+}
+
 export async function applyMatch(importId: number, transactionId: number): Promise<void> {
   const asaasImport = await AsaasImportRepo.getAsaasImportById(importId);
   if (!asaasImport) throw new Error(`Import ${importId} não encontrado`);
 
   const externalId = asaasImport.asaasPaymentId ?? asaasImport.asaasTransactionId ?? null;
+  const paymentDate = asaasImport.paymentDate ?? asaasImport.dueDate;
 
-  await TransactionRepo.updateTransaction(transactionId, {
-    paid: true,
-    externalId,
-    paymentMethod: asaasImport.billingType ?? null,
-  });
+  const target = await prisma.transaction.findUnique({ where: { id: transactionId } });
+  if (!target) throw new Error(`Transação ${transactionId} não encontrada`);
+
+  let resolvedTransactionId = transactionId;
+
+  if (isMonthlyRecurrenceTemplate(target)) {
+    // Template recorrente: criar exceção paga em vez de marcar o template
+    let groupId = target.recurrenceGroupId;
+    if (!groupId) {
+      groupId = randomUUID();
+      await prisma.transaction.update({
+        where: { id: target.id },
+        data: { recurrenceGroupId: groupId },
+      });
+    }
+
+    const referenceDate = parseDate(paymentDate);
+    const exceptionForDate = alignToTemplateCycle(target.date, referenceDate);
+
+    const existing = await prisma.transaction.findFirst({
+      where: {
+        accountId: target.accountId,
+        recurrenceGroupId: groupId,
+        isException: true,
+        exceptionForDate,
+      },
+    });
+
+    if (existing) {
+      const updated = await prisma.transaction.update({
+        where: { id: existing.id },
+        data: {
+          paid: true,
+          externalId,
+          paymentMethod: asaasImport.billingType ?? existing.paymentMethod,
+          date: referenceDate,
+        },
+      });
+      resolvedTransactionId = updated.id;
+    } else {
+      const created = await prisma.transaction.create({
+        data: {
+          description: target.description,
+          amount: asaasImport.amount,
+          type: target.type,
+          date: referenceDate,
+          categoryId: target.categoryId,
+          accountId: target.accountId,
+          bankAccountId: asaasImport.bankAccountId ?? target.bankAccountId,
+          paymentMethod: asaasImport.billingType ?? target.paymentMethod,
+          clientName: target.clientName,
+          projectName: target.projectName,
+          costCenter: target.costCenter,
+          isException: true,
+          exceptionForDate,
+          recurrenceGroupId: groupId,
+          launchType: 'unica',
+          recurrenceFrequency: null,
+          recurrenceEndDate: null,
+          installments: 1,
+          currentInstallment: 1,
+          paid: true,
+          externalId,
+        },
+      });
+      resolvedTransactionId = created.id;
+    }
+  } else {
+    await TransactionRepo.updateTransaction(transactionId, {
+      paid: true,
+      externalId,
+      paymentMethod: asaasImport.billingType ?? null,
+    });
+  }
 
   await AsaasImportRepo.updateAsaasImport(importId, {
     status: 'matched',
-    matchedTransactionId: transactionId,
+    matchedTransactionId: resolvedTransactionId,
     resolvedAt: new Date().toISOString(),
   });
 }

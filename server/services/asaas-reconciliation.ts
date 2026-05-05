@@ -1,5 +1,5 @@
 import { prisma } from '../db';
-import { addDays, differenceInDays } from '../storage/utils';
+import { addDays, addMonthsPreserveDay, differenceInDays } from '../storage/utils';
 
 export interface AsaasImportData {
   amount: string | number;
@@ -198,7 +198,7 @@ export async function getMatchCandidates(
     },
   });
 
-  return transactions.map((tx) => ({
+  const candidates: MatchCandidate[] = transactions.map((tx) => ({
     id: tx.id,
     amount: tx.amount.toString(),
     date: tx.date,
@@ -206,4 +206,82 @@ export async function getMatchCandidates(
     bankAccountId: tx.bankAccountId ?? null,
     externalId: tx.externalId ?? null,
   }));
+
+  // Templates recorrentes mensais: gerar ocorrência virtual no range
+  // (cobre o caso onde a data do template está fora do range mas a próxima
+  // ocorrência calculada cai dentro).
+  const physicalIds = new Set(candidates.map((c) => c.id));
+  const templates = await prisma.transaction.findMany({
+    where: {
+      accountId,
+      type: direction,
+      launchType: 'recorrente',
+      recurrenceFrequency: 'mensal',
+      isException: false,
+      ...bankAccountFilter,
+    },
+    select: {
+      id: true,
+      amount: true,
+      date: true,
+      description: true,
+      bankAccountId: true,
+      recurrenceEndDate: true,
+      recurrenceGroupId: true,
+    },
+  });
+
+  for (const template of templates) {
+    if (physicalIds.has(template.id)) continue;
+    const occurrence = nextOccurrenceInRange(
+      template.date,
+      template.recurrenceEndDate,
+      dateMin,
+      dateMax,
+    );
+    if (!occurrence) continue;
+
+    // Pular se já existe exceção paga nessa ocorrência
+    if (template.recurrenceGroupId) {
+      const existingException = await prisma.transaction.findFirst({
+        where: {
+          accountId,
+          recurrenceGroupId: template.recurrenceGroupId,
+          isException: true,
+          exceptionForDate: occurrence,
+        },
+        select: { id: true, paid: true, externalId: true },
+      });
+      if (existingException && (existingException.paid || existingException.externalId)) {
+        continue;
+      }
+    }
+
+    candidates.push({
+      id: template.id,
+      amount: template.amount.toString(),
+      date: occurrence,
+      description: template.description,
+      bankAccountId: template.bankAccountId ?? null,
+      externalId: null,
+    });
+  }
+
+  return candidates;
+}
+
+function nextOccurrenceInRange(
+  templateDate: Date,
+  recurrenceEndDate: Date | null,
+  rangeMin: Date,
+  rangeMax: Date,
+): Date | null {
+  // Procura ocorrência (templateDate + N meses) que caia dentro do range
+  for (let offset = 0; offset <= 240; offset++) {
+    const occurrence = addMonthsPreserveDay(templateDate, offset);
+    if (occurrence > rangeMax) return null;
+    if (recurrenceEndDate && occurrence > recurrenceEndDate) return null;
+    if (occurrence >= rangeMin) return occurrence;
+  }
+  return null;
 }
