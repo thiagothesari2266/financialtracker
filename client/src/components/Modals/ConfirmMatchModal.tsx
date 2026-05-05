@@ -57,12 +57,7 @@ export default function ConfirmMatchModal({
   });
 
   const direction = asaasImport.direction ?? 'income';
-  const unpaidTransactions = transactions.filter((t) => {
-    if (t.paid || t.type !== direction) return false;
-    const isRecurrenceTemplate =
-      t.launchType === 'recorrente' && t.recurrenceFrequency === 'mensal';
-    return !isRecurrenceTemplate;
-  });
+  const unpaidTransactions = transactions.filter((t) => !t.paid && t.type === direction);
 
   const selectedTransaction =
     unpaidTransactions.find((t) => t.id === selectedTransactionId) ??
