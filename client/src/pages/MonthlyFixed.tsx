@@ -32,6 +32,8 @@ export default function MonthlyFixed() {
   const { data: monthlyFixed, isLoading } = useQuery<MonthlyFixedSummary>({
     queryKey: [`/api/accounts/${currentAccount?.id}/monthly-fixed`],
     enabled: !!currentAccount,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   const normalizeAmountForApi = (raw: string) => {
