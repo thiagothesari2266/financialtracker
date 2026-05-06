@@ -66,7 +66,7 @@ server.tool(
 
 server.tool(
   "nexfin_criar_fluxo_fixo",
-  "Cria um item de fluxo de caixa fixo (receita ou despesa recorrente mensal)",
+  "Cria um item de fluxo de caixa fixo para PROJEÇÃO de saldo (não aparece em transações). Para transação recorrente real com status pago/pendente, use nexfin_criar_transacao_recorrente.",
   {
     descricao: z.string().describe("Descrição do fluxo fixo"),
     valor: z.coerce.number().positive().describe("Valor mensal"),

@@ -67,6 +67,73 @@ server.tool(
 );
 
 server.tool(
+  "nexfin_criar_transacao_recorrente",
+  "Cria uma transação recorrente mensal (aparece todo mês na lista de transações com status pago/pendente). Diferente de fluxo fixo que é só projeção.",
+  {
+    descricao: z.string().describe("Descrição da transação"),
+    valor: z.coerce.number().positive().describe("Valor mensal"),
+    tipo: z
+      .enum(["income", "expense"])
+      .describe("Tipo: income (receita) ou expense (despesa)"),
+    data: z.string().describe("Data da primeira ocorrência YYYY-MM-DD (o dia define o dia de repetição)"),
+    categoriaId: z
+      .number()
+      .describe("ID da categoria (use nexfin_categorias)"),
+    accountId: z.coerce.number().describe("ID da conta (use nexfin_contas)"),
+    dataFim: z
+      .string()
+      .optional()
+      .describe("Data fim da recorrência YYYY-MM-DD (opcional, null = sem fim)"),
+    pago: z.boolean().default(false).describe("Se a primeira ocorrência já foi paga (padrão: false)"),
+    bankAccountId: z
+      .number()
+      .optional()
+      .describe("ID da conta bancária (opcional)"),
+  },
+  async ({ descricao, valor, tipo, data, categoriaId, accountId, dataFim, pago, bankAccountId }) => {
+    if (!(await assertAccountOwnership(accountId))) {
+      return { content: [{ type: "text" as const, text: `Erro: conta ID ${accountId} não pertence ao usuário atual.` }] };
+    }
+    const groupId = crypto.randomUUID();
+    const res = await pool.query(
+      `INSERT INTO transactions
+        (description, amount, type, date, category_id, account_id, paid,
+         launch_type, recurrence_frequency, recurrence_end_date, recurrence_group_id,
+         installments, current_installment, is_invoice_transaction, is_exception,
+         bank_account_id)
+       VALUES ($1, $2, $3, $4::date, $5, $6, $7,
+         'recorrente', 'mensal', $8, $9,
+         1, 1, false, false, $10)
+       RETURNING id, description, amount, type, date, paid`,
+      [descricao, valor, tipo, data, categoriaId, accountId, pago,
+       dataFim ?? null, groupId, bankAccountId ?? null]
+    );
+
+    const row = res.rows[0];
+    if (!row) {
+      return {
+        content: [
+          { type: "text" as const, text: "Erro: resposta inesperada do banco." },
+        ],
+      };
+    }
+
+    const tipoLabel = row.type === "income" ? "Receita" : "Despesa";
+    let output = `## Transação Recorrente Criada\n\n`;
+    output += `- **ID:** ${row.id}\n`;
+    output += `- **Descrição:** ${row.description}\n`;
+    output += `- **Valor:** ${formatBRL(row.amount)}\n`;
+    output += `- **Tipo:** ${tipoLabel}\n`;
+    output += `- **Primeira ocorrência:** ${ensureDateString(row.date)}\n`;
+    output += `- **Frequência:** Mensal\n`;
+    output += `- **Fim:** ${dataFim ?? "Sem fim"}\n`;
+    output += `- **Pago:** ${row.paid ? "Sim" : "Não"}\n`;
+
+    return { content: [{ type: "text" as const, text: output }] };
+  }
+);
+
+server.tool(
   "nexfin_atualizar_transacao",
   "Atualiza uma transação. Para recorrentes, suporta escopo: single (só esta, cria exceção), all (todas do grupo), future (esta e próximas). Use tabela='conta'|'cartao' para desambiguar quando o ID existe em ambas as tabelas.",
   {
